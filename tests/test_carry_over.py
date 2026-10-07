@@ -1,0 +1,17 @@
+from assigntool.model import Dev, Level, SprintRow, SprintSheet
+from assigntool.rules.carry_over import BUSY_STATUSES, carry_over
+
+
+def test_carry_over_counts_busy_tasks_and_subtasks_once_per_pool_dev() -> None:
+    linh = Dev("Linh", "L", Level.MIDDLE, True, ())
+    minh = Dev("Minh", "M", Level.MIDDLE, True, ())
+    rows = (
+        SprintRow(1, "task", "Task", "", ("Linh", "Linh"), "QA - Need Fix", "", None, None, "", ()),
+        SprintRow(2, "subtask", "Subtask", "", ("Linh", "Minh"), "pending", "", None, None, "", ()),
+        SprintRow(3, "subtask", "Subtask", "", ("Minh",), "internal - cant fix", "", None, None, "", ()),
+    )
+    prev = SprintSheet("Sprint 9", 9, None, None, (), rows)
+
+    assert carry_over(prev, (linh, minh)) == {"L": 1, "M": 1}
+    assert carry_over(None, (linh, minh)) == {"L": 0, "M": 0}
+    assert len(BUSY_STATUSES) == 6
