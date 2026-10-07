@@ -6,9 +6,9 @@ from assigntool.model import Finding, Order, Priority, Severity, SprintSheet
 from assigntool.normalize import app_key, parse_priority, text_key
 
 
-def history_findings(csv_used: bool, sheet_names: tuple[str, ...]) -> tuple[Finding, ...]:
-    """Say where familiarity came from when there was no history CSV (spec §5, §9)."""
-    if csv_used:
+def history_findings(file_used: bool, sheet_names: tuple[str, ...]) -> tuple[Finding, ...]:
+    """Say where familiarity came from when there was no history file (spec §5, §9)."""
+    if file_used:
         return ()
     if sheet_names:
         sheets = ", ".join(sheet_names)
@@ -17,7 +17,7 @@ def history_findings(csv_used: bool, sheet_names: tuple[str, ...]) -> tuple[Find
                 Severity.INFO,
                 "HISTORY-FROM-WORKBOOK",
                 sheets,
-                f"Không có file .csv lịch sử; dùng sheet {sheets} trong workbook làm lịch sử.",
+                f"Không có file lịch sử; dùng sheet {sheets} trong workbook làm lịch sử.",
             ),
         )
     return (
@@ -25,7 +25,7 @@ def history_findings(csv_used: bool, sheet_names: tuple[str, ...]) -> tuple[Find
             Severity.WARN,
             "HISTORY-MISSING",
             "Lịch sử",
-            "Không có file .csv lịch sử và workbook không có sheet sprint cũ; coi như chưa ai làm app nào.",
+            "Không có file lịch sử và workbook không có sheet sprint cũ; coi như chưa ai làm app nào.",
         ),
     )
 

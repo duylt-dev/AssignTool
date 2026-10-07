@@ -13,6 +13,8 @@ BUSY_STATUSES = frozenset(
         text_key("ready to progress"),
         text_key("need to be clean"),
         text_key("internal - cant fix"),
+        text_key("internal - need fix"),
+        text_key("đã ro"),
     }
 )
 

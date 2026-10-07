@@ -7,19 +7,21 @@ import contextlib
 import logging
 import sys
 import traceback
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from assigntool import ai_cli
 from assigntool.dev_reader import read_devs
 from assigntool.errors import AssignError, InputError
 from assigntool.history_reader import read_history
-from assigntool.model import Finding, HistoryOrder, Order, Result, Severity, SizeEstimate, Source
+from assigntool.model import BacktestOrder, Dev, Finding, HistoryOrder, Order, Result, Severity, SizeEstimate, Source
+from assigntool.rules.backtest import backtest, percent
+from assigntool.rules.history_window import history_for
 from assigntool.rules.pipeline import build_result
 from assigntool.rules.sizing import build_prompt, default_sizes, parse_reply
 from assigntool.rules.validate import history_findings, orders_and_findings
-from assigntool.sprint_reader import read_sheet_history, read_workbook
-from assigntool.xlsx_report import write_report
+from assigntool.sprint_reader import has_sprint_sheets, read_sheet_history, read_workbook
+from assigntool.xlsx_report import write_backtest, write_report
 
 DEVS_FILE = "devs.xlsx"
 
@@ -43,12 +45,17 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="assigntool", description="Đề xuất PIC cho từng đơn đầu sprint.")
+    parser = argparse.ArgumentParser(prog="assigntool", description="Giao PIC cho các đơn còn trống của sprint.")
     parser.add_argument("--input", default="input", help="thư mục chứa file input (mặc định: input/)")
-    parser.add_argument("--sprint", help="workbook sprint .xlsx (mặc định: file .xlsx duy nhất khác devs.xlsx)")
+    parser.add_argument("--sprint", help="file export sprint .xlsx (mặc định: file .xlsx duy nhất có sheet Sprint N)")
     parser.add_argument("--devs", help="file dev (mặc định: <input>/devs.xlsx)")
     parser.add_argument(
-        "--history", help="CSV lịch sử (mặc định: file .csv duy nhất trong --input; không có thì dùng sheet sprint cũ)"
+        "--history",
+        help="file lịch sử Tech manager .xlsx/.csv (mặc định: file .xlsx không có sheet Sprint N hoặc file .csv; "
+        "không có thì dùng sheet sprint cũ)",
+    )
+    parser.add_argument(
+        "--backtest", action="store_true", help="giao lại các sprint Maintain trong file lịch sử và so với TM"
     )
     parser.add_argument("--sheet", help="sheet sprint cần giao (mặc định: Sprint N lớn nhất)")
     parser.add_argument("--out", default="output", help="thư mục ghi báo cáo (mặc định: output/)")
@@ -61,24 +68,33 @@ def _parser() -> argparse.ArgumentParser:
 
 def _run(args: argparse.Namespace) -> int:
     input_dir = Path(args.input)
-    sprint_path = _explicit(args.sprint, "--sprint") or _only_one(
-        [p for p in _files(input_dir, ".xlsx") if p.name.lower() != DEVS_FILE], "file .xlsx export sprint", "--sprint"
-    )
+    workbooks = [p for p in _files(input_dir, ".xlsx") if p.name.lower() != DEVS_FILE]
+    sprint_books = [p for p in workbooks if has_sprint_sheets(p)]
+    sprint_path = None
+    if not args.backtest:
+        sprint_path = _explicit(args.sprint, "--sprint") or _only_one(
+            sprint_books, "file .xlsx export sprint (có sheet Sprint N)", "--sprint"
+        )
     devs_path = _explicit(args.devs, "--devs") or _only_one(
         [p for p in _files(input_dir, ".xlsx") if p.name.lower() == DEVS_FILE], f"file {DEVS_FILE}", "--devs"
     )
     history_path = _explicit(args.history, "--history") or _at_most_one(
-        _files(input_dir, ".csv"), "file .csv lịch sử", "--history"
+        [*_files(input_dir, ".csv"), *(p for p in workbooks if p not in sprint_books)], "file lịch sử", "--history"
     )
+    if args.backtest:
+        if history_path is None:
+            raise InputError("Không tìm thấy file lịch sử để backtest. Chỉ định bằng --history.")
+        return _backtest(read_history(history_path), read_devs(devs_path), history_path, Path(args.out))
 
     target, prev, prev_name = read_workbook(sprint_path, args.sheet)
     devs = read_devs(devs_path)
     if history_path is not None:
-        history, history_note = read_history(history_path), f"file {history_path.name}"
+        history = history_for(read_history(history_path), target.number, target.start, target.end, date.today())
+        history_note = f"file {history_path.name} ({len(history)} đơn gốc)"
         sheets: tuple[str, ...] = ()
     else:
         history, sheets = read_sheet_history(sprint_path, target.number)
-        history_note = f"sheet {', '.join(sheets)} trong workbook (không có file .csv)" if sheets else "không có"
+        history_note = f"sheet {', '.join(sheets)} trong workbook (không có file lịch sử)" if sheets else "không có"
     print(f"Lịch sử: {history_note}")
     orders, findings = orders_and_findings(target)
     findings += history_findings(history_path is not None, sheets)
@@ -97,6 +113,26 @@ def _run(args: argparse.Namespace) -> int:
     path = write_report(result, target.headers, Path(args.out), datetime.now())
     _print_summary(result, path)
     return 0
+
+
+def _backtest(history: tuple[HistoryOrder, ...], devs: tuple[Dev, ...], history_path: Path, out_dir: Path) -> int:
+    """Replay the history's Maintain sprints and compare with the TM (D22, spec §13)."""
+    sprints = backtest(history, devs)
+    if not sprints:
+        raise InputError(f"File '{history_path}' không có sprint Maintain nào để backtest.")
+    print(f"Backtest: file {history_path.name}, {len(sprints)} sprint Maintain (mọi đơn M, không tính việc dở)")
+    for sprint in sprints:
+        print(f"{sprint.label.name}: {_matches(sprint.orders)}")
+    print(f"Tổng: {_matches(tuple(order for sprint in sprints for order in sprint.orders))}")
+    print(f"Báo cáo: {write_backtest(sprints, out_dir, datetime.now())}")
+    return 0
+
+
+def _matches(orders: tuple[BacktestOrder, ...]) -> str:
+    if not orders:
+        return "không có đơn để so"
+    matched = sum(order.matched for order in orders)
+    return f"khớp {matched}/{len(orders)} đơn ({percent(matched, len(orders))}%)"
 
 
 def _sizes(

@@ -1,7 +1,7 @@
 [project]
 name = "assigntool"
 version = "0.1.0"
-description = "Đề xuất dev phụ trách (PIC) cho từng đơn đầu sprint"
+description = "Giao dev phụ trách (PIC) cho các đơn còn trống của sprint"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = ["openpyxl>=3.1"]

@@ -7,7 +7,7 @@ from assigntool.normalize import text_key
 from assigntool.rules.familiarity import FamiliarityIndex
 from assigntool.rules.reasons import PREASSIGNED_REASON, proposed_reason
 
-GAP_HOURS = 16
+GAP_ORDERS = 1  # D26: a dev may hold at most one order more than the least-loaded dev
 
 
 def assign(
@@ -39,8 +39,8 @@ def assign(
     pending = sorted((order for order in orders if not order.row.assignees), key=_processing_key)
     for order in pending:
         needs_senior = order.priority in (Priority.URGENT, Priority.HIGH) or fam.is_new_app(order.row.app)
-        cap_limit = min(loads.values()) + GAP_HOURS
-        capped = tuple(dev for dev in pool if loads[dev.code] <= cap_limit)
+        cap_limit = min(counts.values()) + GAP_ORDERS
+        capped = tuple(dev for dev in pool if counts[dev.code] <= cap_limit)
 
         def key(
             dev: Dev,
@@ -62,9 +62,9 @@ def assign(
         backups = tuple(dev.code for dev in sorted((dev for dev in pool if dev != pic), key=key)[:2])
         pic_rank, pic_gap = key(pic)[:2]
         outside_cap = sorted((dev for dev in pool if dev not in capped), key=key)
-        excluded = tuple((dev.code, loads[dev.code]) for dev in outside_cap if key(dev)[0] < pic_rank)
+        excluded = tuple((dev.code, counts[dev.code]) for dev in outside_cap if key(dev)[0] < pic_rank)
         excluded_senior = tuple(
-            (dev.code, loads[dev.code]) for dev in outside_cap if key(dev)[0] == pic_rank and key(dev)[1] < pic_gap
+            (dev.code, counts[dev.code]) for dev in outside_cap if key(dev)[0] == pic_rank and key(dev)[1] < pic_gap
         )
         senior_cause = (
             "priority"

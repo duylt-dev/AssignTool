@@ -1,4 +1,5 @@
-"""Write the Excel report (spec §10). The only module that writes openpyxl workbooks."""
+"""Write the Excel reports: the assignment (spec §10) and the backtest (spec §13). The only module that writes
+openpyxl workbooks."""
 
 from __future__ import annotations
 
@@ -12,7 +13,8 @@ from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
-from assigntool.model import Assignment, DevSummary, Finding, Level, Result
+from assigntool.model import Assignment, BacktestSprint, DevSummary, Finding, Level, Result
+from assigntool.rules.backtest import percent
 
 _EXTRA_HEADERS = (
     "Độ lớn",
@@ -38,6 +40,20 @@ _DEV_HEADERS = (
     "Tổng giờ ước tính",
     "Danh sách đơn",
     "App đã làm",
+)
+_SPRINT_HEADERS = ("Sprint", "Bắt đầu", "Kết thúc", "Đơn so sánh", "Khớp", "Tỉ lệ khớp", "Đơn mang sang")
+_ORDER_HEADERS = (
+    "Sprint",
+    "Ngày lên đơn",
+    "App",
+    "Đơn",
+    "Ưu tiên",
+    "TM giao",
+    "Tool giao",
+    "Khớp",
+    "Dự phòng 1",
+    "Dự phòng 2",
+    "Lý do của tool",
 )
 _LEVEL_NAMES = {
     Level.JUNIOR: "junior",
@@ -67,6 +83,61 @@ def write_report(result: Result, headers: tuple[str, ...], out_dir: Path, now: d
     workbook.save(temporary)
     os.replace(temporary, path)
     return path
+
+
+def write_backtest(sprints: tuple[BacktestSprint, ...], out_dir: Path, now: datetime) -> Path:
+    """`backtest_<YYYYMMDD-HHMMSS>.xlsx` with sheets `Theo sprint` and `Theo đơn`, via `.tmp` (spec §13)."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / f"backtest_{now:%Y%m%d-%H%M%S}.xlsx"
+    workbook = Workbook()
+    summary = workbook.active
+    summary.title = "Theo sprint"
+    summary.append(list(_SPRINT_HEADERS))
+    for sprint in sprints:
+        label = sprint.label
+        matched = sum(order.matched for order in sprint.orders)
+        summary.append([label.name, label.start, label.end, *_counts(matched, len(sprint.orders)), sprint.kept])
+    matched = sum(order.matched for sprint in sprints for order in sprint.orders)
+    total = sum(len(sprint.orders) for sprint in sprints)
+    summary.append(["Tổng", None, None, *_counts(matched, total), sum(sprint.kept for sprint in sprints)])
+    _finish(summary)
+    _date_format(summary, 2, 3)
+    detail = workbook.create_sheet("Theo đơn")
+    detail.append(list(_ORDER_HEADERS))
+    for sprint in sprints:
+        for item in sprint.orders:
+            backups = (*item.assignment.backups, "", "")
+            detail.append(
+                [
+                    sprint.label.name,
+                    item.order.created,
+                    item.order.app,
+                    item.order.title,
+                    item.order.priority_raw,
+                    ", ".join(item.tm_codes),
+                    item.assignment.pic_codes[0],
+                    "✓" if item.matched else "✗",
+                    backups[0],
+                    backups[1],
+                    item.assignment.reason,
+                ]
+            )
+    _finish(detail)
+    _date_format(detail, 2, 2)
+    temporary = path.with_name(path.name + ".tmp")
+    workbook.save(temporary)
+    os.replace(temporary, path)
+    return path
+
+
+def _counts(matched: int, total: int) -> list[object]:
+    return [total, matched, f"{percent(matched, total)}%" if total else ""]
+
+
+def _date_format(sheet: Worksheet, first: int, last: int) -> None:
+    for row in sheet.iter_rows(min_row=2, min_col=first, max_col=last):
+        for cell in row:
+            cell.number_format = "DD/MM/YYYY"
 
 
 def _assignments_sheet(sheet: Worksheet, assignments: tuple[Assignment, ...], headers: tuple[str, ...]) -> None:

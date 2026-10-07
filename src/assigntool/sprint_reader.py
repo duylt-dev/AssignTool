@@ -44,8 +44,20 @@ def read_workbook(path: Path, sheet: str | None = None) -> tuple[SprintSheet, Sp
         workbook.close()
 
 
+def has_sprint_sheets(path: Path) -> bool:
+    """True for a sprint export (a sheet named `Sprint N`); input discovery uses it to tell it from history (A2)."""
+    try:
+        workbook = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    except (BadZipFile, InvalidFileException, OSError) as error:
+        raise InputError(f"Không mở được file '{path}': {error}") from error
+    try:
+        return bool(_sprint_sheets(workbook.sheetnames))
+    finally:
+        workbook.close()
+
+
 def read_sheet_history(path: Path, before: int) -> tuple[tuple[HistoryOrder, ...], tuple[str, ...]]:
-    """History from the workbook's sprint sheets numbered below `before`, used when there is no CSV (spec §5).
+    """History from the workbook's sprint sheets numbered below `before`, used when there is no history file (§5).
 
     Returns the orders ("Loại" = Task, with an app, a name and a creation date) and the sheet names read, oldest first.
     """

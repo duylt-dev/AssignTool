@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import enum
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
 
@@ -91,15 +91,32 @@ class Order:
 
 
 @dataclass(frozen=True, slots=True)
-class HistoryOrder:
-    """One "Loại" = "Task" row of the history CSV (spec §5)."""
+class SprintLabel:
+    """One sprint named in the history's "Sprint" cell, e.g. "Sprint 10 (10/6 - 10/17)" (spec §5, A24).
 
-    sprint: str
+    Two labels are the same sprint when number, start and end agree: "Sprint 1" exists on two boards with the same
+    start date (A21).
+    """
+
+    number: int
+    start: date
+    end: date
+    name: str = field(default="", compare=False)  # the label as written
+
+
+@dataclass(frozen=True, slots=True)
+class HistoryOrder:
+    """One root order of the history: a row of the Tech manager export (spec §5) or of an older sprint sheet."""
+
+    sprint: str  # quoted in reasons: the "Sprint" cell as written ("" when empty), or the sheet name
     app: str
     title: str
     assignees: tuple[str, ...]
-    hours: float | None  # "Ước lượng (h)"
-    created: date
+    hours: float | None  # "Ước lượng (h)", when the file has it
+    created: date  # "Ngày lên đơn" / "Ngày tạo"
+    sprints: tuple[SprintLabel, ...] = ()  # parsed from `sprint`; empty for sheet history
+    priority_raw: str = ""  # "Ưu tiên" as written; used by the backtest
+    due: date | None = None  # "Due date"; used by the backtest
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,3 +177,23 @@ class Result:
     assignments: tuple[Assignment, ...]  # in source STT order
     findings: tuple[Finding, ...]
     devs: tuple[DevSummary, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestOrder:
+    """One order the TM gave to pool devs, assigned again by the tool (D22, A29)."""
+
+    order: HistoryOrder
+    tm_codes: tuple[str, ...]  # pool devs the TM named
+    assignment: Assignment  # the tool's choice, made without the TM's names
+
+    @property
+    def matched(self) -> bool:
+        return self.assignment.pic_codes[0] in self.tm_codes
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestSprint:
+    label: SprintLabel
+    orders: tuple[BacktestOrder, ...]  # compared orders, in the order they were assigned
+    kept: int  # orders carried over from an earlier Maintain sprint, kept as the TM assigned them
