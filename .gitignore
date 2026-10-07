@@ -1,0 +1,21 @@
+# AI config: settings.json and .env hold GEMINI_API_KEY in plain text
+.claude/
+
+# Docs for AI agents, kept local (D18)
+LLM.md
+AGENTS.md
+
+# Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# OS and editors
+.DS_Store
+~$*
+*.tmp
