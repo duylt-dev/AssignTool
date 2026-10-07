@@ -1,4 +1,4 @@
-"""Acceptance on the real sample: the tables of spec §12, through the CLI, with --ai off."""
+"""Acceptance on the real sample: the tables of spec §12 and §13, through the CLI, with --ai off."""
 
 from __future__ import annotations
 
@@ -10,23 +10,26 @@ from openpyxl import load_workbook
 from assigntool.cli import main
 from assigntool.sprint_reader import read_workbook
 from tests.conftest import build_devs, write_history_csv
-from tests.sample import DEVS, SAMPLE, SKIP_REASON, history_rows
+from tests.sample import DEVS, SAMPLE, SKIP_REASON, TECH, TECH_SKIP_REASON, history_rows
 
 pytestmark = [pytest.mark.real_input, pytest.mark.skipif(not SAMPLE.is_file(), reason=SKIP_REASON)]
 
 
-def _run(tmp_path: Path, workbook: Path, *, csv: bool = True) -> Path:
-    """csv=True: history = a CSV of sheet Sprint 9 (runs A, B). csv=False: no CSV, so the older sheets (runs C, D)."""
+def _run(tmp_path: Path, workbook: Path, *, csv: bool = True, history: Path | None = None) -> Path:
+    """csv=True: history = sheet Sprint 9 as a Tech manager CSV (runs A, B). csv=False: no history file, so the older
+    sheets (runs C, D). history: that file (run E)."""
     source = tmp_path / "input"
     source.mkdir()
     devs = source / "devs.xlsx"
     build_devs(devs, DEVS)
-    if csv:
+    if csv and history is None:
         _, previous, _ = read_workbook(SAMPLE)
         write_history_csv(source / "history.csv", history_rows(previous))
     out = tmp_path / "out"
+    flags = ["--history", str(history)] if history else []
     code = main(
         ["--input", str(source), "--sprint", str(workbook), "--devs", str(devs), "--out", str(out), "--ai", "off"]
+        + flags
     )
     assert code == 0
     (report,) = out.glob("assignment_sprint-10_*.xlsx")
@@ -136,4 +139,64 @@ def test_run_d_backtest_without_csv_matches_the_spec_table(tmp_path: Path) -> No
         "MinhNM": 32,
         "AnTD": 32,
         "TiếnBV": 0,
+    }
+
+
+@pytest.mark.skipif(not TECH.is_file(), reason=TECH_SKIP_REASON)
+def test_run_e_tech_manager_history_proposes_an_for_roblox(tmp_path: Path) -> None:
+    report = _run(tmp_path, SAMPLE, history=TECH)
+
+    roblox = {r["STT"]: r for r in _table(report, "Phân công")}[10]
+    assert (roblox["Mã PIC"], roblox["Dự phòng 1"], roblox["Dự phòng 2"]) == ("AnTD", "MinhNM", "TiếnBV")
+    assert roblox["Lý do"].startswith("Làm version gần nhất của Roblox skin (Sprint 8 (9/4 - 9/18): 1.0.1 - Add ads)")
+    assert [r["Mức"] for r in _table(report, "Cảnh báo")] == ["Không có cảnh báo"]
+    assert {code: hours for code, (_, hours, _) in _devs(report).items()} == {
+        "LinhNV": 32,
+        "MinhNM": 16,
+        "AnTD": 48,
+        "TiếnBV": 16,
+    }
+
+
+@pytest.mark.skipif(not TECH.is_file(), reason=TECH_SKIP_REASON)
+def test_run_f_backtest_on_the_tech_manager_file_matches_the_spec_table(tmp_path: Path) -> None:
+    source = tmp_path / "input"
+    source.mkdir()
+    build_devs(source / "devs.xlsx", DEVS)
+    out = tmp_path / "out"
+
+    assert main(["--input", str(source), "--history", str(TECH), "--out", str(out), "--backtest"]) == 0
+
+    (report,) = out.glob("backtest_*.xlsx")
+    rows = _table(report, "Theo sprint")
+    assert [(r["Sprint"], r["Khớp"], r["Đơn so sánh"], r["Đơn mang sang"]) for r in rows] == [
+        ("Sprint 14 (1/26 - 2/12)", 0, 1, 0),
+        ("Sprint 15 (2/24 - 3/13)", 2, 5, 0),
+        ("Sprint 16 (3/16 - 3/31)", 1, 4, 2),
+        ("Sprint 17 (4/2 - 4/14)", 0, 3, 3),
+        ("Sprint 18 (4/17 - 4/29)", 0, 3, 3),
+        ("Sprint 19 (5/6 - 5/20)", 0, 3, 3),
+        ("Sprint 1 (5/22 - 6/5)", 3, 7, 0),
+        ("Sprint 2 (6/5 - 6/19)", 5, 8, 0),
+        ("Sprint 3 (6/22 - 7/3)", 2, 6, 0),
+        ("Sprint 4 (7/7 - 7/17)", 7, 11, 0),
+        ("Sprint 5 (7/28 - 8/10)", 4, 6, 0),
+        ("Sprint 6 (8/10 - 8/14)", 2, 3, 0),
+        ("Sprint 7 (8/17 - 8/28)", 3, 7, 0),
+        ("Sprint 8 (9/4 - 9/18)", 2, 9, 0),
+        ("Sprint 9 (9/21 - 10/2)", 8, 11, 0),
+        ("Sprint 10 (10/6 - 10/17)", 4, 5, 0),
+        ("Tổng", 43, 92, 11),
+    ]
+    sprint_10 = {
+        r["App"]: (r["TM giao"], r["Tool giao"])
+        for r in _table(report, "Theo đơn")
+        if r["Sprint"].startswith("Sprint 10 ")
+    }
+    assert sprint_10 == {
+        "PS Remote": ("MinhNM", "LinhNV"),
+        "Game Emulator": ("AnTD", "AnTD"),
+        "Auto click": ("AnTD", "AnTD"),
+        "Phone Cleaner": ("LinhNV, TiếnBV", "TiếnBV"),
+        "spin wheel 2": ("LinhNV", "LinhNV"),
     }

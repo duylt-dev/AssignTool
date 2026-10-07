@@ -26,7 +26,27 @@ SPRINT_HEADERS = [
 ]
 
 DEV_HEADERS = ["Tên", "Mã", "Level", "Nhận việc", "Ngày nghỉ"]
-HISTORY_HEADERS = ["Sprint", "STT", "Task", "Loại", "App Name", "Người làm", "Ước lượng (h)", "Ngày tạo"]
+# The history export (list "Tech manager", spec §5): 18 columns, header on row 1, one sheet per month.
+TECH_HEADERS = [
+    "Ngày lên đơn",
+    "ID",
+    "Tên task",
+    "Loại",
+    "Task cha",
+    "Trạng thái",
+    "Ưu tiên",
+    "App Name",
+    "Task type",
+    "Người làm",
+    "Người tạo",
+    "Sprint",
+    "Start date",
+    "Due date",
+    "Ngày đóng",
+    "Điểm",
+    "Đánh giá DEV",
+    "Đánh giá Test",
+]
 
 
 def build_sprint_workbook(
@@ -65,17 +85,39 @@ def build_devs(path: Path, rows: list[dict]) -> None:
     workbook.save(path)
 
 
+def build_history_xlsx(path: Path, months: dict[str, list[dict]]) -> None:
+    """The Tech manager export: a "Tổng hợp" summary sheet first, then one sheet per month."""
+    workbook = Workbook()
+    summary = workbook.active
+    summary.title = "Tổng hợp"
+    summary.append(["Tháng", "Tổng task", "Task", "Bug", "Task gốc", "Subtask"])
+    summary.append(["Tháng 9/2026", None, None, None, None, None])
+    for name, rows in months.items():
+        worksheet = workbook.create_sheet(name)
+        worksheet.append(TECH_HEADERS)
+        for row in rows:
+            worksheet.append([row.get(header) for header in TECH_HEADERS])
+    workbook.save(path)
+
+
 def write_history_csv(
-    path: Path, rows: list[dict], *, bom: bool = False, delimiter: str = ",", date_style: str = "iso"
+    path: Path,
+    rows: list[dict],
+    *,
+    bom: bool = False,
+    delimiter: str = ",",
+    date_style: str = "iso",
+    headers: list[str] = TECH_HEADERS,
 ) -> None:
+    """The same export saved as CSV; `date_style="dmy"` writes "Ngày lên đơn" as DD/MM/YYYY."""
     with path.open("w", encoding="utf-8-sig" if bom else "utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=HISTORY_HEADERS, delimiter=delimiter)
+        writer = csv.DictWriter(handle, fieldnames=headers, delimiter=delimiter)
         writer.writeheader()
         for values in rows:
-            row = {header: values.get(header, "") for header in HISTORY_HEADERS}
-            if date_style == "dmy" and isinstance(row["Ngày tạo"], (date, datetime)):
-                row["Ngày tạo"] = row["Ngày tạo"].strftime("%d/%m/%Y")
-            elif date_style == "dmy" and row["Ngày tạo"]:
-                parsed = datetime.fromisoformat(str(row["Ngày tạo"]))
-                row["Ngày tạo"] = parsed.strftime("%d/%m/%Y")
+            row = {header: values.get(header, "") for header in headers}
+            created = row.get("Ngày lên đơn")
+            if date_style == "dmy" and isinstance(created, (date, datetime)):
+                row["Ngày lên đơn"] = created.strftime("%d/%m/%Y")
+            elif date_style == "dmy" and created:
+                row["Ngày lên đơn"] = datetime.fromisoformat(str(created)).strftime("%d/%m/%Y")
             writer.writerow(row)

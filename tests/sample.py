@@ -9,6 +9,8 @@ from assigntool.normalize import header_key
 
 SAMPLE = Path(__file__).resolve().parents[1] / "input" / "Maintain_update_Sprint_10_va_9.xlsx"
 SKIP_REASON = f"thiếu file mẫu {SAMPLE}"
+TECH = Path(__file__).resolve().parents[1] / "input" / "Tech_manager_T2-T10_2026.xlsx"
+TECH_SKIP_REASON = f"thiếu file lịch sử mẫu {TECH}"
 
 # The pool of D7 / spec §4. These four names are configuration (devs.xlsx), not data copied from input/.
 DEVS = [
@@ -20,18 +22,18 @@ DEVS = [
 
 
 def history_rows(sheet: SprintSheet) -> list[dict]:
-    """The sheet's "Task" rows in the history CSV columns of spec §5."""
-    hours_index = next(i for i, header in enumerate(sheet.headers) if header_key(header) == "ước lượng (h)")
+    """The sheet's orders as rows of the Tech manager export (spec §5), labelled like the export labels them."""
+    label = f"{sheet.name} ({sheet.start.month}/{sheet.start.day} - {sheet.end.month}/{sheet.end.day})"
     return [
         {
-            "Sprint": sheet.name,
-            "STT": row.stt,
-            "Task": row.title,
+            "Ngày lên đơn": f"{row.created.isoformat()} 09:00" if row.created else "",
+            "ID": f"T-{row.stt}",
+            "Tên task": row.title,
             "Loại": "Task",
+            "Task cha": "",
             "App Name": row.app,
             "Người làm": ", ".join(row.assignees),
-            "Ước lượng (h)": row.cells[hours_index] if row.cells[hours_index] is not None else "",
-            "Ngày tạo": row.created.isoformat() if row.created else "",
+            "Sprint": label,
         }
         for row in sheet.rows
         if row.kind == "Task"

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -12,7 +12,7 @@ from assigntool import ai_cli
 from assigntool.cli import main
 from assigntool.model import AiReply
 from assigntool.xlsx_report import report_name
-from tests.conftest import build_devs, build_sprint_workbook, write_history_csv
+from tests.conftest import build_devs, build_history_xlsx, build_sprint_workbook, write_history_csv
 
 ORDER = {
     "STT": 1,
@@ -31,21 +31,18 @@ def _inputs(directory: Path) -> Path:
         {"Sprint 2": [ORDER], "Sprint 1": [{**ORDER, "Người làm": "Dev A", "Trạng thái": "qa - need fix"}]},
     )
     build_devs(directory / "devs.xlsx", [{"Tên": "Dev A", "Mã": "DevA", "Level": "middle", "Nhận việc": "Y"}])
-    write_history_csv(
-        directory / "history.csv",
-        [
-            {
-                "Sprint": "Sprint 1",
-                "Task": "1.0.0",
-                "Loại": "Task",
-                "App Name": "Demo",
-                "Người làm": "Dev A",
-                "Ước lượng (h)": 8,
-                "Ngày tạo": date(2026, 9, 1).isoformat(),
-            }
-        ],
-    )
+    write_history_csv(directory / "history.csv", [HISTORY])
     return directory
+
+
+HISTORY = {
+    "Ngày lên đơn": "2026-09-01 10:00",
+    "Tên task": "1.0.0",
+    "Loại": "Task",
+    "App Name": "Demo",
+    "Người làm": "Dev A",
+    "Sprint": "Sprint 1 (9/22 - 10/3)",
+}
 
 
 def _report(out: Path) -> Path:
@@ -116,22 +113,38 @@ def test_ai_failure_falls_back_to_m_and_still_writes_the_report(tmp_path: Path, 
 @pytest.mark.parametrize(
     ("files", "flags", "message"),
     [
-        ([], [], "Không tìm thấy file .xlsx export sprint. Chỉ định bằng --sprint."),
-        (["a.xlsx", "b.xlsx", "devs.xlsx", "h.csv"], [], "Có nhiều file .xlsx export sprint: a.xlsx, b.xlsx."),
-        (["a.xlsx", "h.csv"], [], "Không tìm thấy file devs.xlsx. Chỉ định bằng --devs."),
+        ([], [], "Không tìm thấy file .xlsx export sprint (có sheet Sprint N). Chỉ định bằng --sprint."),
         (
-            ["a.xlsx", "~$a.xlsx", ".b.xlsx", "devs.xlsx", "h.csv", "g.csv"],
+            ["a.xlsx:sprint", "b.xlsx:sprint", "devs.xlsx:devs", "h.csv"],
             [],
-            "Có nhiều file .csv lịch sử: g.csv, h.csv.",
+            "Có nhiều file .xlsx export sprint (có sheet Sprint N): a.xlsx, b.xlsx.",
         ),
+        (["a.xlsx:sprint", "h.csv"], [], "Không tìm thấy file devs.xlsx. Chỉ định bằng --devs."),
+        (
+            ["a.xlsx:sprint", "~$a.xlsx", ".b.xlsx", "devs.xlsx:devs", "h.csv", "g.csv"],
+            [],
+            "Có nhiều file lịch sử: g.csv, h.csv.",
+        ),
+        (["a.xlsx:sprint", "devs.xlsx:devs", "t.xlsx:history", "h.csv"], [], "Có nhiều file lịch sử: h.csv, t.xlsx."),
+        (["a.xlsx"], [], "Không mở được file"),
         ([], ["--sprint", "missing.xlsx"], "Không có file 'missing.xlsx' (--sprint)."),
+        (["a.xlsx:sprint", "devs.xlsx:devs"], ["--backtest"], "Không tìm thấy file lịch sử để backtest."),
     ],
 )
 def test_input_errors_exit_2_with_a_message(tmp_path: Path, capsys, files, flags, message) -> None:
+    """Discovery reads content: an .xlsx with `Sprint N` sheets is the export, any other .xlsx or .csv is history."""
     source = tmp_path / "input"
     source.mkdir()
-    for name in files:
-        (source / name).write_bytes(b"")
+    for spec in files:
+        name, _, kind = spec.partition(":")
+        if kind == "sprint":
+            build_sprint_workbook(source / name, {"Sprint 1": [ORDER]})
+        elif kind == "devs":
+            build_devs(source / name, [{"Tên": "Dev A", "Mã": "DevA", "Level": "middle", "Nhận việc": "Y"}])
+        elif kind == "history":
+            build_history_xlsx(source / name, {"Tháng 9": [HISTORY]})
+        else:
+            (source / name).write_bytes(b"")
 
     assert main(["--input", str(source), "--out", str(tmp_path / "out"), "--ai", "off", *flags]) == 2
 
@@ -150,7 +163,7 @@ def test_report_name_uses_a_windows_safe_slug() -> None:
     assert report_name("Sprint: 1/2", now) == "assignment_sprint_-1_2_20261006-143000.xlsx"
 
 
-def test_without_csv_the_older_sheets_are_the_history_and_the_report_is_written(tmp_path: Path, capsys) -> None:
+def test_without_history_file_the_older_sheets_are_the_history_and_the_report_is_written(tmp_path: Path, capsys):
     source = _inputs(tmp_path / "input")
     (source / "history.csv").unlink()
     out = tmp_path / "out"
@@ -158,9 +171,59 @@ def test_without_csv_the_older_sheets_are_the_history_and_the_report_is_written(
     assert main(["--input", str(source), "--out", str(out), "--ai", "off"]) == 0
 
     printed = capsys.readouterr().out
-    assert "Lịch sử: sheet Sprint 1 trong workbook (không có file .csv)" in printed
+    assert "Lịch sử: sheet Sprint 1 trong workbook (không có file lịch sử)" in printed
     workbook = load_workbook(_report(out))
     assignment = list(workbook["Phân công"].iter_rows(values_only=True))[1]
     assert assignment[-3].startswith("Làm version gần nhất của Demo (Sprint 1: 1.0.1 - Add ads)")
     findings = list(workbook["Cảnh báo"].iter_rows(values_only=True))[1:]
     assert [row[:3] for row in findings] == [("INFO", "HISTORY-FROM-WORKBOOK", "Sprint 1")]
+
+
+def test_tech_manager_xlsx_beside_the_export_is_found_as_history(tmp_path: Path, capsys) -> None:
+    source = _inputs(tmp_path / "input")
+    (source / "history.csv").unlink()
+    target_order = {**HISTORY, "Tên task": "1.0.1 - Add ads", "Người làm": "", "Sprint": "Sprint 2 (10/6 - 10/17)"}
+    build_history_xlsx(source / "tech.xlsx", {"Tháng 9": [HISTORY], "Tháng 10": [target_order]})
+    out = tmp_path / "out"
+
+    assert main(["--input", str(source), "--out", str(out), "--ai", "off"]) == 0
+
+    assert "Lịch sử: file tech.xlsx (1 đơn gốc)" in capsys.readouterr().out
+    assignment = list(load_workbook(_report(out))["Phân công"].iter_rows(values_only=True))[1]
+    assert assignment[-3].startswith("Làm version gần nhất của Demo (Sprint 1 (9/22 - 10/3): 1.0.0)")
+
+
+def test_backtest_replays_the_history_and_writes_its_report(tmp_path: Path, capsys) -> None:
+    source = tmp_path / "input"
+    source.mkdir()
+    build_devs(
+        source / "devs.xlsx",
+        [
+            {"Tên": "Dev A", "Mã": "DevA", "Level": "middle", "Nhận việc": "Y"},
+            {"Tên": "Dev B", "Mã": "DevB", "Level": "junior", "Nhận việc": "Y"},
+        ],
+    )
+    s9, s10 = "Sprint 9 (9/21 - 10/2)", "Sprint 10 (10/6 - 10/17)"
+    rows = [
+        {**HISTORY, "Ngày lên đơn": "2026-09-20 09:00", "App Name": "Demo", "Người làm": "Dev B", "Sprint": s9},
+        {**HISTORY, "Ngày lên đơn": "2026-10-01 09:00", "App Name": "Demo", "Người làm": "Dev B", "Sprint": s10},
+        {**HISTORY, "Ngày lên đơn": "2026-10-02 09:00", "App Name": "New", "Người làm": "Dev B", "Sprint": s10},
+        {**HISTORY, "Ngày lên đơn": "2026-09-01 09:00", "Người làm": "Dev A", "Sprint": "Sprint 3 (9/3 - 9/30)"},
+    ]
+    build_history_xlsx(source / "tech.xlsx", {"Tháng 9": rows})
+    out = tmp_path / "out"
+
+    assert main(["--input", str(source), "--out", str(out), "--backtest"]) == 0
+
+    printed = capsys.readouterr().out
+    assert "Backtest: file tech.xlsx, 2 sprint Maintain (mọi đơn M, không tính việc dở)" in printed
+    assert "Sprint 9 (9/21 - 10/2): khớp 0/1 đơn (0%)" in printed
+    assert "Sprint 10 (10/6 - 10/17): khớp 1/2 đơn (50%)" in printed
+    assert "Tổng: khớp 1/3 đơn (33%)" in printed
+    (report,) = out.glob("backtest_*.xlsx")
+    workbook = load_workbook(report)
+    assert workbook.sheetnames == ["Theo sprint", "Theo đơn"]
+    summary = list(workbook["Theo sprint"].iter_rows(values_only=True))
+    assert summary[-1] == ("Tổng", None, None, 3, 1, "33%", 0)
+    detail = list(workbook["Theo đơn"].iter_rows(values_only=True))
+    assert [row[5:8] for row in detail[1:]] == [("DevB", "DevA", "✗"), ("DevB", "DevB", "✓"), ("DevB", "DevA", "✗")]
