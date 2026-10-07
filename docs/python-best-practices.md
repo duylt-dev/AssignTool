@@ -59,6 +59,9 @@ Every rule states what breaking it costs. A rule with no reason gets ignored, th
   compare a `datetime` with a `date`; it raises `TypeError` at runtime in the middle of a sort.
 - **CSV:** open with `encoding="utf-8-sig"` (accepts files with and without BOM) and `newline=""` (the `csv` module
   requires it, or quoted multi-line cells break). Detect `,` vs `;` from the header line only.
+- **One parser per export, two file formats.** The history export comes as `.xlsx` or `.csv` with the same columns
+  (D6); both go through the same row function in `history_reader.py`. Two parsers for one layout drift apart, and the
+  `.csv` path is the one nobody runs until the day the exporter switches format.
 
 ## 4 · Calling the AI tool (subprocess)
 
@@ -134,6 +137,10 @@ The tool runs on Windows, Linux and macOS (A2).
   Rules then cannot mutate their inputs, and the order in which rules run cannot change a result.
 - `Level`, `Priority` and `Size` are `enum.IntEnum`: `Level.JUNIOR` (0) … `Level.SENIOR` (4); `Priority.URGENT` (0) …
   `Priority.LOW` (3), smaller first; `Size` values are the hours (`S = 4` … `XL = 64`), so a load is a plain sum.
+- **Test a parsed enum with `is None`, never with truthiness.** `Priority.URGENT` and `Level.JUNIOR` are 0, so
+  `parse_priority(raw) or Priority.NORMAL` turns every urgent order into a normal one without an error. This happened
+  in the first backtest (2026-10-07): urgent orders lost their place in the queue until an independent recount
+  disagreed on Sprint 10.
 - `Severity` is an `enum.Enum` ordered WARN > INFO.
 
 ## 10 · Testing

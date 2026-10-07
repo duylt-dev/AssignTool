@@ -1,10 +1,15 @@
 # assigntool
 
-Tool dòng lệnh đề xuất **dev phụ trách (PIC)** cho từng đơn đầu sprint. Đơn do BA lên trên tool nội bộ. Tech Manager
-export danh sách đơn ra Excel, chạy tool, đọc đề xuất kèm lý do trong file báo cáo, rồi tự quyết định và giao trên
-tool nội bộ. Tool chỉ đề xuất: không sửa file input, không ghi ngược vào tool nội bộ.
+Tool dòng lệnh **giao dev phụ trách (PIC)** cho các đơn còn trống của board Maintain. Đơn do BA lên trên hệ thống nội
+bộ. Chạy tool lúc nào cũng được trong sprint (đầu sprint, và mỗi khi BA lên đơn mới): đơn đã có người thì giữ nguyên,
+đơn trống thì tool chọn người và ghi lý do vào file báo cáo.
 
-> **Trạng thái (2026-10-06):** bản v1 chạy được (82 test pass; đã chạy thật với Gemini trên file mẫu).
+Mục tiêu là tool tự ghi `Người làm` thẳng vào hệ thống, không cần duyệt. Việc đó cần API và một token cho tool, hiện
+chưa có (`confirm.md` O8). Vì vậy hiện tại tool ghi kết quả ra file Excel, và người có quyền nhập vào hệ thống. Tool
+không sửa file input.
+
+> **Trạng thái (2026-10-07):** chạy được với file lịch sử Tech manager, giới hạn tải theo số đơn và backtest
+> (102 test pass).
 
 ## 1. Cài đặt
 
@@ -19,15 +24,16 @@ Thiếu Gemini CLI hoặc key thì tool **vẫn chạy và vẫn ra báo cáo**,
 
 ## 2. Chạy nhanh
 
-1. Đặt file vào `input/` (mục 3). Repo đã có sẵn file mẫu Sprint 6–10 và `devs.xlsx` của 4 dev.
+1. Đặt file vào `input/` (mục 3). Repo đã có sẵn file export Sprint 6–10, file lịch sử Tech manager tháng 2–10/2026
+   và `devs.xlsx` của 4 dev.
 2. Chạy:
 
    ```bash
    uv run assigntool
    ```
 
-3. Mở file `output/assignment_<sprint>_<thời gian>.xlsx` (mục 4): xem đề xuất ở sheet `Phân công`, xử lý các dòng
-   ở sheet `Cảnh báo`, rồi giao trên tool nội bộ.
+3. Mở file `output/assignment_<sprint>_<thời gian>.xlsx` (mục 4): người được giao ở sheet `Phân công`, các dòng cần
+   xử lý ở sheet `Cảnh báo`. Nhập `PIC` vào hệ thống nội bộ.
 
 Các cách chạy khác:
 
@@ -35,6 +41,7 @@ Các cách chạy khác:
 uv run assigntool --ai off                  # không gọi AI; mọi đơn tính là M (16h)
 uv run assigntool --ai agy                  # dùng Antigravity thay cho gemini (máy dev)
 uv run assigntool --sprint path/export.xlsx # chỉ định file export khi input/ có nhiều file .xlsx
+uv run assigntool --backtest                # giao lại các sprint cũ trong file lịch sử và so với TM (mục 4.2)
 uv run assigntool --help                    # mọi tuỳ chọn (mục 6)
 ```
 
@@ -42,14 +49,17 @@ uv run assigntool --help                    # mọi tuỳ chọn (mục 6)
 
 ```
 input/
-├── <file export sprint>.xlsx   bắt buộc · đúng 1 file .xlsx ngoài devs.xlsx
-├── devs.xlsx                   bắt buộc
-└── <lịch sử>.csv               không bắt buộc · tối đa 1 file
+├── <file export sprint>.xlsx       bắt buộc · file .xlsx có sheet "Sprint N"
+├── devs.xlsx                       bắt buộc
+└── <file lịch sử Tech manager>     nên có · .xlsx (không có sheet "Sprint N") hoặc .csv · tối đa 1 file
 ```
 
-Tool tự tìm file theo đuôi. Có 0 hoặc nhiều hơn một file ứng viên thì tool dừng, liệt kê các file tìm thấy và chỉ
-cờ cần dùng (`--sprint`, `--devs`, `--history`); tool không đoán. File bắt đầu bằng `~$` (file khoá khi Excel đang
-mở) và `.` bị bỏ qua. Khi sang sprint mới, **thay** file export cũ bằng file mới, đừng để cả hai trong `input/`.
+Mỗi lần chạy cần export lại **cả hai file** từ hệ thống: file export sprint (đơn cần giao, mô tả, việc dở) và file
+Tech manager (lịch sử ai làm app nào). Tool nhận ra file theo **nội dung**, không theo tên: file `.xlsx` có sheet
+`Sprint N` là file export sprint; file `.xlsx` còn lại hoặc file `.csv` là file lịch sử. Có 0 hoặc nhiều hơn một file
+ứng viên thì tool dừng, liệt kê các file tìm thấy và chỉ cờ cần dùng (`--sprint`, `--devs`, `--history`); tool không
+đoán. File bắt đầu bằng `~$` (file khoá khi Excel đang mở) và `.` bị bỏ qua. Khi export lại, **thay** file cũ bằng
+file mới, đừng để cả hai trong `input/`.
 
 ### 3.1 File export sprint (`.xlsx`)
 
@@ -57,7 +67,7 @@ File export của tool nội bộ, giữ nguyên định dạng, không cần s�
 
 - Mỗi sprint là một sheet tên `Sprint N`. Sheet có tên khác bị bỏ qua.
 - **Sheet được giao** là `Sprint N` có N lớn nhất (đổi bằng `--sheet`). Sheet `Sprint N-1` là **sprint trước**,
-  dùng để tính việc dở của từng dev. Các sheet nhỏ hơn N là **lịch sử** khi không có file CSV (mục 3.3).
+  dùng để tính việc dở của từng dev. Các sheet nhỏ hơn N là **lịch sử** khi không có file lịch sử (mục 3.3).
 - Dòng 3 chứa `Thời gian: YYYY-MM-DD → YYYY-MM-DD`: ngày bắt đầu và kết thúc sprint, dùng để tính ngày nghỉ. Không
   có dòng này thì ngày nghỉ bị bỏ qua.
 - Dòng tiêu đề là dòng đầu tiên trong 10 dòng đầu có ô cột A là `STT`. Cột được tìm **theo tên**, thứ tự cột không
@@ -70,8 +80,8 @@ File export của tool nội bộ, giữ nguyên định dạng, không cần s�
 | `Task` | ✓ | Tiêu đề đơn, gửi cho AI. |
 | `Loại` | ✓ | `Task` là đơn cần giao; `Subtask` bị bỏ qua. Giá trị khác: bỏ dòng và cảnh báo. |
 | `App Name.` | ✓ | App của đơn, để biết ai từng làm app đó. Không phân biệt hoa thường và khoảng trắng. |
-| `Trạng thái` | ✓ | Chỉ dùng ở sheet sprint trước: dòng có trạng thái `qa - need fix`, `all issue`, `in progress`, `ready to progress`, `need to be clean` hoặc `internal - cant fix` tính là việc dở. |
-| `Người làm` | ✓ | Đã có tên (cách nhau bằng dấu phẩy) thì đơn là **giao sẵn**: tool giữ nguyên, chỉ cộng tải cho dev. Trống thì tool đề xuất. |
+| `Trạng thái` | ✓ | Chỉ dùng ở sheet sprint trước: dòng có trạng thái `qa - need fix`, `all issue`, `in progress`, `ready to progress`, `need to be clean`, `internal - cant fix`, `internal - need fix` hoặc `đã ro` tính là việc dở. `qa - cant fix`, `pending` và các trạng thái khác không tính. |
+| `Người làm` | ✓ | Đã có tên (cách nhau bằng dấu phẩy) thì đơn là **giao sẵn**: tool giữ nguyên, chỉ cộng tải cho dev. Trống thì tool giao. |
 | `Ưu tiên` | ✓ | `urgent`, `high`, `normal`, `low` hoặc trống (= normal). Đơn gấp được xét trước. |
 | `Hạn` | ✓ | Thứ tự xét đơn (hạn sớm trước, trống sau). |
 | `Ngày tạo` | ✓ | Thứ tự xét đơn. |
@@ -102,44 +112,46 @@ Ví dụ:
 | Trần Đức An | AnTD | junior+ | Y | |
 | Bùi Văn Tiến | TiếnBV | junior | Y | |
 
-- Chỉ dev có `Nhận việc` = `Y` được đề xuất. Dev nghỉ trọn mọi ngày làm việc (thứ 2–6) của sprint bị loại khỏi lần
+- Chỉ dev có `Nhận việc` = `Y` được giao. Dev nghỉ trọn mọi ngày làm việc (thứ 2–6) của sprint bị loại khỏi lần
   giao đó; nghỉ một phần chỉ dùng để phân định khi hai người ngang nhau.
 - Người không có trong file (QA, RnD, Tech Manager…) bị bỏ qua hoàn toàn, không cảnh báo. Vì vậy nếu tên một dev bị
   gõ khác trong file export (thiếu dấu, thừa chữ), tool coi đó là người lạ và tính thiếu tải cho dev đó mà không báo.
 
-### 3.3 File lịch sử `.csv` (không bắt buộc)
+### 3.3 File lịch sử Tech manager (nên có)
 
-Danh sách các đơn đã làm ở các sprint trước, export từ hệ thống nội bộ. Tool dùng nó để biết ai đã làm app nào và
-version nào gần nhất; số giờ của đơn cũ được gửi cho AI làm mốc so sánh.
+File export list "Tech manager" từ CSDL hệ thống nội bộ, giữ nguyên định dạng. Tool dùng nó để biết ai đã làm app nào
+và version nào gần nhất.
 
-Dùng **chính các cột của file export**, thêm cột `Sprint`. Mỗi dòng một task; chỉ dòng `Loại` = `Task` được dùng,
-nên có thể dump cả bảng gồm subtask.
-
-```csv
-Sprint,STT,Task,Loại,App Name,Người làm,Ước lượng (h),Ngày tạo,Mô tả
-Sprint 9,1,1.1.1 - Fix ads/FIx luồng/ fix policy,Task,PS Remote,"Ngọc Văn Linh, Nguyễn Nhật Minh",68,2026-09-21,
-Sprint 9,165,1.0.3. Fix crash,Task,Game Emulator,Trần Đức An,17,2026-09-22,
-```
-
-- Bắt buộc: `Sprint`, `Loại`, `App Name`, `Người làm`, `Ngày tạo`. Nên có: `Task`, `Ước lượng (h)`.
-- UTF-8 có hoặc không BOM; phân cách `,` hoặc `;`; ngày `YYYY-MM-DD` hoặc `DD/MM/YYYY`. "CSV UTF-8" lưu từ Excel đọc
-  được, kể cả Excel locale Việt Nam.
-- **Không có file CSV** thì tool lấy mọi sheet sprint cũ hơn trong file export làm lịch sử (file mẫu: Sprint 6–9) và
-  ghi một dòng INFO. Có CSV thì chỉ dùng CSV; hai nguồn không bao giờ gộp, để không đếm trùng một sprint.
+- `.xlsx`: mỗi tháng một sheet, tiêu đề ở dòng 1. Sheet không có cột `Ngày lên đơn` (vd sheet `Tổng hợp`) bị bỏ qua.
+  Hoặc `.csv` với cùng các cột: UTF-8 có hoặc không BOM, phân cách `,` hoặc `;`, ngày `YYYY-MM-DD` hoặc `DD/MM/YYYY`.
+- Cột bắt buộc: `Ngày lên đơn`, `Tên task`, `Loại`, `Task cha`, `App Name`, `Người làm`, `Sprint`. Cột khác bị bỏ qua.
+- Chỉ dùng **đơn gốc**: `Loại` = `Task` và `Task cha` trống. Subtask và bug bị bỏ qua.
+- Lấy cả đơn board MVP / nghiên cứu và đơn không có sprint: dev làm MVP của app nào thì cũng là quen app đó. Đơn MVP
+  không tính vào tải.
+- Bỏ các đơn của sprint đang giao (một đơn không tự làm lịch sử cho chính nó), đơn lên sau hôm nay, và đơn của sprint
+  chưa bắt đầu.
+- Nhãn sprint đọc dạng `Sprint 10 (10/6 - 10/17)`, một ô có thể có nhiều nhãn. Sprint dài tối đa 21 ngày là sprint
+  Maintain, dài hơn là MVP / nghiên cứu (export chưa có cột board).
+- Nếu sau này export có thêm cột `Ước lượng (h)`, số giờ đó được gửi cho AI làm mốc so sánh. Hiện file chưa có cột này.
+- **Không có file lịch sử** thì tool lấy mọi sheet sprint cũ hơn trong file export làm lịch sử (file mẫu: Sprint 6–9)
+  và ghi một dòng INFO. Có file lịch sử thì chỉ dùng file đó; hai nguồn không bao giờ gộp, để không đếm trùng.
 
 ### 3.4 Dữ liệu gửi cho AI
 
 Tool gọi AI **một lần** cho cả sprint, chỉ để xếp độ lớn từng đơn. AI không chọn người.
 
-- Gửi đi: STT, app, ưu tiên, tiêu đề, mô tả (đã bỏ link và cắt ngắn) của các đơn sprint này, và tối đa 30 đơn cũ
-  (app · tiêu đề · số giờ) làm mốc. **Không gửi tên người, không gửi link.**
+- Gửi đi: STT, app, ưu tiên, tiêu đề, mô tả (đã bỏ link và cắt ngắn) của các đơn sprint này, và tối đa 30 đơn cũ có
+  số giờ (app · tiêu đề · số giờ) làm mốc; file Tech manager hiện chưa có số giờ nên phần mốc trống. **Không gửi tên
+  người, không gửi link.**
 - AI chạy ở chế độ chỉ đọc, trong một thư mục tạm rỗng, nên không đọc được `input/`. Quá 180 giây thì bị dừng
   (đổi bằng `--ai-timeout`).
 - AI lỗi, hết giờ hoặc trả sai định dạng: mọi đơn (hoặc các đơn bị thiếu) tính là `M`, báo cáo vẫn được ghi.
-- Cùng một input, hai lần chạy có thể ra độ lớn khác nhau, nên đề xuất cũng có thể khác. Độ lớn và lý do của AI có
-  trong báo cáo để kiểm tra.
+- Cùng một input, hai lần chạy có thể ra độ lớn khác nhau. Độ lớn chỉ ảnh hưởng tới tiêu chí số giờ (mục 5), không
+  quyết định ai được xét. Độ lớn và lý do của AI có trong báo cáo để kiểm tra.
 
 ## 4. Output
+
+### 4.1 Báo cáo giao việc
 
 Mỗi lần chạy ghi **một file mới** `output/assignment_<sprint>_<YYYYMMDD-HHMMSS>.xlsx`, vd
 `assignment_sprint-10_20261006-143000.xlsx` (đổi thư mục bằng `--out`). Báo cáo cũ đang mở trong Excel không cản lần
@@ -164,8 +176,8 @@ gốc), thêm các cột:
 Ví dụ một ô `Lý do`:
 
 ```
-Làm version gần nhất của PS Remote (Sprint 9: 1.1.1 - Fix ads/FIx luồng/ fix policy) · Đơn urgent → ưu tiên middle
-trở lên · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 9: 0
+Làm version gần nhất của PS Remote (Sprint 9 (9/21 - 10/2): 1.1.1 - Fix ads/FIx luồng/ fix policy) · Đơn urgent →
+ưu tiên middle trở lên · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 9: 0
 ```
 
 ### Sheet `Cảnh báo`
@@ -182,8 +194,8 @@ Cột `Mức` · `Mã` · `Vị trí` · `Nội dung`; WARN xếp trước INFO.
 | `DUE-BEFORE-CREATED` | WARN | `Hạn` trước `Ngày tạo`. | Kiểm tra hạn của đơn. |
 | `TYPE-UNKNOWN` | WARN | `Loại` không phải Task/Subtask; dòng bị bỏ qua. | Sửa loại trên tool nội bộ. |
 | `PREV-SPRINT-MISSING` | WARN | Không có sheet `Sprint N-1`; coi như không ai còn việc dở. | Export kèm sheet sprint trước. |
-| `HISTORY-MISSING` | WARN | Không có CSV và không có sheet sprint cũ; coi như chưa ai làm app nào. | Thêm file CSV lịch sử hoặc export kèm các sprint cũ. |
-| `HISTORY-FROM-WORKBOOK` | INFO | Không có CSV; dùng các sheet sprint cũ làm lịch sử. | Không cần làm gì. |
+| `HISTORY-MISSING` | WARN | Không có file lịch sử và không có sheet sprint cũ; coi như chưa ai làm app nào. | Thêm file lịch sử Tech manager. |
+| `HISTORY-FROM-WORKBOOK` | INFO | Không có file lịch sử; dùng các sheet sprint cũ làm lịch sử. | Nên thêm file lịch sử Tech manager: nhiều lịch sử hơn thì giao đúng hơn. |
 | `DEV-ON-LEAVE` | INFO | Một dev nghỉ cả sprint nên không được giao. | Không cần làm gì. |
 
 ### Sheet `Tải dev`
@@ -197,12 +209,12 @@ lớn, mỗi đơn một dòng) và `App đã làm`.
 Ví dụ trên file mẫu với `--ai off`:
 
 ```
-Lịch sử: sheet Sprint 6, Sprint 7, Sprint 8, Sprint 9 trong workbook (không có file .csv)
+Lịch sử: file Tech_manager_T2-T10_2026.xlsx (172 đơn gốc)
 Sprint: Sprint 10
 Độ lớn: tắt AI (mọi đơn M)
-Đơn: 6 · giao sẵn: 5 · tool đề xuất: 1 · cảnh báo: 0 WARN, 1 INFO
+Đơn: 6 · giao sẵn: 5 · tool đề xuất: 1 · cảnh báo: 0 WARN, 0 INFO
 STT 10 · Roblox skin 1.0.4 - Fix luồng/Add Ads/Fix UI [M] → AnTD (dự phòng: MinhNM, TiếnBV)
-Báo cáo: output/assignment_sprint-10_20261006-171450.xlsx
+Báo cáo: output/assignment_sprint-10_20261007-160752.xlsx
 ```
 
 Khi có AI, trước đó in thêm `Đang ước lượng độ lớn bằng gemini…` và dòng độ lớn thành `Độ lớn: AI (gemini, 6/6 đơn)`
@@ -215,8 +227,33 @@ Khi có AI, trước đó in thêm `Đang ước lượng độ lớn bằng gem
 | `2` | Lỗi input hoặc sai cách gọi; **không** ghi báo cáo. Thông báo `Lỗi: …` chỉ rõ file, sheet, dòng hoặc cột. |
 | `130` | Dừng bằng Ctrl+C. |
 
-Các lỗi input dừng tool: thiếu file hoặc có nhiều file ứng viên; thiếu cột bắt buộc; `Level` sai; `Nhận việc` không
-phải `Y`/`N`; trùng `Tên` hoặc `Mã`; ngày không đọc được; không còn dev nào để giao sau khi trừ người nghỉ.
+Các lỗi input dừng tool: thiếu file hoặc có nhiều file ứng viên; file `.xlsx` không mở được; thiếu cột bắt buộc;
+`Level` sai; `Nhận việc` không phải `Y`/`N`; trùng `Tên` hoặc `Mã`; ngày không đọc được; không còn dev nào để giao sau
+khi trừ người nghỉ.
+
+### 4.2 Backtest: tool có giao giống TM không
+
+```bash
+uv run assigntool --backtest
+```
+
+Chỉ cần file lịch sử Tech manager và `devs.xlsx`. Với mỗi sprint Maintain trong file lịch sử (file mẫu: 16 sprint,
+tháng 1–10/2026), tool xoá `Người làm` của các đơn TM đã giao cho dev trong danh sách, giao lại theo đúng luật ở mục 5,
+rồi so với người TM đã giao.
+
+- Đơn được giao lại theo **ngày lên đơn**, như khi chạy tool mỗi lần BA lên đơn: đơn lên trước ngày bắt đầu sprint
+  được giao cùng lúc vào ngày bắt đầu, mỗi ngày sau là một lần chạy. Lịch sử của mỗi lần chạy chỉ gồm việc đã có
+  trước ngày đó.
+- Đơn mang sang từ sprint trước giữ nguyên người TM giao (không so sánh). Đơn không có dev trong danh sách bị bỏ qua.
+- **Mọi đơn tính là M và việc dở bằng 0**: file Tech manager không có mô tả để AI ước lượng, và trạng thái trong file
+  là trạng thái hôm nay, không phải lúc sprint đó bắt đầu.
+- **Khớp** khi người tool chọn là một trong các dev TM đã giao. Lệch chưa chắc là sai: luật cố ý cân tải.
+
+File `output/backtest_<thời gian>.xlsx` có hai sheet: `Theo sprint` (số đơn so sánh, số khớp, tỉ lệ, số đơn mang
+sang; dòng cuối là tổng) và `Theo đơn` (mỗi đơn: TM giao ai, tool giao ai, khớp hay không, lý do của tool).
+
+Kết quả trên file mẫu: **khớp 43/92 đơn (47%)**. Các sprint tháng 1–5 (ít lịch sử) chỉ khớp 3/19; từ Sprint 1 (tháng
+5) khớp 40/73 (55%); Sprint 9 khớp 8/11, Sprint 10 khớp 4/5. Chi tiết và cách đọc: spec §13.
 
 ## 5. Tool chọn PIC thế nào
 
@@ -231,8 +268,9 @@ phải `Y`/`N`; trùng `Tên` hoặc `Mã`; ngày không đọc được; không
 
 2. **Đơn giao sẵn giữ nguyên**, chỉ cộng giờ vào tải của dev được ghi tên.
 3. **Đơn trống được xét lần lượt**: urgent → high → normal → low, rồi hạn sớm, rồi ngày tạo, rồi `STT`.
-4. Với mỗi đơn, chỉ xét dev có tải **không vượt quá người ít việc nhất + 16 giờ** (để một người quen nhiều app không
-   ôm hết). Trong số đó, chọn người tốt nhất theo thứ tự ưu tiên:
+4. Với mỗi đơn, chỉ xét dev có **số đơn không vượt quá người ít đơn nhất + 1** (để một người quen nhiều app không ôm
+   hết). Tính theo số đơn chứ không theo giờ, vì độ lớn do AI ước lượng thay đổi giữa các lần chạy. Trong số đó, chọn
+   người tốt nhất theo thứ tự ưu tiên:
    1. Đã làm version gần nhất của app → từng làm app → chưa làm.
    2. Đơn urgent/high, hoặc app chưa ai trong team làm: ưu tiên level middle trở lên.
    3. Ít giờ việc hơn trong sprint này.
@@ -242,21 +280,22 @@ phải `Y`/`N`; trùng `Tên` hoặc `Mã`; ngày không đọc được; không
 
    Hai người tiếp theo theo cùng thứ tự (bỏ qua giới hạn tải) là dự phòng.
 5. Cột `Lý do` ghi lại từng bước trên. Nếu người quen app hơn bị loại vì giới hạn tải, lý do cũng ghi rõ, vd
-   `AnTD quen app hơn nhưng đang có 96h (cân tải)`.
+   `AnTD quen app hơn nhưng đang có 3 đơn (cân tải)`.
 
 ## 6. Tuỳ chọn dòng lệnh
 
 | Tuỳ chọn | Mặc định | Ý nghĩa |
 |---|---|---|
 | `--input DIR` | `input/` | Thư mục tìm file input. |
-| `--sprint FILE` | file `.xlsx` duy nhất khác `devs.xlsx` | File export sprint. |
+| `--sprint FILE` | file `.xlsx` duy nhất có sheet `Sprint N` | File export sprint. |
 | `--devs FILE` | `<input>/devs.xlsx` | File dev. |
-| `--history FILE` | file `.csv` duy nhất; không có thì dùng sheet sprint cũ | File lịch sử. |
+| `--history FILE` | file `.xlsx` không có sheet `Sprint N`, hoặc file `.csv`; không có thì dùng sheet sprint cũ | File lịch sử Tech manager. |
 | `--sheet NAME` | `Sprint N` lớn nhất | Sheet cần giao, vd `--sheet "Sprint 9"`. |
 | `--out DIR` | `output/` | Thư mục ghi báo cáo; tự tạo nếu chưa có. |
 | `--ai gemini\|agy\|off` | `gemini` | Công cụ AI. `agy` cho máy dev; `off` tính mọi đơn là M. |
 | `--ai-model NAME` | mặc định của công cụ AI | Tên model truyền thẳng cho công cụ AI. |
 | `--ai-timeout SECONDS` | `180` | Số giây chờ AI. |
+| `--backtest` | tắt | Giao lại các sprint Maintain trong file lịch sử và so với TM (mục 4.2). Bỏ qua `--sprint`, `--sheet`, `--ai…`. |
 | `-v` | tắt | In traceback khi lỗi và nội dung trao đổi với AI. |
 
 ## 7. Dành cho người phát triển
@@ -266,8 +305,8 @@ uv run ruff check . && uv run ruff format --check . && uv run pytest   # chạy 
 ASSIGNTOOL_TEST_AI=gemini uv run pytest -m ai                         # thêm 1 lần gọi AI thật (cần mạng và key)
 ```
 
-Test nghiệm thu (`tests/test_real_input.py`) chạy trên `input/Maintain_update_Sprint_10_va_9.xlsx`; thiếu file đó
-thì test được bỏ qua kèm lý do.
+Test nghiệm thu (`tests/test_real_input.py`) chạy trên `input/Maintain_update_Sprint_10_va_9.xlsx` và
+`input/Tech_manager_T2-T10_2026.xlsx`; thiếu file nào thì các test dùng file đó được bỏ qua kèm lý do.
 
 | Tài liệu | Nội dung |
 |---|---|
