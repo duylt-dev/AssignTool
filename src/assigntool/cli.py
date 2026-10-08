@@ -254,7 +254,8 @@ def _print_summary(result: Result, path: Path) -> None:
         row = item.order.row
         backups = ", ".join(item.backups) or "không có"
         print(
-            f"STT {row.stt} · {row.app} {row.title} [{item.size.size.name}] → {item.pic_codes[0]} (dự phòng: {backups})"
+            f"STT {row.stt} · {row.app or '(không có app)'} {row.title} [{item.size.size.name}] → {item.pic_codes[0]} "
+            f"(dự phòng: {backups})"
         )
     for finding in result.findings:
         if finding.severity is Severity.WARN:
