@@ -16,12 +16,15 @@ _URL = re.compile(r"https?://\S+")
 _SIZES = {size.name: size for size in Size}
 _FAILED_MESSAGE = "Không ước lượng được độ lớn bằng AI ({}); mọi đơn tính là M (16h)."
 
-_PROMPT = """You estimate the size of software change orders for an Android app team.
-Classify every order below into exactly one class:
-- S (about 4 hours): at most a day; a crash fix, a policy fix, a text or config change.
-- M (about 16 hours): two to three days.
-- L (about 32 hours): about a week.
-- XL (about 64 hours): more than a week; a new feature, a new SDK, several flows at once.
+_PROMPT = """You estimate the size of change orders for an Android app team.
+An order is one release (version) of one app, e.g. "1.1.2 - Fix ads/Fix luồng/Fix UI": the developer who takes it
+does every item in the title and the description, then the release goes through QA.
+Classify every order below into exactly one class, by the total effort of all its items:
+- S (about 4 hours): one small item only: a single crash, a single policy or store change, a text or config change.
+- M (about 16 hours): two to three days: one feature-sized item, or two or three small items.
+- L (about 32 hours): about a week: several items, e.g. ads or IAP changes together with flow (luồng) or UI changes.
+- XL (about 64 hours): more than a week: a new feature, a new SDK, a new app, or many items at once.
+Items written as "Fix" (Fix ads, Fix luồng, Fix UI) rework existing screens; each still takes days, not hours.
 Judge from the text only. Do not open links, do not use any tool, do not read files.
 
 Past orders of this team with the hours they took (for calibration):

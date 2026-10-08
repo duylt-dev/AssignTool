@@ -127,7 +127,7 @@ def _run(args: argparse.Namespace) -> int:
     print(f"Lịch sử: {history_note}")
     orders, findings = orders_and_findings(target)
     findings += history_findings(history_path is not None, sheets)
-    sizes, size_findings, note = _sizes(args, orders, history)
+    sizes, size_findings, note = _sizes(args, orders, history, sprint_path, target.number)
     result = build_result(
         target=target,
         prev=prev,
@@ -198,15 +198,34 @@ def _matches(orders: tuple[BacktestOrder, ...]) -> str:
 
 
 def _sizes(
-    args: argparse.Namespace, orders: tuple[Order, ...], history: tuple[HistoryOrder, ...]
+    args: argparse.Namespace,
+    orders: tuple[Order, ...],
+    history: tuple[HistoryOrder, ...],
+    sprint_path: Path,
+    number: int,
 ) -> tuple[dict[int, SizeEstimate], tuple[Finding, ...], str]:
     if args.ai == "off":
         return default_sizes(orders), (), "tắt AI (mọi đơn M)"
     if not orders:
         return {}, (), "không có đơn"
     print(f"Đang ước lượng độ lớn bằng {args.ai}…", flush=True)
-    reply = ai_cli.run_ai(args.ai, build_prompt(orders, history), model=args.ai_model, timeout=args.ai_timeout)
+    prompt = build_prompt(orders, _examples(history, sprint_path, number))
+    reply = ai_cli.run_ai(args.ai, prompt, model=args.ai_model, timeout=args.ai_timeout)
     return parse_reply(reply, orders)
+
+
+def _examples(history: tuple[HistoryOrder, ...], sprint_path: Path, number: int) -> tuple[HistoryOrder, ...]:
+    """Calibration examples for the AI (spec §6.4, A19): history orders with hours, else the workbook's older sheets.
+
+    The Tech manager export has no hours (D25), while the sprint export's older sheets do. They serve only as
+    examples here; familiarity still comes from the history file alone (A8). An unreadable older sheet gives none.
+    """
+    if any(order.hours for order in history):
+        return history
+    try:
+        return read_sheet_history(sprint_path, number)[0]
+    except InputError:
+        return ()
 
 
 def _files(directory: Path, suffix: str) -> list[Path]:
