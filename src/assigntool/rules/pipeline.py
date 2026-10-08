@@ -3,12 +3,23 @@
 from __future__ import annotations
 
 from assigntool.errors import InputError
-from assigntool.model import Dev, Finding, HistoryOrder, Order, Result, Severity, SizeEstimate, SprintSheet
+from assigntool.model import (
+    Dev,
+    Finding,
+    HistoryOrder,
+    Order,
+    Result,
+    Severity,
+    SizeEstimate,
+    SprintSheet,
+    TeamRule,
+)
 from assigntool.rules.assign import assign
 from assigntool.rules.carry_over import carry_over
 from assigntool.rules.familiarity import FamiliarityIndex
 from assigntool.rules.leave import leave_count, on_leave_all_sprint, working_days
 from assigntool.rules.summary import summarize
+from assigntool.rules.team_rules import relaxed_findings, unavailable_findings
 
 
 def build_result(
@@ -22,8 +33,9 @@ def build_result(
     history: tuple[HistoryOrder, ...],
     sizes: dict[int, SizeEstimate],
     sizing_note: str,
+    rules: tuple[TeamRule, ...] = (),
 ) -> Result:
-    """Apply leave exclusion and combine all pure rules into a report result."""
+    """Apply leave exclusion and combine all pure rules into a report result. `rules` are the TM rules in force."""
     days = working_days(target.start, target.end)
     active = tuple(dev for dev in devs if dev.active)
     removed = tuple(dev for dev in active if on_leave_all_sprint(dev, days))
@@ -47,7 +59,8 @@ def build_result(
     fam = FamiliarityIndex.build(history, pool)
     carry = carry_over(prev, active)
     leave = {dev.code: leave_count(dev, days) for dev in active}
-    assignments = assign(orders, sizes, pool, fam, carry, leave, prev_name)
+    assignments = assign(orders, sizes, pool, fam, carry, leave, prev_name, rules)
+    extra += [*unavailable_findings(rules, devs, pool), *relaxed_findings(assignments)]
     summaries = summarize(devs, pool, days, carry, leave, assignments, fam)
     ordered_findings = tuple(
         sorted(

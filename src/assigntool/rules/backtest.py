@@ -4,13 +4,24 @@ from __future__ import annotations
 
 from datetime import date
 
-from assigntool.model import BacktestOrder, BacktestSprint, Dev, HistoryOrder, Order, Priority, SprintLabel, SprintRow
+from assigntool.model import (
+    BacktestOrder,
+    BacktestSprint,
+    Dev,
+    HistoryOrder,
+    Order,
+    Priority,
+    SprintLabel,
+    SprintRow,
+    TeamRule,
+)
 from assigntool.normalize import parse_priority, text_key
 from assigntool.rules.assign import assign
 from assigntool.rules.familiarity import FamiliarityIndex
 from assigntool.rules.history_window import history_for
 from assigntool.rules.leave import leave_count, on_leave_all_sprint, working_days
 from assigntool.rules.sizing import default_sizes
+from assigntool.rules.team_rules import in_force
 
 MAINTAIN_MAX_DAYS = 21  # A21: Maintain sprints last 4–17 days in the data, MVP / research sprints 27–54
 PREV_NAME = "sprint trước"  # carry-over is 0 in a backtest (A29); this only fills the reason text
@@ -33,11 +44,16 @@ def maintain_sprints(history: tuple[HistoryOrder, ...]) -> tuple[SprintLabel, ..
     return tuple(sorted(labels, key=lambda label: (label.start, label.end, label.number)))
 
 
-def backtest(history: tuple[HistoryOrder, ...], devs: tuple[Dev, ...]) -> tuple[BacktestSprint, ...]:
-    return tuple(_replay(label, history, devs) for label in maintain_sprints(history))
+def backtest(
+    history: tuple[HistoryOrder, ...], devs: tuple[Dev, ...], rules: tuple[TeamRule, ...] = ()
+) -> tuple[BacktestSprint, ...]:
+    """Replay every Maintain sprint; each run applies the TM rules in force on its day (D34)."""
+    return tuple(_replay(label, history, devs, rules) for label in maintain_sprints(history))
 
 
-def _replay(label: SprintLabel, history: tuple[HistoryOrder, ...], devs: tuple[Dev, ...]) -> BacktestSprint:
+def _replay(
+    label: SprintLabel, history: tuple[HistoryOrder, ...], devs: tuple[Dev, ...], rules: tuple[TeamRule, ...]
+) -> BacktestSprint:
     days = working_days(label.start, label.end)
     active = tuple(dev for dev in devs if dev.active)
     pool = tuple(dev for dev in active if not on_leave_all_sprint(dev, days))
@@ -61,7 +77,7 @@ def _replay(label: SprintLabel, history: tuple[HistoryOrder, ...], devs: tuple[D
         )
         by_stt = {
             item.order.row.stt: item
-            for item in assign(orders, default_sizes(orders), pool, fam, carry, leave, PREV_NAME)
+            for item in assign(orders, default_sizes(orders), pool, fam, carry, leave, PREV_NAME, in_force(rules, day))
         }
         for stt, order in sorted(batch, key=lambda item: (item[1].created, item[0])):
             assignment = by_stt[stt]

@@ -43,6 +43,15 @@ class Source(enum.Enum):
     PROPOSED = "Tool đề xuất"
 
 
+class RuleKind(enum.Enum):
+    """The four kinds of TM rule (spec §14, D30); the value is the `Loại` cell."""
+
+    PIN = "Chỉ định"
+    EXCLUDE = "Không giao"
+    MAX_ORDERS = "Tối đa đơn"
+    PREFER = "Ưu tiên"
+
+
 @dataclass(frozen=True, slots=True)
 class Dev:
     """One row of devs.xlsx (spec §4)."""
@@ -120,6 +129,20 @@ class HistoryOrder:
 
 
 @dataclass(frozen=True, slots=True)
+class TeamRule:
+    """One row of the TM rules file (spec §14). Text fields are NFC-normalised."""
+
+    kind: RuleKind
+    dev: str  # "Dev": a "Mã" of devs.xlsx, as written
+    app: str  # "" = every app (EXCLUDE only)
+    max_orders: int | None  # "Số đơn"; MAX_ORDERS only
+    start: date | None  # "Từ ngày"; None = no lower limit
+    end: date | None  # "Đến ngày"; None = no upper limit
+    note: str  # "Ghi chú"
+    line: int  # line number in the file, quoted in messages and reasons
+
+
+@dataclass(frozen=True, slots=True)
 class Finding:
     severity: Severity
     code: str  # spec §9
@@ -143,6 +166,8 @@ class Assignment:
     pic_codes: tuple[str, ...]  # codes of the pool devs among pic_names
     reason: str  # spec §8
     backups: tuple[str, ...]  # codes, at most 2; empty for PREASSIGNED
+    rule_lines: tuple[int, ...] = ()  # lines of the TM rules that shaped the choice (spec §13 "Luật TM")
+    rules_relaxed: bool = False  # the rules left no candidate, so EXCLUDE and MAX_ORDERS were ignored (A31)
 
 
 @dataclass(frozen=True, slots=True)

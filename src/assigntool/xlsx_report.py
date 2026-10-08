@@ -41,7 +41,16 @@ _DEV_HEADERS = (
     "Danh sách đơn",
     "App đã làm",
 )
-_SPRINT_HEADERS = ("Sprint", "Bắt đầu", "Kết thúc", "Đơn so sánh", "Khớp", "Tỉ lệ khớp", "Đơn mang sang")
+_SPRINT_HEADERS = (
+    "Sprint",
+    "Bắt đầu",
+    "Kết thúc",
+    "Đơn so sánh",
+    "Khớp",
+    "Tỉ lệ khớp",
+    "Đơn mang sang",
+    "Đơn theo luật TM",
+)
 _ORDER_HEADERS = (
     "Sprint",
     "Ngày lên đơn",
@@ -54,6 +63,7 @@ _ORDER_HEADERS = (
     "Dự phòng 1",
     "Dự phòng 2",
     "Lý do của tool",
+    "Luật TM",
 )
 _LEVEL_NAMES = {
     Level.JUNIOR: "junior",
@@ -96,10 +106,13 @@ def write_backtest(sprints: tuple[BacktestSprint, ...], out_dir: Path, now: date
     for sprint in sprints:
         label = sprint.label
         matched = sum(order.matched for order in sprint.orders)
-        summary.append([label.name, label.start, label.end, *_counts(matched, len(sprint.orders)), sprint.kept])
+        summary.append(
+            [label.name, label.start, label.end, *_counts(matched, len(sprint.orders)), sprint.kept, _ruled(sprint)]
+        )
     matched = sum(order.matched for sprint in sprints for order in sprint.orders)
     total = sum(len(sprint.orders) for sprint in sprints)
-    summary.append(["Tổng", None, None, *_counts(matched, total), sum(sprint.kept for sprint in sprints)])
+    kept = sum(sprint.kept for sprint in sprints)
+    summary.append(["Tổng", None, None, *_counts(matched, total), kept, sum(_ruled(sprint) for sprint in sprints)])
     _finish(summary)
     _date_format(summary, 2, 3)
     detail = workbook.create_sheet("Theo đơn")
@@ -120,6 +133,7 @@ def write_backtest(sprints: tuple[BacktestSprint, ...], out_dir: Path, now: date
                     backups[0],
                     backups[1],
                     item.assignment.reason,
+                    ", ".join(f"dòng {line}" for line in item.assignment.rule_lines),
                 ]
             )
     _finish(detail)
@@ -128,6 +142,11 @@ def write_backtest(sprints: tuple[BacktestSprint, ...], out_dir: Path, now: date
     workbook.save(temporary)
     os.replace(temporary, path)
     return path
+
+
+def _ruled(sprint: BacktestSprint) -> int:
+    """Compared orders whose choice a TM rule shaped (spec §13)."""
+    return sum(bool(order.assignment.rule_lines) for order in sprint.orders)
 
 
 def _counts(matched: int, total: int) -> list[object]:

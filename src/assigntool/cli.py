@@ -14,12 +14,25 @@ from assigntool import ai_cli
 from assigntool.dev_reader import read_devs
 from assigntool.errors import AssignError, InputError
 from assigntool.history_reader import read_history
-from assigntool.model import BacktestOrder, Dev, Finding, HistoryOrder, Order, Result, Severity, SizeEstimate, Source
+from assigntool.model import (
+    BacktestOrder,
+    Dev,
+    Finding,
+    HistoryOrder,
+    Order,
+    Result,
+    Severity,
+    SizeEstimate,
+    Source,
+    TeamRule,
+)
 from assigntool.rules.backtest import backtest, percent
 from assigntool.rules.history_window import history_for
 from assigntool.rules.pipeline import build_result
 from assigntool.rules.sizing import build_prompt, default_sizes, parse_reply
+from assigntool.rules.team_rules import check_rules, in_force, rules_day
 from assigntool.rules.validate import history_findings, orders_and_findings
+from assigntool.rules_reader import read_rules
 from assigntool.sprint_reader import has_sprint_sheets, read_sheet_history, read_workbook
 from assigntool.xlsx_report import write_backtest, write_report
 
@@ -54,6 +67,7 @@ def _parser() -> argparse.ArgumentParser:
         help="file lịch sử Tech manager .xlsx/.csv (mặc định: file .xlsx không có sheet Sprint N hoặc file .csv; "
         "không có thì dùng sheet sprint cũ)",
     )
+    parser.add_argument("--rules", help="file luật TM .md (mặc định: file .md duy nhất trong thư mục input)")
     parser.add_argument(
         "--backtest", action="store_true", help="giao lại các sprint Maintain trong file lịch sử và so với TM"
     )
@@ -81,13 +95,21 @@ def _run(args: argparse.Namespace) -> int:
     history_path = _explicit(args.history, "--history") or _at_most_one(
         [*_files(input_dir, ".csv"), *(p for p in workbooks if p not in sprint_books)], "file lịch sử", "--history"
     )
+    rules_path = _explicit(args.rules, "--rules") or _at_most_one(_files(input_dir, ".md"), "file luật .md", "--rules")
     if args.backtest:
         if history_path is None:
             raise InputError("Không tìm thấy file lịch sử để backtest. Chỉ định bằng --history.")
-        return _backtest(read_history(history_path), read_devs(devs_path), history_path, Path(args.out))
+        devs = read_devs(devs_path)
+        rules = _rules(rules_path, devs)
+        print(_rules_note(rules_path, rules, "áp theo ngày giao lại"))
+        return _backtest(read_history(history_path), devs, rules, history_path, Path(args.out))
 
     target, prev, prev_name = read_workbook(sprint_path, args.sheet)
     devs = read_devs(devs_path)
+    rules = _rules(rules_path, devs)
+    day = rules_day(date.today(), target.start)
+    rules_now = in_force(rules, day)
+    print(_rules_note(rules_path, rules, f"{len(rules_now)} có hiệu lực ngày {day:%d/%m/%Y}"))
     if history_path is not None:
         history = history_for(read_history(history_path), target.number, target.start, target.end, date.today())
         history_note = f"file {history_path.name} ({len(history)} đơn gốc)"
@@ -109,15 +131,35 @@ def _run(args: argparse.Namespace) -> int:
         history=history,
         sizes=sizes,
         sizing_note=note,
+        rules=rules_now,
     )
     path = write_report(result, target.headers, Path(args.out), datetime.now())
     _print_summary(result, path)
     return 0
 
 
-def _backtest(history: tuple[HistoryOrder, ...], devs: tuple[Dev, ...], history_path: Path, out_dir: Path) -> int:
+def _rules(path: Path | None, devs: tuple[Dev, ...]) -> tuple[TeamRule, ...]:
+    """The TM rules file, checked against devs.xlsx (spec §14); no file means no rules."""
+    if path is None:
+        return ()
+    rules = read_rules(path)
+    check_rules(rules, devs, str(path))
+    return rules
+
+
+def _rules_note(path: Path | None, rules: tuple[TeamRule, ...], detail: str) -> str:
+    return "Luật TM: không có" if path is None else f"Luật TM: file {path.name} ({len(rules)} luật, {detail})"
+
+
+def _backtest(
+    history: tuple[HistoryOrder, ...],
+    devs: tuple[Dev, ...],
+    rules: tuple[TeamRule, ...],
+    history_path: Path,
+    out_dir: Path,
+) -> int:
     """Replay the history's Maintain sprints and compare with the TM (D22, spec §13)."""
-    sprints = backtest(history, devs)
+    sprints = backtest(history, devs, rules)
     if not sprints:
         raise InputError(f"File '{history_path}' không có sprint Maintain nào để backtest.")
     print(f"Backtest: file {history_path.name}, {len(sprints)} sprint Maintain (mọi đơn M, không tính việc dở)")
