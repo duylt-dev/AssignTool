@@ -45,6 +45,13 @@ HISTORY = {
 }
 
 
+RULES = "# Luật\n\n| Loại | Dev | App | Ghi chú |\n|---|---|---|---|\n| Chỉ định | DevB | Demo | thử |\n"
+TWO_DEVS = [
+    {"Tên": "Dev A", "Mã": "DevA", "Level": "middle", "Nhận việc": "Y"},
+    {"Tên": "Dev B", "Mã": "DevB", "Level": "junior", "Nhận việc": "Y"},
+]
+
+
 def _report(out: Path) -> Path:
     (path,) = out.glob("assignment_sprint-2_*.xlsx")
     return path
@@ -73,6 +80,7 @@ def test_off_run_discovers_inputs_and_writes_the_three_sheets(tmp_path: Path, ca
     assert row[-9:-2] == ("M (mặc định)", 16, None, "Dev A", "DevA", "Tool đề xuất", row[-3])
     printed = capsys.readouterr().out
     assert "Sprint: Sprint 2" in printed and "Độ lớn: tắt AI (mọi đơn M)" in printed
+    assert "Luật TM: không có" in printed
     assert "STT 1 · Demo 1.0.1 - Add ads [M] → DevA (dự phòng: không có)" in printed
     assert not list(source.glob("*.tmp")) and not list(out.glob("*.tmp"))
 
@@ -129,6 +137,15 @@ def test_ai_failure_falls_back_to_m_and_still_writes_the_report(tmp_path: Path, 
         (["a.xlsx"], [], "Không mở được file"),
         ([], ["--sprint", "missing.xlsx"], "Không có file 'missing.xlsx' (--sprint)."),
         (["a.xlsx:sprint", "devs.xlsx:devs"], ["--backtest"], "Không tìm thấy file lịch sử để backtest."),
+        (
+            ["a.xlsx:sprint", "devs.xlsx:devs", "a.md", "b.md"],
+            [],
+            "Có nhiều file luật .md: a.md, b.md. Chỉ định một file bằng --rules.",
+        ),
+        (["a.xlsx:sprint", "devs.xlsx:devs", "a.md"], [], "không có bảng luật (bảng có cột Loại và Dev)."),
+        (["a.xlsx:sprint", "devs.xlsx:devs"], ["--rules", "missing.md"], "Không có file 'missing.md' (--rules)."),
+        (["a.xlsx:sprint", "devs.xlsx:devs", "a.md:rules"], [], "dòng 5: không có dev mã 'Nobody' trong file dev."),
+        (["devs.xlsx:devs", "t.xlsx:history", "a.md:rules"], ["--backtest"], "không có dev mã 'Nobody'"),
     ],
 )
 def test_input_errors_exit_2_with_a_message(tmp_path: Path, capsys, files, flags, message) -> None:
@@ -143,6 +160,8 @@ def test_input_errors_exit_2_with_a_message(tmp_path: Path, capsys, files, flags
             build_devs(source / name, [{"Tên": "Dev A", "Mã": "DevA", "Level": "middle", "Nhận việc": "Y"}])
         elif kind == "history":
             build_history_xlsx(source / name, {"Tháng 9": [HISTORY]})
+        elif kind == "rules":
+            (source / name).write_text(RULES.replace("DevB", "Nobody"), encoding="utf-8")
         else:
             (source / name).write_bytes(b"")
 
@@ -224,6 +243,43 @@ def test_backtest_replays_the_history_and_writes_its_report(tmp_path: Path, caps
     workbook = load_workbook(report)
     assert workbook.sheetnames == ["Theo sprint", "Theo đơn"]
     summary = list(workbook["Theo sprint"].iter_rows(values_only=True))
-    assert summary[-1] == ("Tổng", None, None, 3, 1, "33%", 0)
+    assert summary[-1] == ("Tổng", None, None, 3, 1, "33%", 0, 0)
     detail = list(workbook["Theo đơn"].iter_rows(values_only=True))
     assert [row[5:8] for row in detail[1:]] == [("DevB", "DevA", "✗"), ("DevB", "DevB", "✓"), ("DevB", "DevA", "✗")]
+
+
+def test_the_md_file_in_the_input_folder_is_the_rules_file_and_its_pin_reaches_the_report(tmp_path: Path, capsys):
+    source = _inputs(tmp_path / "input")
+    build_devs(source / "devs.xlsx", TWO_DEVS)
+    (source / "luat.md").write_text(RULES.replace("\n", "\r\n"), encoding="utf-8-sig")
+    out = tmp_path / "out"
+
+    assert main(["--input", str(source), "--out", str(out), "--ai", "off"]) == 0
+
+    printed = capsys.readouterr().out
+    assert "Luật TM: file luat.md (1 luật, 1 có hiệu lực ngày " in printed
+    assert "STT 1 · Demo 1.0.1 - Add ads [M] → DevB (dự phòng: DevA)" in printed
+    assignment = list(load_workbook(_report(out))["Phân công"].iter_rows(values_only=True))[1]
+    assert assignment[-3].startswith("Luật TM dòng 5: chỉ định DevB cho Demo (thử) · Chưa làm Demo")
+
+
+def test_backtest_applies_the_rules_and_reports_which_orders_they_shaped(tmp_path: Path, capsys) -> None:
+    source = tmp_path / "input"
+    source.mkdir()
+    build_devs(source / "devs.xlsx", TWO_DEVS)
+    row = {**HISTORY, "Ngày lên đơn": "2026-10-02 09:00", "Người làm": "Dev B", "Sprint": "Sprint 10 (10/6 - 10/17)"}
+    build_history_xlsx(source / "tech.xlsx", {"Tháng 10": [row]})
+    rules = source / "rules-for-test.md"
+    rules.write_text(RULES, encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert main(["--input", str(source), "--out", str(out), "--backtest", "--rules", str(rules)]) == 0
+
+    printed = capsys.readouterr().out
+    assert "Luật TM: file rules-for-test.md (1 luật, áp theo ngày giao lại)" in printed
+    assert "Sprint 10 (10/6 - 10/17): khớp 1/1 đơn (100%)" in printed
+    workbook = load_workbook(next(out.glob("backtest_*.xlsx")))
+    summary = list(workbook["Theo sprint"].iter_rows(values_only=True))
+    assert summary[0][-1] == "Đơn theo luật TM" and summary[1][-1] == 1 and summary[-1][-1] == 1
+    detail = list(workbook["Theo đơn"].iter_rows(values_only=True))
+    assert (detail[0][-1], detail[1][5:8], detail[1][-1]) == ("Luật TM", ("DevB", "DevB", "✓"), "dòng 5")

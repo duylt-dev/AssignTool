@@ -1,6 +1,6 @@
 from datetime import date
 
-from assigntool.model import Dev, HistoryOrder, Level, SprintLabel
+from assigntool.model import Dev, HistoryOrder, Level, RuleKind, SprintLabel, TeamRule
 from assigntool.rules.backtest import backtest, maintain_sprints, percent
 
 LINH = Dev("Linh", "LinhNV", Level.MIDDLE_PLUS, True, ())
@@ -19,8 +19,8 @@ def order(
     return HistoryOrder("", app, title or app, people, None, created, sprints, priority)
 
 
-def replay(*history: HistoryOrder, devs: tuple[Dev, ...] = POOL):
-    return {sprint.label.number: sprint for sprint in backtest(history, devs)}
+def replay(*history: HistoryOrder, devs: tuple[Dev, ...] = POOL, rules: tuple[TeamRule, ...] = ()):
+    return {sprint.label.number: sprint for sprint in backtest(history, devs, rules)}
 
 
 def picks(sprint) -> dict[str, str]:
@@ -91,3 +91,18 @@ def test_a_pool_on_leave_for_the_whole_sprint_compares_nothing() -> None:
     sprint = replay(order("App", ("Linh",), date(2026, 10, 1), S10), devs=(off,))[10]
 
     assert sprint.orders == ()
+
+
+def test_rules_act_only_on_the_replay_days_inside_their_dates() -> None:
+    """D34: a pin dated from 8/10 leaves the order assigned on the sprint's first day alone."""
+    pin = TeamRule(RuleKind.PIN, "AnTD", "Fresh", None, date(2026, 10, 8), None, "", 5)
+    history = (
+        order("Fresh", ("Linh",), date(2026, 10, 1), S10, title="first day"),
+        order("Fresh", ("An",), date(2026, 10, 9), S10, title="mid-sprint"),
+    )
+
+    sprint = replay(*history, rules=(pin,))[10]
+
+    assert picks(sprint) == {"first day": "LinhNV", "mid-sprint": "AnTD"}
+    assert [item.assignment.rule_lines for item in sprint.orders] == [(), (5,)]
+    assert picks(replay(*history)[10]) == {"first day": "LinhNV", "mid-sprint": "MinhNM"}

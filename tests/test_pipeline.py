@@ -9,10 +9,12 @@ from assigntool.model import (
     Level,
     Order,
     Priority,
+    RuleKind,
     Size,
     SizeEstimate,
     SprintRow,
     SprintSheet,
+    TeamRule,
 )
 from assigntool.rules.pipeline import build_result
 
@@ -175,3 +177,40 @@ def test_pipeline_rejects_an_empty_available_pool() -> None:
             sizes={order.row.stt: SizeEstimate(Size.M, "", True) for order in orders},
             sizing_note="AI off",
         )
+
+
+def test_pipeline_reports_rules_that_cannot_act_and_orders_they_left_without_candidates() -> None:
+    """RULE-DEV-UNAVAILABLE and RULE-NO-CANDIDATE fire; the same run with rules that can act reports neither."""
+    target_sheet, orders = target(clear_assignees=True)
+    out = Dev("Out", "OutDev", Level.MIDDLE, False, ())
+
+    def findings(*rules: TeamRule) -> list[tuple[str, str, str]]:
+        result = build_result(
+            target=target_sheet,
+            prev=previous(),
+            prev_name="Sprint 9",
+            orders=orders,
+            findings=(),
+            devs=(*DEVS, out),
+            history=history(),
+            sizes={order.row.stt: SizeEstimate(Size.M, "", True) for order in orders},
+            sizing_note="AI off",
+            rules=rules,
+        )
+        return [(finding.code, finding.where, finding.message) for finding in result.findings]
+
+    every = tuple(TeamRule(RuleKind.EXCLUDE, dev.code, "PS Remote", None, None, None, "", 2) for dev in DEVS)
+    pin_out = TeamRule(RuleKind.PIN, "outdev", "AR Dog", None, None, None, "", 3)
+    assert findings(pin_out, *every) == [
+        (
+            "RULE-DEV-UNAVAILABLE",
+            "Luật dòng 3",
+            "Luật dòng 3 (Chỉ định OutDev) không áp dụng: OutDev không nhận việc hoặc nghỉ cả sprint.",
+        ),
+        (
+            "RULE-NO-CANDIDATE",
+            "Đơn STT 7",
+            "Luật TM loại hết dev khỏi đơn STT 7; đơn này được giao như khi không có luật Không giao và Tối đa đơn.",
+        ),
+    ]
+    assert findings(TeamRule(RuleKind.PIN, "LinhNV", "AR Dog", None, None, None, "", 3), *every[1:]) == []
