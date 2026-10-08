@@ -24,7 +24,8 @@ Every rule states what breaking it costs. A rule with no reason gets ignored, th
 ## 1 · Toolchain
 
 - Python `>=3.11`, `.python-version` 3.13, environment and lock file managed by **uv** (A1). Commands: `uv sync`,
-  `uv run assigntool …`, `uv run pytest`, `uv run ruff check .`, `uv run ruff format .`.
+  `uv run assigntool …`, `uv run pytest`, `uv run ruff check .`, `uv run ruff format .`; the evaluation set:
+  `uv run python eval/build_cases.py`, `uv run python eval/run_eval.py` (A36).
 - Runtime dependency: `openpyxl` only. Dev dependencies: `pytest`, `ruff`. Nothing else without a reason written in
   `confirm.md`: pandas, for instance, would add tens of MB to read a few hundred rows, and its type inference turns
   an empty `Hạn` into `NaN` and a `STT` into a float. No AI SDK either: the AI is reached through the user's own CLI

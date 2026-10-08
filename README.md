@@ -43,6 +43,7 @@ uv run assigntool --ai agy                  # dùng Antigravity thay cho gemini 
 uv run assigntool --sprint path/export.xlsx # chỉ định file export khi input/ có nhiều file .xlsx
 uv run assigntool --backtest                # giao lại các sprint cũ trong file lịch sử và so với TM (mục 4.2)
 uv run assigntool --rules path/luat.md      # dùng file luật TM nằm ngoài input/ (mục 3.5)
+uv run assigntool --today 2026-10-19        # chạy như thể hôm nay là 19/10/2026 (lịch sử và ngày áp luật)
 uv run assigntool --help                    # mọi tuỳ chọn (mục 6)
 ```
 
@@ -306,10 +307,14 @@ hai dòng `Chỉ định LinhNV` cho AR Dog và VPN thì khớp 50/92 (54%): AR 
 
    | Hạng | Giờ | Ý nghĩa |
    |---|---|---|
-   | `S` | 4 | Tối đa một ngày: sửa crash, sửa policy, đổi text/config. |
-   | `M` | 16 | Hai đến ba ngày. |
-   | `L` | 32 | Khoảng một tuần. |
-   | `XL` | 64 | Hơn một tuần: tính năng mới, SDK mới, nhiều luồng cùng lúc. |
+   | `S` | 4 | Chỉ một việc nhỏ: một crash, một lần sửa policy hoặc store, đổi text/config. |
+   | `M` | 16 | Hai đến ba ngày: một việc cỡ tính năng, hoặc hai ba việc nhỏ. |
+   | `L` | 32 | Khoảng một tuần: nhiều việc, vd sửa ads hoặc IAP kèm sửa luồng hoặc UI. |
+   | `XL` | 64 | Hơn một tuần: tính năng mới, SDK mới, app mới, hoặc rất nhiều việc cùng lúc. |
+
+   AI được dặn rằng mỗi đơn là một version của app, PIC làm hết mọi việc ghi trong tiêu đề và mô tả. Để AI hiểu thang
+   giờ của team, prompt kèm tối đa 30 đơn cũ có `Ước lượng (h)`: lấy từ file lịch sử nếu file có cột giờ, không thì
+   lấy từ các sheet sprint cũ trong file export sprint (file Tech manager hiện chưa có cột giờ).
 
 2. **Đơn giao sẵn giữ nguyên**, chỉ cộng giờ vào tải của dev được ghi tên.
 3. **Đơn trống được xét lần lượt**: urgent → high → normal → low, rồi hạn sớm, rồi ngày tạo, rồi `STT`.
@@ -339,11 +344,12 @@ hai dòng `Chỉ định LinhNV` cho AR Dog và VPN thì khớp 50/92 (54%): AR 
 | `--history FILE` | file `.xlsx` không có sheet `Sprint N`, hoặc file `.csv`; không có thì dùng sheet sprint cũ | File lịch sử Tech manager. |
 | `--rules FILE` | file `.md` duy nhất trong `input/`; không có thì không dùng luật | File luật TM (mục 3.5). |
 | `--sheet NAME` | `Sprint N` lớn nhất | Sheet cần giao, vd `--sheet "Sprint 9"`. |
+| `--today DATE` | hôm nay | Chạy như thể hôm nay là ngày này (`YYYY-MM-DD` hoặc `DD/MM/YYYY`): lịch sử chỉ gồm việc có trước ngày đó, luật áp theo ngày đó. Dùng để chạy lại một sprint cũ hoặc bộ đánh giá trong `eval/`. Tên file báo cáo vẫn theo giờ thật. |
 | `--out DIR` | `output/` | Thư mục ghi báo cáo; tự tạo nếu chưa có. |
 | `--ai gemini\|agy\|off` | `gemini` | Công cụ AI. `agy` cho máy dev; `off` tính mọi đơn là M. |
 | `--ai-model NAME` | mặc định của công cụ AI | Tên model truyền thẳng cho công cụ AI. |
 | `--ai-timeout SECONDS` | `180` | Số giây chờ AI. |
-| `--backtest` | tắt | Giao lại các sprint Maintain trong file lịch sử và so với TM (mục 4.2), có áp file luật. Bỏ qua `--sprint`, `--sheet`, `--ai…`. |
+| `--backtest` | tắt | Giao lại các sprint Maintain trong file lịch sử và so với TM (mục 4.2), có áp file luật. Bỏ qua `--sprint`, `--sheet`, `--today`, `--ai…`. |
 | `-v` | tắt | In traceback khi lỗi và nội dung trao đổi với AI. |
 
 ## 7. Dành cho người phát triển
@@ -355,6 +361,14 @@ ASSIGNTOOL_TEST_AI=gemini uv run pytest -m ai                         # thêm 1 
 
 Test nghiệm thu (`tests/test_real_input.py`) chạy trên `input/Maintain_update_Sprint_10_va_9.xlsx` và
 `input/Tech_manager_T2-T10_2026.xlsx`; thiếu file nào thì các test dùng file đó được bỏ qua kèm lý do.
+
+Bộ đánh giá 5 case nằm trong [`eval/`](eval/README.md): 2 sprint thật dựng lại (đo độ khớp với TM và độ lớn AI so với
+giờ thật) và 3 kịch bản giả lập (giữa sprint và nghỉ phép, luật TM, dữ liệu bẩn). Chạy lại sau mỗi thay đổi luật:
+
+```bash
+uv run python eval/build_cases.py   # sinh lại input của 5 case
+uv run python eval/run_eval.py      # chạy tool (1 lần --ai off + 3 lần gemini mỗi case), ghi eval/results/<giờ>/bang-diem.md
+```
 
 | Tài liệu | Nội dung |
 |---|---|

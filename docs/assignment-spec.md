@@ -50,8 +50,8 @@ exactly as the tool must print it.
 ## 2 · Command line
 
 ```
-assigntool [--input DIR] [--sprint FILE] [--devs FILE] [--history FILE] [--rules FILE] [--sheet NAME] [--out DIR]
-           [--ai gemini|agy|off] [--ai-model NAME] [--ai-timeout SECONDS] [--backtest] [-v]
+assigntool [--input DIR] [--sprint FILE] [--devs FILE] [--history FILE] [--rules FILE] [--sheet NAME] [--today DATE]
+           [--out DIR] [--ai gemini|agy|off] [--ai-model NAME] [--ai-timeout SECONDS] [--backtest] [-v]
 ```
 
 | Option | Default | Meaning |
@@ -62,11 +62,12 @@ assigntool [--input DIR] [--sprint FILE] [--devs FILE] [--history FILE] [--rules
 | `--history FILE` | the only other `*.xlsx` (no `Sprint N` sheet) or `*.csv` in `--input`; none → the workbook's older sprint sheets (§5) | History export (§5). |
 | `--rules FILE` | the only `*.md` in `--input`; none → no rules | TM rules (§14, D29). |
 | `--sheet NAME` | highest `Sprint N` | Target sprint sheet. The previous sprint is then `Sprint N-1`. |
+| `--today DATE` | today (the clock) | The run day, `YYYY-MM-DD` or `DD/MM/YYYY` (A35): the day of the history window (§5.1) and the day the rules day is computed from (§14.3). Lets a past sprint be replayed without seeing later orders, and keeps an evaluation run reproducible (`eval/`). The report's file name still uses the clock. Unreadable: input error. |
 | `--out DIR` | `output/` | Where the report is written. Created if missing. |
 | `--ai` | `gemini` | AI tool used for sizing (§6.4, D16, A17). `agy` is for the dev machine; `off` sizes every order `M`. |
 | `--ai-model` | the AI tool's own default | Model name passed through to the AI tool. |
 | `--ai-timeout` | `180` | Seconds before the AI call is killed and sizes fall back to `M`. |
-| `--backtest` | off | Replay every Maintain sprint of the history export and compare with the TM (§13). Needs only `--history` and `--devs` (and uses `--rules`); `--sprint`, `--sheet` and the `--ai` options are ignored. |
+| `--backtest` | off | Replay every Maintain sprint of the history export and compare with the TM (§13). Needs only `--history` and `--devs` (and uses `--rules`); `--sprint`, `--sheet`, `--today` and the `--ai` options are ignored. |
 | `-v` | off | Show tracebacks for input errors and the AI tool's raw output. |
 
 Discovery reads content, not names (A2): each `.xlsx` other than `devs.xlsx` is opened, and the one with a `Sprint N`
@@ -187,7 +188,8 @@ A run uses the history orders that existed **before it**:
 2. filed (`Ngày lên đơn`) on or before the run day;
 3. its earliest sprint, if it has one, started on or before the run day.
 
-The run day is today for a normal run, and the day the order was filed for the backtest (§13). The same rule in both
+The run day is today for a normal run (or the day given with `--today`, A35), and the day the order was filed for
+the backtest (§13). The same rule in both
 places means the backtest measures exactly what a normal run does, and never sees an assignment made later.
 History includes MVP / research orders and orders with no sprint (A23, D23). A history file is never combined with
 the workbook's older sheets (A8).
@@ -241,7 +243,7 @@ done) is not busy. Statuses are compared after NFC, trimming and casefolding. `�
 ### 6.3 Leave
 
 Working days of the sprint are Monday to Friday between the dates of §3 rule 4, inclusive. A dev whose leave days
-cover every working day is removed from the pool (`DEV-ON-LEAVE`). Otherwise the number of leave days on working days
+cover every working day is removed from the pool (`DEV-ON-LEAVE`). A pre-assigned order held by such a dev and by no other pool dev is kept (D10) and reported (`PRE-ASSIGNED-ON-LEAVE`, A43): nobody in the pool works on it. Otherwise the number of leave days on working days
 is a tie-breaker only (A12). Leave days outside the sprint are ignored.
 
 ### 6.4 Size (AI)
@@ -253,10 +255,14 @@ load (D13). The AI only sizes; it never sees people and never picks a PIC.
 
 | Class | Hours | Meaning given to the AI |
 |---|---|---|
-| `S` | 4 | At most a day: a crash fix, a policy fix, a text or config change. |
-| `M` | 16 | Two to three days. |
-| `L` | 32 | About a week. |
-| `XL` | 64 | More than a week: a new feature, a new SDK, several flows at once. |
+| `S` | 4 | One small item only: a single crash, a single policy or store change, a text or config change. |
+| `M` | 16 | Two to three days: one feature-sized item, or two or three small items. |
+| `L` | 32 | About a week: several items, e.g. ads or IAP changes together with flow (`luồng`) or UI changes. |
+| `XL` | 64 | More than a week: a new feature, a new SDK, a new app, or many items at once. |
+
+The prompt also tells the AI that an order is one release of one app whose PIC does every item listed, and that items
+written as "Fix" (`Fix ads`, `Fix luồng`, `Fix UI`) rework existing screens and each takes days (A44). Without that,
+the AI read "Fix ads/Fix luồng/fix policy" as a policy fix (`S`) when it took 68h (`eval/`, 2026-10-08).
 
 **Tool selection** (`--ai`, A17):
 
@@ -276,7 +282,10 @@ The child runs in a **fresh empty temporary directory** with the user's environm
 1. Instructions: the class table above; "judge from the text only, do not open links or use tools"; the output
    format below.
 2. Up to 30 **examples**: history orders with `Ước lượng (h)` > 0, the target sprint's apps first, then most recent
-   first. Each line: app · title · hours. No names.
+   first. Each line: app · title · hours. No names. When the history has no hours (the Tech manager export today,
+   D25), the examples come from the sprint workbook's older sheets (`Sprint 1` … `Sprint N-1`, read as in §5 "No
+   history file"), which carry `Ước lượng (h)`; they serve only as examples, familiarity still comes from the history
+   file alone (A8, A19). Older sheets that cannot be read give no examples.
 3. The **orders**: each line `STT` · app · priority · title · description. In the description every URL is replaced
    by `[link]` and the text is cut to 600 characters.
 4. If the prompt is longer than 30,000 characters, descriptions are cut to 200 characters, then dropped. This keeps
@@ -405,6 +414,7 @@ never renamed once released. Nothing is ever reported about people outside the p
 | `HISTORY-MISSING` | WARN | No history file and no sprint sheet older than the target (§5). | `Không có file lịch sử và workbook không có sheet sprint cũ; coi như chưa ai làm app nào.` |
 | `HISTORY-FROM-WORKBOOK` | INFO | No history file; the older sheets were used (§5). `where` = the sheet names. | `Không có file lịch sử; dùng sheet <các sheet> trong workbook làm lịch sử.` |
 | `DEV-ON-LEAVE` | INFO | A pool dev is off for every working day. | `<Mã> nghỉ cả sprint; không được giao đơn.` |
+| `PRE-ASSIGNED-ON-LEAVE` | WARN | A pre-assigned order names a dev who is off for every working day (`DEV-ON-LEAVE`) and no other pool dev, so nobody in the pool works on it (A43). The order is still kept (D10). `where` = `Đơn STT <n>`. | `Đơn STT <n> giao sẵn cho <Mã> nhưng <Mã> nghỉ cả sprint; đơn chưa có ai làm, cân nhắc giao lại.` |
 | `RULE-DEV-UNAVAILABLE` | WARN | A `Chỉ định` or `Ưu tiên` rule in force names a dev who is not in the pool: `Nhận việc` = `N` or on leave for the whole sprint (D35). `where` = `Luật dòng <n>`. | `Luật dòng <n> (<Loại> <Mã>) không áp dụng: <Mã> không nhận việc hoặc nghỉ cả sprint.` |
 | `RULE-NO-CANDIDATE` | WARN | The `Không giao` and `Tối đa đơn` rules left no candidate for an order (§7, A31). | `Luật TM loại hết dev khỏi đơn STT <n>; đơn này được giao như khi không có luật Không giao và Tối đa đơn.` |
 
@@ -454,7 +464,7 @@ findings writes a single row `Không có cảnh báo`.
 | `2` | Input or usage error. No report is written. The message names the file, sheet, row or column. |
 | `130` | Interrupted with Ctrl+C. |
 
-The terminal shows: the rules file (`Luật TM: file luat.md (4 luật, 3 có hiệu lực ngày 06/10/2026)`, or `Luật TM:
+The terminal shows: the run day when `--today` is given (`Ngày chạy: 22/10/2026 (--today)`); the rules file (`Luật TM: file luat.md (4 luật, 3 có hiệu lực ngày 06/10/2026)`, or `Luật TM:
 không có`); where the history came from (`Lịch sử: file Tech_manager_T2-T10_2026.xlsx (172 đơn gốc)`, the
 count being the root orders left after the window of §5.1, or `Lịch sử: sheet Sprint 6, Sprint 7, Sprint 8, Sprint 9
 trong workbook (không có file lịch sử)`); the target sprint; how sizing went (`Độ lớn: AI (gemini, 6/6 đơn)`, or the fallback and why);
@@ -731,8 +741,8 @@ A valid rule that cannot act is not an error: a `Chỉ định` or `Ưu tiên` f
 
 A rule is in force on a day when `Từ ngày` ≤ day ≤ `Đến ngày`. The day is:
 
-- **normal run:** today, but not earlier than the target sprint's first day when the sheet has dates (A34): a TM who
-  runs the tool on the Friday before Sprint 10 gets the rules dated for Sprint 10;
+- **normal run:** today (or `--today`, A35), but not earlier than the target sprint's first day when the sheet has
+  dates (A34): a TM who runs the tool on the Friday before Sprint 10 gets the rules dated for Sprint 10;
 - **backtest:** the day each batch is replayed (§13 step 2), so a rule dated for one sprint does not touch another
   (D34).
 
