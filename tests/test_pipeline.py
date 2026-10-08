@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import date
 
 import pytest
@@ -159,6 +160,39 @@ def test_pipeline_reports_missing_previous_and_full_sprint_leave() -> None:
         ("DEV-ON-LEAVE", "OFF"),
     ]
     assert result.devs[-1].dev.code == "OFF" and result.devs[-1].on_leave_all_sprint
+
+
+def test_pipeline_warns_when_a_kept_order_is_held_only_by_a_dev_off_for_the_whole_sprint() -> None:
+    """PRE-ASSIGNED-ON-LEAVE (A43): fires when nobody else in the pool holds the order, which is still kept (D10)."""
+    target_sheet, orders = target(clear_assignees=True)
+    off = Dev("Đỗ Văn Nghỉ", "OFF", Level.MIDDLE, True, tuple(date(2026, 10, day) for day in range(6, 17)))
+    back = Dev("Đỗ Văn Nghỉ", "OFF", Level.MIDDLE, True, (date(2026, 10, 6),))
+
+    def warnings(people: tuple[str, ...], devs: tuple[Dev, ...]) -> list[tuple[str, str, str]]:
+        kept = tuple(Order(replace(o.row, assignees=people), o.priority) if o.row.stt == 7 else o for o in orders)
+        result = build_result(
+            target=target_sheet,
+            prev=previous(),
+            prev_name="Sprint 9",
+            orders=kept,
+            findings=(),
+            devs=devs,
+            history=(),
+            sizes={order.row.stt: SizeEstimate(Size.M, "", True) for order in orders},
+            sizing_note="AI off",
+        )
+        assert next(a for a in result.assignments if a.order.row.stt == 7).source.name == "PREASSIGNED"
+        return [(f.code, f.where, f.message) for f in result.findings if f.code == "PRE-ASSIGNED-ON-LEAVE"]
+
+    assert warnings(("đỗ  văn nghỉ", "QA Ngoài"), (*DEVS, off)) == [
+        (
+            "PRE-ASSIGNED-ON-LEAVE",
+            "Đơn STT 7",
+            "Đơn STT 7 giao sẵn cho OFF nhưng OFF nghỉ cả sprint; đơn chưa có ai làm, cân nhắc giao lại.",
+        )
+    ]
+    assert warnings(("Đỗ Văn Nghỉ", LINH.name), (*DEVS, off)) == []  # LinhNV still works on it
+    assert warnings(("Đỗ Văn Nghỉ",), (*DEVS, back)) == []  # off one day only
 
 
 def test_pipeline_rejects_an_empty_available_pool() -> None:

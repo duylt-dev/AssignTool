@@ -17,7 +17,7 @@ from assigntool.model import (
 from assigntool.rules.assign import assign
 from assigntool.rules.carry_over import carry_over
 from assigntool.rules.familiarity import FamiliarityIndex
-from assigntool.rules.leave import leave_count, on_leave_all_sprint, working_days
+from assigntool.rules.leave import leave_count, on_leave_all_sprint, pre_assigned_on_leave, working_days
 from assigntool.rules.summary import summarize
 from assigntool.rules.team_rules import relaxed_findings, unavailable_findings
 
@@ -47,6 +47,7 @@ def build_result(
         Finding(Severity.INFO, "DEV-ON-LEAVE", dev.code, f"{dev.code} nghỉ cả sprint; không được giao đơn.")
         for dev in removed
     ]
+    extra += pre_assigned_on_leave(orders, removed, pool)
     if prev is None:
         extra.append(
             Finding(
