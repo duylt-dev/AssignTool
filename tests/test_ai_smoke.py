@@ -26,7 +26,7 @@ def test_real_ai_sizes_every_order_of_the_sample() -> None:
     orders, _ = orders_and_findings(target)
     prompt = build_prompt(orders, history_orders(previous))
 
-    reply = run_ai(TOOL, prompt, model=None, timeout=300)
+    reply = run_ai(TOOL, prompt, model=None, timeout=600)  # agy took 117–360 s per sprint prompt (2026-10-08)
     sizes, findings, note = parse_reply(reply, orders)
 
     assert reply.failure is None, reply.failure

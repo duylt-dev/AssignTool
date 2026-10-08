@@ -93,7 +93,8 @@ TM ít hơn 1 đơn: number tracker, không ai trong tầm cân tải quen app, 
 (tiêu chí 3); độ lớn đổi thì số giờ đổi. Không phải do luật chọn PIC thay đổi.
 
 Lượt đo code mới dùng câu mở đầu prompt "a team of four Android developers"; bản commit đổi thành "an Android app
-team" để không ghi cứng số dev. Smoke test với AI thật (`ASSIGNTOOL_TEST_AI=agy`) chạy trên bản commit.
+team" để không ghi cứng số dev. Smoke test với AI thật (`ASSIGNTOOL_TEST_AI=agy`) chạy trên bản commit: qua sau 294 giây; lần đầu hỏng vì vượt
+mức chờ 300 giây trong test, nên mức này nâng lên 600 giây. Chưa chạy được với `gemini` vì key ngừng trả lời.
 
 ### 3.2 Đơn giao sẵn cho dev nghỉ cả sprint không được báo
 
