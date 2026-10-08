@@ -30,7 +30,8 @@ def test_build_prompt_has_exact_headers_removes_urls_and_never_includes_people()
         (_history("Previous", people=("Tran Thi B",)),),
     )
 
-    assert prompt.startswith("You estimate the size of software change orders for an Android app team.\n")
+    assert prompt.startswith("You estimate the size of change orders for an Android app team.\n")
+    assert "An order is one release (version) of one app" in prompt
     assert "Past orders of this team with the hours they took (for calibration):\n- Camera · Previous · 4h" in prompt
     assert "Orders to size:\n- STT 7 · Camera · high · Fix crash · See [link] please" in prompt
     assert prompt.endswith(

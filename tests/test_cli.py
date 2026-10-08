@@ -318,3 +318,17 @@ def test_today_replaces_the_clock_for_the_rules_day(tmp_path: Path, capsys, toda
     printed = capsys.readouterr().out
     assert f"có hiệu lực ngày {rules_day})" in printed
     assert f"STT 1 · Demo 1.0.1 - Add ads [M] → {pic} " in printed
+
+
+def test_without_hours_in_the_history_the_older_sheets_calibrate_the_ai(tmp_path: Path, monkeypatch) -> None:
+    """The Tech manager export has no hours; Sprint 1's `Ước lượng (h)` becomes the AI's example (spec §6.4, A19)."""
+    source = _inputs(tmp_path / "input")
+    older = {**ORDER, "Task": "1.0.0 - First release", "Người làm": "Dev A", "Ước lượng (h)": 12}
+    build_sprint_workbook(source / "export.xlsx", {"Sprint 2": [ORDER], "Sprint 1": [older]})
+    prompts = []
+    monkeypatch.setattr(ai_cli, "run_ai", lambda tool, prompt, **_: prompts.append(prompt) or AiReply(tool, "[]", None))
+
+    assert main(["--input", str(source), "--out", str(tmp_path / "out")]) == 0
+
+    (prompt,) = prompts
+    assert "(for calibration):\n- Demo · 1.0.0 - First release · 12h\n" in prompt
