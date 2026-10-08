@@ -26,6 +26,7 @@ from assigntool.model import (
     Source,
     TeamRule,
 )
+from assigntool.normalize import parse_date
 from assigntool.rules.backtest import backtest, percent
 from assigntool.rules.history_window import history_for
 from assigntool.rules.pipeline import build_result
@@ -72,6 +73,9 @@ def _parser() -> argparse.ArgumentParser:
         "--backtest", action="store_true", help="giao lại các sprint Maintain trong file lịch sử và so với TM"
     )
     parser.add_argument("--sheet", help="sheet sprint cần giao (mặc định: Sprint N lớn nhất)")
+    parser.add_argument(
+        "--today", help="chạy như thể hôm nay là ngày này, YYYY-MM-DD hoặc DD/MM/YYYY (mặc định: hôm nay)"
+    )
     parser.add_argument("--out", default="output", help="thư mục ghi báo cáo (mặc định: output/)")
     parser.add_argument("--ai", choices=("gemini", "agy", "off"), default="gemini", help="công cụ AI ước lượng độ lớn")
     parser.add_argument("--ai-model", help="model truyền thẳng cho công cụ AI")
@@ -104,14 +108,17 @@ def _run(args: argparse.Namespace) -> int:
         print(_rules_note(rules_path, rules, "áp theo ngày giao lại"))
         return _backtest(read_history(history_path), devs, rules, history_path, Path(args.out))
 
+    today = _today(args.today)
     target, prev, prev_name = read_workbook(sprint_path, args.sheet)
     devs = read_devs(devs_path)
     rules = _rules(rules_path, devs)
-    day = rules_day(date.today(), target.start)
+    if args.today is not None:
+        print(f"Ngày chạy: {today:%d/%m/%Y} (--today)")
+    day = rules_day(today, target.start)
     rules_now = in_force(rules, day)
     print(_rules_note(rules_path, rules, f"{len(rules_now)} có hiệu lực ngày {day:%d/%m/%Y}"))
     if history_path is not None:
-        history = history_for(read_history(history_path), target.number, target.start, target.end, date.today())
+        history = history_for(read_history(history_path), target.number, target.start, target.end, today)
         history_note = f"file {history_path.name} ({len(history)} đơn gốc)"
         sheets: tuple[str, ...] = ()
     else:
@@ -136,6 +143,19 @@ def _run(args: argparse.Namespace) -> int:
     path = write_report(result, target.headers, Path(args.out), datetime.now())
     _print_summary(result, path)
     return 0
+
+
+def _today(value: str | None) -> date:
+    """The run day (spec §2): today, or the day given with --today, for the history window and the rules day."""
+    if value is None:
+        return date.today()
+    try:
+        day = parse_date(value)
+    except ValueError:
+        day = None
+    if day is None:
+        raise InputError(f"--today '{value}': không đọc được ngày; dùng YYYY-MM-DD hoặc DD/MM/YYYY.")
+    return day
 
 
 def _rules(path: Path | None, devs: tuple[Dev, ...]) -> tuple[TeamRule, ...]:
