@@ -1,0 +1,20 @@
+Ngày chạy: 21/09/2026 (--today)
+Luật TM: không có
+Lịch sử: file Tech_manager_T2-T10_2026.xlsx (154 đơn gốc)
+Sprint: Sprint 9
+Độ lớn: tắt AI (mọi đơn M)
+Đơn: 12 · giao sẵn: 1 · tool đề xuất: 11 · cảnh báo: 2 WARN, 0 INFO
+STT 1 · PS Remote 1.1.1 - Fix ads/FIx luồng/ fix policy [M] → MinhNM (dự phòng: LinhNV, TiếnBV)
+STT 28 · AR Dog 1.1.1. Add New feature/ Add ads [M] → LinhNV (dự phòng: AnTD, MinhNM)
+STT 49 · Game Emulator 1.0.5 Add fearture/Add tracking/Fix bug/Fix crash/Add ads [M] → AnTD (dự phòng: MinhNM, LinhNV)
+STT 62 · Speak2 1.0.6 - Fix ads/Edit luồng/Fix UI [M] → TiếnBV (dự phòng: MinhNM, LinhNV)
+STT 91 · Game mode 2 1.0.1 - Add ads/Add IAP/Add [M] → TiếnBV (dự phòng: LinhNV, AnTD)
+STT 142 · AR Dog 1.1.0. Edit Flow/Fix ads [M] → LinhNV (dự phòng: AnTD, MinhNM)
+STT 160 · metal detector 1.0.7 - Fix policy native too small [M] → MinhNM (dự phòng: LinhNV, AnTD)
+STT 162 · Santa prank 1.2.4. Fix crash [M] → LinhNV (dự phòng: MinhNM, TiếnBV)
+STT 165 · Game Emulator 1.0.3. Fix crash [M] → AnTD (dự phòng: LinhNV, MinhNM)
+STT 170 · SpeakerCleaner 1.1.2 - Fix ads/Fix luồng/ Fix policy [M] → MinhNM (dự phòng: LinhNV, TiếnBV)
+STT 182 · Game Emulator Nghiên cứu kỹ thuật ứng dụnng game emutaltor [M] → AnTD (dự phòng: LinhNV, MinhNM)
+WARN DUE-BEFORE-CREATED: Đơn STT 160 có Hạn 10/02/2026 trước Ngày tạo 21/09/2026.
+WARN PREV-SPRINT-MISSING: Không có sheet Sprint 8; coi như không dev nào còn việc dở.
+Báo cáo: /Users/macbook/Desktop/AssignTools/eval/results/20261008-1537-baseline/case-1-sprint-9/off/assignment_sprint-9_20261008-153737.xlsx

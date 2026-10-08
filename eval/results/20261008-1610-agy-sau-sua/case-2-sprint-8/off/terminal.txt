@@ -1,0 +1,16 @@
+Ngày chạy: 04/09/2026 (--today)
+Luật TM: không có
+Lịch sử: file Tech_manager_T2-T10_2026.xlsx (138 đơn gốc)
+Sprint: Sprint 8
+Độ lớn: tắt AI (mọi đơn M)
+Đơn: 11 · giao sẵn: 2 · tool đề xuất: 9 · cảnh báo: 0 WARN, 0 INFO
+STT 1 · Auto click 1.0.8. Add tracking/Edit Flow/Edit UI/Add feature/ Fix ads [M] → AnTD (dự phòng: MinhNM, LinhNV)
+STT 11 · Nhiều App Fix lỗi quảng cáo native too small [M] → MinhNM (dự phòng: AnTD, LinhNV)
+STT 16 · number tracker 1.1.3 - Fix ads/FIx luồng [M] → AnTD (dự phòng: LinhNV, TiếnBV)
+STT 32 · AR Dog 1.0.7.Check và fix bug/Edit model/Fix ads/Add tracking [M] → TiếnBV (dự phòng: LinhNV, MinhNM)
+STT 45 · spin wheel 2 [1.0.1] - Add ads [M] → LinhNV (dự phòng: MinhNM, AnTD)
+STT 50 · Roblox skin 1.0.1 - Add ads [M] → MinhNM (dự phòng: LinhNV, AnTD)
+STT 60 · camera detector 1.1.5 - chuyển store [M] → LinhNV (dự phòng: MinhNM, AnTD)
+STT 61 · AR Dog 1.0.8. Fix crash/Tối ưu request data [M] → LinhNV (dự phòng: MinhNM, AnTD)
+STT 66 · Game mode 1.1.1 - Fix policy native too small [M] → MinhNM (dự phòng: LinhNV, TiếnBV)
+Báo cáo: /Users/macbook/Desktop/AssignTools/eval/results/20261008-1610-agy-sau-sua/case-2-sprint-8/off/assignment_sprint-8_20261008-161742.xlsx

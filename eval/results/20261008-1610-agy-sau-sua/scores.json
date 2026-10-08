@@ -1,0 +1,1478 @@
+[
+  {
+    "case": "case-1-sprint-9",
+    "run": "off",
+    "mode": "off",
+    "exit": 0,
+    "seconds": 0.3,
+    "sizing": "tắt AI (mọi đơn M)",
+    "rows": {
+      "1": {
+        "stt": 1,
+        "size": "M",
+        "default": true,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của PS Remote (Sprint 7 (8/17 - 8/28): 1.0.8 - Fix ads/ Add feature/ Add remote) · Tải sprint này: 16h (1 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "LinhNV",
+          "TiếnBV"
+        ]
+      },
+      "28": {
+        "stt": 28,
+        "size": "M",
+        "default": true,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của AR Dog (Sprint 8 (9/4 - 9/18): 1.0.8. Fix crash/Tối ưu request data) · Tải sprint này: 16h (1 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "AnTD",
+          "MinhNM"
+        ]
+      },
+      "49": {
+        "stt": 49,
+        "size": "M",
+        "default": true,
+        "pic": "AnTD",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Game Emulator (Sprint 5 (7/28 - 8/10): 1.0.1 - Add ads/ Add IAP) · Tải sprint này: 32h (2 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "MinhNM",
+          "LinhNV"
+        ]
+      },
+      "62": {
+        "stt": 62,
+        "size": "M",
+        "default": true,
+        "pic": "TiếnBV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Speak2 (Sprint 4 (7/7 - 7/17): 1.0.4 - Fix ads/Fix UI) · Tải sprint này: 16h (1 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "MinhNM",
+          "LinhNV"
+        ]
+      },
+      "91": {
+        "stt": 91,
+        "size": "M",
+        "default": true,
+        "pic": "TiếnBV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Game mode 2 (Sprint 7 (8/17 - 8/28): [Game mode 2] tạo tool auto tracking) · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "LinhNV",
+          "AnTD"
+        ]
+      },
+      "142": {
+        "stt": 142,
+        "size": "M",
+        "default": true,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của AR Dog (Sprint 8 (9/4 - 9/18): 1.0.8. Fix crash/Tối ưu request data) · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "AnTD",
+          "MinhNM"
+        ]
+      },
+      "160": {
+        "stt": 160,
+        "size": "M",
+        "default": true,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của metal detector (Sprint 15 (2/24 - 3/13), Sprint 16 (3/16 - 3/31): Fix crash/Add tracking) · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "LinhNV",
+          "AnTD"
+        ]
+      },
+      "162": {
+        "stt": 162,
+        "size": "M",
+        "default": true,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Santa prank (Sprint 5 (7/28 - 8/10): 1.2.2 Fix lỗi quảng cáo) · Tải sprint này: 32h (2 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "MinhNM",
+          "TiếnBV"
+        ]
+      },
+      "165": {
+        "stt": 165,
+        "size": "M",
+        "default": true,
+        "pic": "AnTD",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Game Emulator (Sprint 5 (7/28 - 8/10): 1.0.1 - Add ads/ Add IAP) · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "LinhNV",
+          "MinhNM"
+        ]
+      },
+      "170": {
+        "stt": 170,
+        "size": "M",
+        "default": true,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của SpeakerCleaner (Sprint 3 (6/22 - 7/3): 1.1.10 Fix ads/ Add ads/Edit UI/) · Tải sprint này: 32h (2 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "LinhNV",
+          "TiếnBV"
+        ]
+      },
+      "182": {
+        "stt": 182,
+        "size": "M",
+        "default": true,
+        "pic": "AnTD",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Game Emulator (Sprint 5 (7/28 - 8/10): 1.0.1 - Add ads/ Add IAP) · Tải sprint này: 16h (1 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "LinhNV",
+          "MinhNM"
+        ]
+      },
+      "183": {
+        "stt": 183,
+        "size": "M",
+        "default": true,
+        "pic": "",
+        "source": "Đã giao sẵn",
+        "reason": "Đã giao sẵn trong file",
+        "backups": []
+      }
+    },
+    "findings": [
+      [
+        "DUE-BEFORE-CREATED",
+        "Đơn STT 160",
+        "Đơn STT 160 có Hạn 10/02/2026 trước Ngày tạo 21/09/2026."
+      ]
+    ],
+    "score": {
+      "tm": [
+        8,
+        11
+      ],
+      "spec_pic": [
+        0,
+        0
+      ],
+      "spec_backups": [
+        0,
+        0
+      ],
+      "kept": [
+        1,
+        1
+      ],
+      "size_exact": [
+        0,
+        0
+      ],
+      "size_near": [
+        0,
+        0
+      ],
+      "size_default": 0,
+      "found": [
+        "DUE-BEFORE-CREATED (STT 160)"
+      ],
+      "missing": [],
+      "extra": [],
+      "misses": [
+        "STT 62 Speak2: tool TiếnBV, TM MinhNM",
+        "STT 160 metal detector: tool MinhNM, TM LinhNV",
+        "STT 170 SpeakerCleaner: tool MinhNM, TM LinhNV"
+      ]
+    }
+  },
+  {
+    "case": "case-1-sprint-9",
+    "run": "agy-1",
+    "mode": "agy",
+    "exit": 0,
+    "seconds": 176.1,
+    "sizing": "AI (agy, 12/12 đơn)",
+    "rows": {
+      "1": {
+        "stt": 1,
+        "size": "L",
+        "default": false,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của PS Remote (Sprint 7 (8/17 - 8/28): 1.0.8 - Fix ads/ Add feature/ Add remote) · Tải sprint này: 4h (1 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "AnTD",
+          "LinhNV"
+        ]
+      },
+      "28": {
+        "stt": 28,
+        "size": "XL",
+        "default": false,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của AR Dog (Sprint 8 (9/4 - 9/18): 1.0.8. Fix crash/Tối ưu request data) · Tải sprint này: 32h (1 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "AnTD",
+          "MinhNM"
+        ]
+      },
+      "49": {
+        "stt": 49,
+        "size": "XL",
+        "default": false,
+        "pic": "AnTD",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Game Emulator (Sprint 5 (7/28 - 8/10): 1.0.1 - Add ads/ Add IAP) · Tải sprint này: 20h (2 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "MinhNM",
+          "LinhNV"
+        ]
+      },
+      "62": {
+        "stt": 62,
+        "size": "L",
+        "default": false,
+        "pic": "TiếnBV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Speak2 (Sprint 4 (7/7 - 7/17): 1.0.4 - Fix ads/Fix UI) · Tải sprint này: 64h (1 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "MinhNM",
+          "LinhNV"
+        ]
+      },
+      "91": {
+        "stt": 91,
+        "size": "XL",
+        "default": false,
+        "pic": "TiếnBV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Game mode 2 (Sprint 7 (8/17 - 8/28): [Game mode 2] tạo tool auto tracking) · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "LinhNV",
+          "AnTD"
+        ]
+      },
+      "142": {
+        "stt": 142,
+        "size": "L",
+        "default": false,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của AR Dog (Sprint 8 (9/4 - 9/18): 1.0.8. Fix crash/Tối ưu request data) · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "AnTD",
+          "MinhNM"
+        ]
+      },
+      "160": {
+        "stt": 160,
+        "size": "S",
+        "default": false,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của metal detector (Sprint 15 (2/24 - 3/13), Sprint 16 (3/16 - 3/31): Fix crash/Add tracking) · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "LinhNV",
+          "AnTD"
+        ]
+      },
+      "162": {
+        "stt": 162,
+        "size": "S",
+        "default": false,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Santa prank (Sprint 5 (7/28 - 8/10): 1.2.2 Fix lỗi quảng cáo) · Tải sprint này: 96h (2 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "MinhNM",
+          "AnTD"
+        ]
+      },
+      "165": {
+        "stt": 165,
+        "size": "S",
+        "default": false,
+        "pic": "AnTD",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Game Emulator (Sprint 5 (7/28 - 8/10): 1.0.1 - Add ads/ Add IAP) · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "LinhNV",
+          "MinhNM"
+        ]
+      },
+      "170": {
+        "stt": 170,
+        "size": "L",
+        "default": false,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của SpeakerCleaner (Sprint 3 (6/22 - 7/3): 1.1.10 Fix ads/ Add ads/Edit UI/) · Tải sprint này: 36h (2 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "LinhNV",
+          "AnTD"
+        ]
+      },
+      "182": {
+        "stt": 182,
+        "size": "M",
+        "default": false,
+        "pic": "AnTD",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Game Emulator (Sprint 5 (7/28 - 8/10): 1.0.1 - Add ads/ Add IAP) · Tải sprint này: 4h (1 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "LinhNV",
+          "MinhNM"
+        ]
+      },
+      "183": {
+        "stt": 183,
+        "size": "XL",
+        "default": false,
+        "pic": "",
+        "source": "Đã giao sẵn",
+        "reason": "Đã giao sẵn trong file",
+        "backups": []
+      }
+    },
+    "findings": [
+      [
+        "DUE-BEFORE-CREATED",
+        "Đơn STT 160",
+        "Đơn STT 160 có Hạn 10/02/2026 trước Ngày tạo 21/09/2026."
+      ]
+    ],
+    "score": {
+      "tm": [
+        8,
+        11
+      ],
+      "spec_pic": [
+        0,
+        0
+      ],
+      "spec_backups": [
+        0,
+        0
+      ],
+      "kept": [
+        1,
+        1
+      ],
+      "size_exact": [
+        6,
+        12
+      ],
+      "size_near": [
+        11,
+        12
+      ],
+      "size_default": 0,
+      "found": [
+        "DUE-BEFORE-CREATED (STT 160)"
+      ],
+      "missing": [],
+      "extra": [],
+      "misses": [
+        "STT 62 Speak2: tool TiếnBV, TM MinhNM",
+        "STT 160 metal detector: tool MinhNM, TM LinhNV",
+        "STT 170 SpeakerCleaner: tool MinhNM, TM LinhNV"
+      ]
+    }
+  },
+  {
+    "case": "case-1-sprint-9",
+    "run": "agy-2",
+    "mode": "agy",
+    "exit": 0,
+    "seconds": 128.0,
+    "sizing": "AI (agy, 12/12 đơn)",
+    "rows": {
+      "1": {
+        "stt": 1,
+        "size": "L",
+        "default": false,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của PS Remote (Sprint 7 (8/17 - 8/28): 1.0.8 - Fix ads/ Add feature/ Add remote) · Tải sprint này: 4h (1 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "AnTD",
+          "LinhNV"
+        ]
+      },
+      "28": {
+        "stt": 28,
+        "size": "XL",
+        "default": false,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của AR Dog (Sprint 8 (9/4 - 9/18): 1.0.8. Fix crash/Tối ưu request data) · Tải sprint này: 32h (1 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "AnTD",
+          "MinhNM"
+        ]
+      },
+      "49": {
+        "stt": 49,
+        "size": "XL",
+        "default": false,
+        "pic": "AnTD",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Game Emulator (Sprint 5 (7/28 - 8/10): 1.0.1 - Add ads/ Add IAP) · Tải sprint này: 20h (2 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "MinhNM",
+          "LinhNV"
+        ]
+      },
+      "62": {
+        "stt": 62,
+        "size": "L",
+        "default": false,
+        "pic": "TiếnBV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Speak2 (Sprint 4 (7/7 - 7/17): 1.0.4 - Fix ads/Fix UI) · Tải sprint này: 64h (1 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "MinhNM",
+          "LinhNV"
+        ]
+      },
+      "91": {
+        "stt": 91,
+        "size": "XL",
+        "default": false,
+        "pic": "TiếnBV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Game mode 2 (Sprint 7 (8/17 - 8/28): [Game mode 2] tạo tool auto tracking) · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "LinhNV",
+          "AnTD"
+        ]
+      },
+      "142": {
+        "stt": 142,
+        "size": "L",
+        "default": false,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của AR Dog (Sprint 8 (9/4 - 9/18): 1.0.8. Fix crash/Tối ưu request data) · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "AnTD",
+          "MinhNM"
+        ]
+      },
+      "160": {
+        "stt": 160,
+        "size": "S",
+        "default": false,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của metal detector (Sprint 15 (2/24 - 3/13), Sprint 16 (3/16 - 3/31): Fix crash/Add tracking) · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "LinhNV",
+          "AnTD"
+        ]
+      },
+      "162": {
+        "stt": 162,
+        "size": "S",
+        "default": false,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Santa prank (Sprint 5 (7/28 - 8/10): 1.2.2 Fix lỗi quảng cáo) · Tải sprint này: 96h (2 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "MinhNM",
+          "AnTD"
+        ]
+      },
+      "165": {
+        "stt": 165,
+        "size": "S",
+        "default": false,
+        "pic": "AnTD",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Game Emulator (Sprint 5 (7/28 - 8/10): 1.0.1 - Add ads/ Add IAP) · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "LinhNV",
+          "MinhNM"
+        ]
+      },
+      "170": {
+        "stt": 170,
+        "size": "L",
+        "default": false,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của SpeakerCleaner (Sprint 3 (6/22 - 7/3): 1.1.10 Fix ads/ Add ads/Edit UI/) · Tải sprint này: 36h (2 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "LinhNV",
+          "AnTD"
+        ]
+      },
+      "182": {
+        "stt": 182,
+        "size": "M",
+        "default": false,
+        "pic": "AnTD",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Game Emulator (Sprint 5 (7/28 - 8/10): 1.0.1 - Add ads/ Add IAP) · Tải sprint này: 4h (1 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "LinhNV",
+          "MinhNM"
+        ]
+      },
+      "183": {
+        "stt": 183,
+        "size": "XL",
+        "default": false,
+        "pic": "",
+        "source": "Đã giao sẵn",
+        "reason": "Đã giao sẵn trong file",
+        "backups": []
+      }
+    },
+    "findings": [
+      [
+        "DUE-BEFORE-CREATED",
+        "Đơn STT 160",
+        "Đơn STT 160 có Hạn 10/02/2026 trước Ngày tạo 21/09/2026."
+      ]
+    ],
+    "score": {
+      "tm": [
+        8,
+        11
+      ],
+      "spec_pic": [
+        0,
+        0
+      ],
+      "spec_backups": [
+        0,
+        0
+      ],
+      "kept": [
+        1,
+        1
+      ],
+      "size_exact": [
+        6,
+        12
+      ],
+      "size_near": [
+        11,
+        12
+      ],
+      "size_default": 0,
+      "found": [
+        "DUE-BEFORE-CREATED (STT 160)"
+      ],
+      "missing": [],
+      "extra": [],
+      "misses": [
+        "STT 62 Speak2: tool TiếnBV, TM MinhNM",
+        "STT 160 metal detector: tool MinhNM, TM LinhNV",
+        "STT 170 SpeakerCleaner: tool MinhNM, TM LinhNV"
+      ]
+    }
+  },
+  {
+    "case": "case-1-sprint-9",
+    "run": "agy-3",
+    "mode": "agy",
+    "exit": 0,
+    "seconds": 136.3,
+    "sizing": "AI (agy, 12/12 đơn)",
+    "rows": {
+      "1": {
+        "stt": 1,
+        "size": "L",
+        "default": false,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của PS Remote (Sprint 7 (8/17 - 8/28): 1.0.8 - Fix ads/ Add feature/ Add remote) · Tải sprint này: 4h (1 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "AnTD",
+          "LinhNV"
+        ]
+      },
+      "28": {
+        "stt": 28,
+        "size": "XL",
+        "default": false,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của AR Dog (Sprint 8 (9/4 - 9/18): 1.0.8. Fix crash/Tối ưu request data) · Tải sprint này: 32h (1 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "AnTD",
+          "MinhNM"
+        ]
+      },
+      "49": {
+        "stt": 49,
+        "size": "XL",
+        "default": false,
+        "pic": "AnTD",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Game Emulator (Sprint 5 (7/28 - 8/10): 1.0.1 - Add ads/ Add IAP) · Tải sprint này: 20h (2 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "MinhNM",
+          "LinhNV"
+        ]
+      },
+      "62": {
+        "stt": 62,
+        "size": "L",
+        "default": false,
+        "pic": "TiếnBV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Speak2 (Sprint 4 (7/7 - 7/17): 1.0.4 - Fix ads/Fix UI) · Tải sprint này: 64h (1 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "MinhNM",
+          "LinhNV"
+        ]
+      },
+      "91": {
+        "stt": 91,
+        "size": "XL",
+        "default": false,
+        "pic": "TiếnBV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Game mode 2 (Sprint 7 (8/17 - 8/28): [Game mode 2] tạo tool auto tracking) · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "LinhNV",
+          "AnTD"
+        ]
+      },
+      "142": {
+        "stt": 142,
+        "size": "L",
+        "default": false,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của AR Dog (Sprint 8 (9/4 - 9/18): 1.0.8. Fix crash/Tối ưu request data) · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "AnTD",
+          "MinhNM"
+        ]
+      },
+      "160": {
+        "stt": 160,
+        "size": "S",
+        "default": false,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của metal detector (Sprint 15 (2/24 - 3/13), Sprint 16 (3/16 - 3/31): Fix crash/Add tracking) · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "LinhNV",
+          "AnTD"
+        ]
+      },
+      "162": {
+        "stt": 162,
+        "size": "S",
+        "default": false,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Santa prank (Sprint 5 (7/28 - 8/10): 1.2.2 Fix lỗi quảng cáo) · Tải sprint này: 96h (2 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "MinhNM",
+          "AnTD"
+        ]
+      },
+      "165": {
+        "stt": 165,
+        "size": "S",
+        "default": false,
+        "pic": "AnTD",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Game Emulator (Sprint 5 (7/28 - 8/10): 1.0.1 - Add ads/ Add IAP) · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "LinhNV",
+          "MinhNM"
+        ]
+      },
+      "170": {
+        "stt": 170,
+        "size": "L",
+        "default": false,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của SpeakerCleaner (Sprint 3 (6/22 - 7/3): 1.1.10 Fix ads/ Add ads/Edit UI/) · Tải sprint này: 36h (2 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "LinhNV",
+          "AnTD"
+        ]
+      },
+      "182": {
+        "stt": 182,
+        "size": "M",
+        "default": false,
+        "pic": "AnTD",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Game Emulator (Sprint 5 (7/28 - 8/10): 1.0.1 - Add ads/ Add IAP) · Tải sprint này: 4h (1 đơn) · Việc dở Sprint 8: 0",
+        "backups": [
+          "LinhNV",
+          "MinhNM"
+        ]
+      },
+      "183": {
+        "stt": 183,
+        "size": "XL",
+        "default": false,
+        "pic": "",
+        "source": "Đã giao sẵn",
+        "reason": "Đã giao sẵn trong file",
+        "backups": []
+      }
+    },
+    "findings": [
+      [
+        "DUE-BEFORE-CREATED",
+        "Đơn STT 160",
+        "Đơn STT 160 có Hạn 10/02/2026 trước Ngày tạo 21/09/2026."
+      ]
+    ],
+    "score": {
+      "tm": [
+        8,
+        11
+      ],
+      "spec_pic": [
+        0,
+        0
+      ],
+      "spec_backups": [
+        0,
+        0
+      ],
+      "kept": [
+        1,
+        1
+      ],
+      "size_exact": [
+        6,
+        12
+      ],
+      "size_near": [
+        11,
+        12
+      ],
+      "size_default": 0,
+      "found": [
+        "DUE-BEFORE-CREATED (STT 160)"
+      ],
+      "missing": [],
+      "extra": [],
+      "misses": [
+        "STT 62 Speak2: tool TiếnBV, TM MinhNM",
+        "STT 160 metal detector: tool MinhNM, TM LinhNV",
+        "STT 170 SpeakerCleaner: tool MinhNM, TM LinhNV"
+      ]
+    }
+  },
+  {
+    "case": "case-2-sprint-8",
+    "run": "off",
+    "mode": "off",
+    "exit": 0,
+    "seconds": 0.3,
+    "sizing": "tắt AI (mọi đơn M)",
+    "rows": {
+      "1": {
+        "stt": 1,
+        "size": "M",
+        "default": true,
+        "pic": "AnTD",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Auto click (Sprint 4 (7/7 - 7/17): 1.0.7. Fix crash) · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "MinhNM",
+          "LinhNV"
+        ]
+      },
+      "11": {
+        "stt": 11,
+        "size": "M",
+        "default": true,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Nhiều App (Sprint 6 (8/10 - 8/14): Fix lỗi ad choice đè lên tag khi đổi ngôn ngữ và native too small) · Tải sprint này: 16h (1 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "AnTD",
+          "LinhNV"
+        ]
+      },
+      "16": {
+        "stt": 16,
+        "size": "M",
+        "default": true,
+        "pic": "AnTD",
+        "source": "Tool đề xuất",
+        "reason": "Chưa làm number tracker · Tải sprint này: 16h (1 đơn) · Việc dở Sprint 7: 0 · LinhNV quen app hơn nhưng đang có 3 đơn (cân tải)",
+        "backups": [
+          "LinhNV",
+          "TiếnBV"
+        ]
+      },
+      "32": {
+        "stt": 32,
+        "size": "M",
+        "default": true,
+        "pic": "TiếnBV",
+        "source": "Tool đề xuất",
+        "reason": "Chưa làm AR Dog · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 7: 0 · LinhNV quen app hơn nhưng đang có 2 đơn (cân tải)",
+        "backups": [
+          "LinhNV",
+          "MinhNM"
+        ]
+      },
+      "45": {
+        "stt": 45,
+        "size": "M",
+        "default": true,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của spin wheel 2 (Sprint 2 (7/28 - 8/31): 1.0.0 phiên bản MVP) · Tải sprint này: 32h (2 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "MinhNM",
+          "AnTD"
+        ]
+      },
+      "50": {
+        "stt": 50,
+        "size": "M",
+        "default": true,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Chưa làm Roblox skin · App chưa ai trong team làm → ưu tiên middle trở lên · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "LinhNV",
+          "AnTD"
+        ]
+      },
+      "60": {
+        "stt": 60,
+        "size": "M",
+        "default": true,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Chưa làm camera detector · App chưa ai trong team làm → ưu tiên middle trở lên · Tải sprint này: 16h (1 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "MinhNM",
+          "AnTD"
+        ]
+      },
+      "61": {
+        "stt": 61,
+        "size": "M",
+        "default": true,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của AR Dog (Sprint 3 (9/3 - 9/30): Nghiên cứu tính năng tương tác với model/mini game/duble model/change skin) · Đơn high → ưu tiên middle trở lên · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "MinhNM",
+          "AnTD"
+        ]
+      },
+      "64": {
+        "stt": 64,
+        "size": "M",
+        "default": true,
+        "pic": "",
+        "source": "Đã giao sẵn",
+        "reason": "Đã giao sẵn trong file",
+        "backups": []
+      },
+      "65": {
+        "stt": 65,
+        "size": "M",
+        "default": true,
+        "pic": "",
+        "source": "Đã giao sẵn",
+        "reason": "Đã giao sẵn trong file",
+        "backups": []
+      },
+      "66": {
+        "stt": 66,
+        "size": "M",
+        "default": true,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Từng làm Game mode (1 version) · Tải sprint này: 32h (2 đơn) · Việc dở Sprint 7: 0 · LinhNV quen app hơn nhưng đang có 3 đơn (cân tải)",
+        "backups": [
+          "LinhNV",
+          "TiếnBV"
+        ]
+      }
+    },
+    "findings": [],
+    "score": {
+      "tm": [
+        4,
+        9
+      ],
+      "spec_pic": [
+        0,
+        0
+      ],
+      "spec_backups": [
+        0,
+        0
+      ],
+      "kept": [
+        2,
+        2
+      ],
+      "size_exact": [
+        0,
+        0
+      ],
+      "size_near": [
+        0,
+        0
+      ],
+      "size_default": 0,
+      "found": [],
+      "missing": [],
+      "extra": [],
+      "misses": [
+        "STT 11 Nhiều App: tool MinhNM, TM LinhNV",
+        "STT 16 number tracker: tool AnTD, TM MinhNM",
+        "STT 32 AR Dog: tool TiếnBV, TM LinhNV, AnTD",
+        "STT 50 Roblox skin: tool MinhNM, TM AnTD",
+        "STT 66 Game mode: tool MinhNM, TM LinhNV"
+      ]
+    }
+  },
+  {
+    "case": "case-2-sprint-8",
+    "run": "agy-1",
+    "mode": "agy",
+    "exit": 0,
+    "seconds": 329.2,
+    "sizing": "AI (agy, 11/11 đơn)",
+    "rows": {
+      "1": {
+        "stt": 1,
+        "size": "XL",
+        "default": false,
+        "pic": "AnTD",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Auto click (Sprint 4 (7/7 - 7/17): 1.0.7. Fix crash) · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "MinhNM",
+          "LinhNV"
+        ]
+      },
+      "11": {
+        "stt": 11,
+        "size": "XL",
+        "default": false,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Nhiều App (Sprint 6 (8/10 - 8/14): Fix lỗi ad choice đè lên tag khi đổi ngôn ngữ và native too small) · Tải sprint này: 16h (1 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "AnTD",
+          "LinhNV"
+        ]
+      },
+      "16": {
+        "stt": 16,
+        "size": "L",
+        "default": false,
+        "pic": "TiếnBV",
+        "source": "Tool đề xuất",
+        "reason": "Chưa làm number tracker · Tải sprint này: 32h (1 đơn) · Việc dở Sprint 7: 0 · LinhNV quen app hơn nhưng đang có 3 đơn (cân tải)",
+        "backups": [
+          "LinhNV",
+          "AnTD"
+        ]
+      },
+      "32": {
+        "stt": 32,
+        "size": "L",
+        "default": false,
+        "pic": "TiếnBV",
+        "source": "Tool đề xuất",
+        "reason": "Chưa làm AR Dog · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 7: 0 · LinhNV quen app hơn nhưng đang có 2 đơn (cân tải)",
+        "backups": [
+          "LinhNV",
+          "MinhNM"
+        ]
+      },
+      "45": {
+        "stt": 45,
+        "size": "L",
+        "default": false,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của spin wheel 2 (Sprint 2 (7/28 - 8/31): 1.0.0 phiên bản MVP) · Tải sprint này: 20h (2 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "MinhNM",
+          "TiếnBV"
+        ]
+      },
+      "50": {
+        "stt": 50,
+        "size": "M",
+        "default": false,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Chưa làm Roblox skin · App chưa ai trong team làm → ưu tiên middle trở lên · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "LinhNV",
+          "AnTD"
+        ]
+      },
+      "60": {
+        "stt": 60,
+        "size": "S",
+        "default": false,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Chưa làm camera detector · App chưa ai trong team làm → ưu tiên middle trở lên · Tải sprint này: 16h (1 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "MinhNM",
+          "AnTD"
+        ]
+      },
+      "61": {
+        "stt": 61,
+        "size": "M",
+        "default": false,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của AR Dog (Sprint 3 (9/3 - 9/30): Nghiên cứu tính năng tương tác với model/mini game/duble model/change skin) · Đơn high → ưu tiên middle trở lên · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "MinhNM",
+          "AnTD"
+        ]
+      },
+      "64": {
+        "stt": 64,
+        "size": "S",
+        "default": false,
+        "pic": "",
+        "source": "Đã giao sẵn",
+        "reason": "Đã giao sẵn trong file",
+        "backups": []
+      },
+      "65": {
+        "stt": 65,
+        "size": "M",
+        "default": false,
+        "pic": "",
+        "source": "Đã giao sẵn",
+        "reason": "Đã giao sẵn trong file",
+        "backups": []
+      },
+      "66": {
+        "stt": 66,
+        "size": "M",
+        "default": false,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Từng làm Game mode (1 version) · Tải sprint này: 80h (2 đơn) · Việc dở Sprint 7: 0 · LinhNV quen app hơn nhưng đang có 3 đơn (cân tải)",
+        "backups": [
+          "LinhNV",
+          "AnTD"
+        ]
+      }
+    },
+    "findings": [],
+    "score": {
+      "tm": [
+        4,
+        9
+      ],
+      "spec_pic": [
+        0,
+        0
+      ],
+      "spec_backups": [
+        0,
+        0
+      ],
+      "kept": [
+        2,
+        2
+      ],
+      "size_exact": [
+        6,
+        8
+      ],
+      "size_near": [
+        8,
+        8
+      ],
+      "size_default": 0,
+      "found": [],
+      "missing": [],
+      "extra": [],
+      "misses": [
+        "STT 11 Nhiều App: tool MinhNM, TM LinhNV",
+        "STT 16 number tracker: tool TiếnBV, TM MinhNM",
+        "STT 32 AR Dog: tool TiếnBV, TM LinhNV, AnTD",
+        "STT 50 Roblox skin: tool MinhNM, TM AnTD",
+        "STT 66 Game mode: tool MinhNM, TM LinhNV"
+      ]
+    }
+  },
+  {
+    "case": "case-2-sprint-8",
+    "run": "agy-2",
+    "mode": "agy",
+    "exit": 0,
+    "seconds": 124.6,
+    "sizing": "AI (agy, 11/11 đơn)",
+    "rows": {
+      "1": {
+        "stt": 1,
+        "size": "XL",
+        "default": false,
+        "pic": "AnTD",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Auto click (Sprint 4 (7/7 - 7/17): 1.0.7. Fix crash) · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "MinhNM",
+          "LinhNV"
+        ]
+      },
+      "11": {
+        "stt": 11,
+        "size": "XL",
+        "default": false,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Nhiều App (Sprint 6 (8/10 - 8/14): Fix lỗi ad choice đè lên tag khi đổi ngôn ngữ và native too small) · Tải sprint này: 16h (1 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "AnTD",
+          "LinhNV"
+        ]
+      },
+      "16": {
+        "stt": 16,
+        "size": "L",
+        "default": false,
+        "pic": "TiếnBV",
+        "source": "Tool đề xuất",
+        "reason": "Chưa làm number tracker · Tải sprint này: 32h (1 đơn) · Việc dở Sprint 7: 0 · LinhNV quen app hơn nhưng đang có 3 đơn (cân tải)",
+        "backups": [
+          "LinhNV",
+          "AnTD"
+        ]
+      },
+      "32": {
+        "stt": 32,
+        "size": "L",
+        "default": false,
+        "pic": "TiếnBV",
+        "source": "Tool đề xuất",
+        "reason": "Chưa làm AR Dog · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 7: 0 · LinhNV quen app hơn nhưng đang có 2 đơn (cân tải)",
+        "backups": [
+          "LinhNV",
+          "MinhNM"
+        ]
+      },
+      "45": {
+        "stt": 45,
+        "size": "L",
+        "default": false,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của spin wheel 2 (Sprint 2 (7/28 - 8/31): 1.0.0 phiên bản MVP) · Tải sprint này: 20h (2 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "MinhNM",
+          "TiếnBV"
+        ]
+      },
+      "50": {
+        "stt": 50,
+        "size": "M",
+        "default": false,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Chưa làm Roblox skin · App chưa ai trong team làm → ưu tiên middle trở lên · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "LinhNV",
+          "AnTD"
+        ]
+      },
+      "60": {
+        "stt": 60,
+        "size": "S",
+        "default": false,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Chưa làm camera detector · App chưa ai trong team làm → ưu tiên middle trở lên · Tải sprint này: 16h (1 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "MinhNM",
+          "AnTD"
+        ]
+      },
+      "61": {
+        "stt": 61,
+        "size": "M",
+        "default": false,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của AR Dog (Sprint 3 (9/3 - 9/30): Nghiên cứu tính năng tương tác với model/mini game/duble model/change skin) · Đơn high → ưu tiên middle trở lên · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "MinhNM",
+          "AnTD"
+        ]
+      },
+      "64": {
+        "stt": 64,
+        "size": "S",
+        "default": false,
+        "pic": "",
+        "source": "Đã giao sẵn",
+        "reason": "Đã giao sẵn trong file",
+        "backups": []
+      },
+      "65": {
+        "stt": 65,
+        "size": "M",
+        "default": false,
+        "pic": "",
+        "source": "Đã giao sẵn",
+        "reason": "Đã giao sẵn trong file",
+        "backups": []
+      },
+      "66": {
+        "stt": 66,
+        "size": "L",
+        "default": false,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Từng làm Game mode (1 version) · Tải sprint này: 80h (2 đơn) · Việc dở Sprint 7: 0 · LinhNV quen app hơn nhưng đang có 3 đơn (cân tải)",
+        "backups": [
+          "LinhNV",
+          "AnTD"
+        ]
+      }
+    },
+    "findings": [],
+    "score": {
+      "tm": [
+        4,
+        9
+      ],
+      "spec_pic": [
+        0,
+        0
+      ],
+      "spec_backups": [
+        0,
+        0
+      ],
+      "kept": [
+        2,
+        2
+      ],
+      "size_exact": [
+        5,
+        8
+      ],
+      "size_near": [
+        8,
+        8
+      ],
+      "size_default": 0,
+      "found": [],
+      "missing": [],
+      "extra": [],
+      "misses": [
+        "STT 11 Nhiều App: tool MinhNM, TM LinhNV",
+        "STT 16 number tracker: tool TiếnBV, TM MinhNM",
+        "STT 32 AR Dog: tool TiếnBV, TM LinhNV, AnTD",
+        "STT 50 Roblox skin: tool MinhNM, TM AnTD",
+        "STT 66 Game mode: tool MinhNM, TM LinhNV"
+      ]
+    }
+  },
+  {
+    "case": "case-2-sprint-8",
+    "run": "agy-3",
+    "mode": "agy",
+    "exit": 0,
+    "seconds": 254.2,
+    "sizing": "AI (agy, 11/11 đơn)",
+    "rows": {
+      "1": {
+        "stt": 1,
+        "size": "XL",
+        "default": false,
+        "pic": "AnTD",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Auto click (Sprint 4 (7/7 - 7/17): 1.0.7. Fix crash) · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "MinhNM",
+          "LinhNV"
+        ]
+      },
+      "11": {
+        "stt": 11,
+        "size": "XL",
+        "default": false,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của Nhiều App (Sprint 6 (8/10 - 8/14): Fix lỗi ad choice đè lên tag khi đổi ngôn ngữ và native too small) · Tải sprint này: 16h (1 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "AnTD",
+          "LinhNV"
+        ]
+      },
+      "16": {
+        "stt": 16,
+        "size": "L",
+        "default": false,
+        "pic": "TiếnBV",
+        "source": "Tool đề xuất",
+        "reason": "Chưa làm number tracker · Tải sprint này: 32h (1 đơn) · Việc dở Sprint 7: 0 · LinhNV quen app hơn nhưng đang có 3 đơn (cân tải)",
+        "backups": [
+          "LinhNV",
+          "AnTD"
+        ]
+      },
+      "32": {
+        "stt": 32,
+        "size": "L",
+        "default": false,
+        "pic": "TiếnBV",
+        "source": "Tool đề xuất",
+        "reason": "Chưa làm AR Dog · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 7: 0 · LinhNV quen app hơn nhưng đang có 2 đơn (cân tải)",
+        "backups": [
+          "LinhNV",
+          "MinhNM"
+        ]
+      },
+      "45": {
+        "stt": 45,
+        "size": "XL",
+        "default": false,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của spin wheel 2 (Sprint 2 (7/28 - 8/31): 1.0.0 phiên bản MVP) · Tải sprint này: 20h (2 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "MinhNM",
+          "TiếnBV"
+        ]
+      },
+      "50": {
+        "stt": 50,
+        "size": "M",
+        "default": false,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Chưa làm Roblox skin · App chưa ai trong team làm → ưu tiên middle trở lên · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "LinhNV",
+          "AnTD"
+        ]
+      },
+      "60": {
+        "stt": 60,
+        "size": "S",
+        "default": false,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Chưa làm camera detector · App chưa ai trong team làm → ưu tiên middle trở lên · Tải sprint này: 16h (1 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "MinhNM",
+          "AnTD"
+        ]
+      },
+      "61": {
+        "stt": 61,
+        "size": "M",
+        "default": false,
+        "pic": "LinhNV",
+        "source": "Tool đề xuất",
+        "reason": "Làm version gần nhất của AR Dog (Sprint 3 (9/3 - 9/30): Nghiên cứu tính năng tương tác với model/mini game/duble model/change skin) · Đơn high → ưu tiên middle trở lên · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 7: 0",
+        "backups": [
+          "MinhNM",
+          "AnTD"
+        ]
+      },
+      "64": {
+        "stt": 64,
+        "size": "S",
+        "default": false,
+        "pic": "",
+        "source": "Đã giao sẵn",
+        "reason": "Đã giao sẵn trong file",
+        "backups": []
+      },
+      "65": {
+        "stt": 65,
+        "size": "M",
+        "default": false,
+        "pic": "",
+        "source": "Đã giao sẵn",
+        "reason": "Đã giao sẵn trong file",
+        "backups": []
+      },
+      "66": {
+        "stt": 66,
+        "size": "M",
+        "default": false,
+        "pic": "MinhNM",
+        "source": "Tool đề xuất",
+        "reason": "Từng làm Game mode (1 version) · Tải sprint này: 80h (2 đơn) · Việc dở Sprint 7: 0 · LinhNV quen app hơn nhưng đang có 3 đơn (cân tải)",
+        "backups": [
+          "LinhNV",
+          "AnTD"
+        ]
+      }
+    },
+    "findings": [],
+    "score": {
+      "tm": [
+        4,
+        9
+      ],
+      "spec_pic": [
+        0,
+        0
+      ],
+      "spec_backups": [
+        0,
+        0
+      ],
+      "kept": [
+        2,
+        2
+      ],
+      "size_exact": [
+        5,
+        8
+      ],
+      "size_near": [
+        8,
+        8
+      ],
+      "size_default": 0,
+      "found": [],
+      "missing": [],
+      "extra": [],
+      "misses": [
+        "STT 11 Nhiều App: tool MinhNM, TM LinhNV",
+        "STT 16 number tracker: tool TiếnBV, TM MinhNM",
+        "STT 32 AR Dog: tool TiếnBV, TM LinhNV, AnTD",
+        "STT 50 Roblox skin: tool MinhNM, TM AnTD",
+        "STT 66 Game mode: tool MinhNM, TM LinhNV"
+      ]
+    }
+  }
+]

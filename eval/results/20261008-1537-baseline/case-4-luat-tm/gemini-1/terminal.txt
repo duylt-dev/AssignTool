@@ -1,0 +1,20 @@
+Ngày chạy: 16/10/2026 (--today)
+Luật TM: file luat.md (8 luật, 7 có hiệu lực ngày 19/10/2026)
+Lịch sử: file Tech_manager_T2-T10_2026.xlsx (178 đơn gốc)
+Đang ước lượng độ lớn bằng gemini…
+Sprint: Sprint 11
+Độ lớn: AI (gemini, 12/12 đơn)
+Đơn: 12 · giao sẵn: 2 · tool đề xuất: 10 · cảnh báo: 2 WARN, 0 INFO
+STT 3 · PS Remote 1.1.3 - Add feature/Add ads [L] → TiếnBV (dự phòng: LinhNV, AnTD)
+STT 4 · AR Dog 1.1.3 - Add New feature mini game/Add ads [XL] → LinhNV (dự phòng: AnTD, TiếnBV)
+STT 5 · AR Dog 1.1.4 - Fix ads/Fix luồng [S] → LinhNV (dự phòng: AnTD, TiếnBV)
+STT 6 · PS Remote 1.1.4 - Fix policy [S] → AnTD (dự phòng: TiếnBV, LinhNV)
+STT 7 · Game Emulator 1.0.8 - Add feature cloud save [L] → AnTD (dự phòng: TiếnBV, LinhNV)
+STT 8 · Spin wheel 1.2.0 - Fix ads/Edit UI [M] → LinhNV (dự phòng: TiếnBV)
+STT 9 · Auto click 1.1.2 - Add tracking/Fix luồng [M] → LinhNV (dự phòng: TiếnBV)
+STT 10 · Lovetest 1.0.8 - Fix ads/Fix luồng [S] → MinhNM (dự phòng: AnTD, TiếnBV)
+STT 11 · VPN 1.1.8 - Fix IAP/Fix luồng [M] → TiếnBV (dự phòng: LinhNV)
+STT 12 · live video 2 1.0.9 - Edit UI [S] → TiếnBV (dự phòng: LinhNV)
+WARN RULE-DEV-UNAVAILABLE: Luật dòng 11 (Ưu tiên NamPV) không áp dụng: NamPV không nhận việc hoặc nghỉ cả sprint.
+WARN RULE-NO-CANDIDATE: Luật TM loại hết dev khỏi đơn STT 10; đơn này được giao như khi không có luật Không giao và Tối đa đơn.
+Báo cáo: /Users/macbook/Desktop/AssignTools/eval/results/20261008-1537-baseline/case-4-luat-tm/gemini-1/assignment_sprint-11_20261008-154209.xlsx

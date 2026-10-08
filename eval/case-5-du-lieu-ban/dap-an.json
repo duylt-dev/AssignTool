@@ -1,0 +1,224 @@
+{
+  "slug": "case-5-du-lieu-ban",
+  "title": "Dữ liệu bẩn, app mới",
+  "kind": "synthetic",
+  "args": [
+    "--today",
+    "2026-10-16",
+    "--history",
+    "input/Tech_manager_T2-T10_2026.xlsx"
+  ],
+  "orders": [
+    {
+      "stt": 1,
+      "app": "Phone Cleaner",
+      "title": "1.0.3 - Fix ANR màn dọn rác",
+      "priority": null,
+      "pre_assigned": true,
+      "tm": null,
+      "spec_pic": null,
+      "spec_backups": [],
+      "size_target": "S",
+      "type": "Task"
+    },
+    {
+      "stt": 3,
+      "app": "Auto click",
+      "title": "1.1.2 - Add tracking/Edit UI",
+      "priority": null,
+      "pre_assigned": true,
+      "tm": null,
+      "spec_pic": null,
+      "spec_backups": [],
+      "size_target": "M",
+      "type": "Task"
+    },
+    {
+      "stt": 4,
+      "app": "live video 2",
+      "title": "1.0.9 - Fix ads",
+      "priority": null,
+      "pre_assigned": true,
+      "tm": null,
+      "spec_pic": null,
+      "spec_backups": [],
+      "size_target": "S",
+      "type": "Task"
+    },
+    {
+      "stt": 5,
+      "app": "QR Scanner",
+      "title": "1.0.0 - Init project/Add ads/Add IAP",
+      "priority": "urgent",
+      "pre_assigned": false,
+      "tm": null,
+      "spec_pic": "MinhNM",
+      "spec_backups": [
+        "LinhNV",
+        "TiếnBV"
+      ],
+      "size_target": "XL",
+      "type": "Task"
+    },
+    {
+      "stt": 6,
+      "app": "Weather Live",
+      "title": "1.0.0 - Init project/Add widget/Add ads",
+      "priority": "Urgent",
+      "pre_assigned": false,
+      "tm": null,
+      "spec_pic": "LinhNV",
+      "spec_backups": [
+        "MinhNM",
+        "TiếnBV"
+      ],
+      "size_target": "XL",
+      "type": "Task"
+    },
+    {
+      "stt": 7,
+      "app": "Fake GPS",
+      "title": "1.0.1 - Fix policy location permission",
+      "priority": "urgent",
+      "pre_assigned": false,
+      "tm": null,
+      "spec_pic": "MinhNM",
+      "spec_backups": [
+        "LinhNV",
+        "TiếnBV"
+      ],
+      "size_target": "S",
+      "type": "Task"
+    },
+    {
+      "stt": 8,
+      "app": null,
+      "title": "Fix crash màn splash trên Android 14",
+      "priority": "high",
+      "pre_assigned": false,
+      "tm": null,
+      "spec_pic": "TiếnBV",
+      "spec_backups": [
+        "LinhNV",
+        "MinhNM"
+      ],
+      "size_target": "S",
+      "type": "Task"
+    },
+    {
+      "stt": 9,
+      "app": "Speaker Cleaner",
+      "title": "1.1.3 - Fix ads/Fix luồng",
+      "priority": null,
+      "pre_assigned": false,
+      "tm": null,
+      "spec_pic": "LinhNV",
+      "spec_backups": [
+        "MinhNM",
+        "TiếnBV"
+      ],
+      "size_target": "M",
+      "type": "Task"
+    },
+    {
+      "stt": 10,
+      "app": "ps remote",
+      "title": "1.1.3 - Fix crash kết nối",
+      "priority": "gấp",
+      "pre_assigned": false,
+      "tm": null,
+      "spec_pic": "MinhNM",
+      "spec_backups": [
+        "LinhNV",
+        "TiếnBV"
+      ],
+      "size_target": "S",
+      "type": "Task"
+    },
+    {
+      "stt": 11,
+      "app": "Nhiều App",
+      "title": "Fix policy native too small cho 6 app",
+      "priority": null,
+      "pre_assigned": false,
+      "tm": null,
+      "spec_pic": "AnTD",
+      "spec_backups": [
+        "LinhNV",
+        "MinhNM"
+      ],
+      "size_target": "M",
+      "type": "Task"
+    },
+    {
+      "stt": 12,
+      "app": "Game Emulator",
+      "title": "1.0.8 - Add feature save state/Add ads",
+      "priority": null,
+      "pre_assigned": false,
+      "tm": null,
+      "spec_pic": "AnTD",
+      "spec_backups": [
+        "TiếnBV",
+        "LinhNV"
+      ],
+      "size_target": "XL",
+      "type": "Task"
+    },
+    {
+      "stt": 13,
+      "app": "VPN",
+      "title": "1.1.8 - Fix IAP",
+      "priority": null,
+      "pre_assigned": false,
+      "tm": null,
+      "spec_pic": "TiếnBV",
+      "spec_backups": [
+        "LinhNV",
+        "MinhNM"
+      ],
+      "size_target": "M",
+      "type": "Task"
+    },
+    {
+      "stt": 14,
+      "app": "VPN",
+      "title": "Crash khi xoay màn hình",
+      "priority": null,
+      "pre_assigned": false,
+      "tm": null,
+      "spec_pic": null,
+      "spec_backups": [],
+      "size_target": null,
+      "type": "Bug"
+    }
+  ],
+  "findings": [
+    {
+      "code": "APP-MISSING",
+      "stt": 8
+    },
+    {
+      "code": "PRIORITY-UNKNOWN",
+      "stt": 10
+    },
+    {
+      "code": "DUE-BEFORE-CREATED",
+      "stt": 12
+    },
+    {
+      "code": "TYPE-UNKNOWN",
+      "stt": 14
+    },
+    {
+      "code": "PREV-SPRINT-MISSING",
+      "stt": null
+    }
+  ],
+  "watch": [
+    "STT 4 giao sẵn cho 'Bùi Văn Tiếng' (gõ sai tên TiếnBV): tool coi là người lạ, TiếnBV bị tính thiếu 1 đơn và không có cảnh báo nào (cái giá đã biết của D14).",
+    "STT 1 tên dạng NFD có hai khoảng trắng, STT 3 viết thường: vẫn phải nhận ra LinhNV, AnTD (A10).",
+    "STT 12 có mô tả khoảng 6.000 ký tự với 60 link: prompt phải cắt còn 600 ký tự và thay link bằng [link].",
+    "Ba đơn urgent của app mới cùng lúc: hai middle+ nhận hai đơn, đơn thứ tư (high, không có app) rơi vào junior."
+  ]
+}

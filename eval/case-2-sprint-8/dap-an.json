@@ -1,0 +1,144 @@
+{
+  "slug": "case-2-sprint-8",
+  "title": "Sprint 8 dựng lại",
+  "kind": "real",
+  "args": [
+    "--today",
+    "2026-09-04",
+    "--history",
+    "input/Tech_manager_T2-T10_2026.xlsx"
+  ],
+  "orders": [
+    {
+      "stt": 1,
+      "app": "Auto click",
+      "title": "1.0.8. Add tracking/Edit Flow/Edit UI/Add feature/ Fix ads",
+      "priority": null,
+      "pre_assigned": false,
+      "tm": [
+        "AnTD"
+      ],
+      "hours": 55.5,
+      "size_true": "XL"
+    },
+    {
+      "stt": 11,
+      "app": "Nhiều App",
+      "title": "Fix lỗi quảng cáo native too small",
+      "priority": null,
+      "pre_assigned": false,
+      "tm": [
+        "LinhNV"
+      ],
+      "hours": null,
+      "size_true": null
+    },
+    {
+      "stt": 16,
+      "app": "number tracker",
+      "title": "1.1.3 - Fix ads/FIx luồng",
+      "priority": null,
+      "pre_assigned": false,
+      "tm": [
+        "MinhNM"
+      ],
+      "hours": 36,
+      "size_true": "L"
+    },
+    {
+      "stt": 32,
+      "app": "AR Dog",
+      "title": "1.0.7.Check và fix bug/Edit model/Fix ads/Add tracking",
+      "priority": null,
+      "pre_assigned": false,
+      "tm": [
+        "LinhNV",
+        "AnTD"
+      ],
+      "hours": 40.67,
+      "size_true": "L"
+    },
+    {
+      "stt": 45,
+      "app": "spin wheel 2",
+      "title": "[1.0.1] - Add ads",
+      "priority": null,
+      "pre_assigned": false,
+      "tm": [
+        "LinhNV"
+      ],
+      "hours": 45,
+      "size_true": "L"
+    },
+    {
+      "stt": 50,
+      "app": "Roblox skin",
+      "title": "1.0.1 - Add ads",
+      "priority": null,
+      "pre_assigned": false,
+      "tm": [
+        "AnTD"
+      ],
+      "hours": 40,
+      "size_true": "L"
+    },
+    {
+      "stt": 60,
+      "app": "camera detector",
+      "title": "1.1.5 - chuyển store",
+      "priority": null,
+      "pre_assigned": false,
+      "tm": [
+        "LinhNV"
+      ],
+      "hours": 4,
+      "size_true": "S"
+    },
+    {
+      "stt": 61,
+      "app": "AR Dog",
+      "title": "1.0.8. Fix crash/Tối ưu request data",
+      "priority": "high",
+      "pre_assigned": false,
+      "tm": [
+        "LinhNV"
+      ],
+      "hours": 5,
+      "size_true": "S"
+    },
+    {
+      "stt": 64,
+      "app": "Roblox skin",
+      "title": "1.0.3. Fix policy Device and Network Abuse",
+      "priority": "high",
+      "pre_assigned": true,
+      "tm": null,
+      "hours": null,
+      "size_true": null
+    },
+    {
+      "stt": 65,
+      "app": "WifiHotspot",
+      "title": "1.2.4- Fix policy",
+      "priority": null,
+      "pre_assigned": true,
+      "tm": null,
+      "hours": null,
+      "size_true": null
+    },
+    {
+      "stt": 66,
+      "app": "Game mode",
+      "title": "1.1.1 - Fix policy native too small",
+      "priority": null,
+      "pre_assigned": false,
+      "tm": [
+        "LinhNV"
+      ],
+      "hours": 10,
+      "size_true": "M"
+    }
+  ],
+  "findings": [],
+  "watch": []
+}
