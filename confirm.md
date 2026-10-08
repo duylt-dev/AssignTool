@@ -7,7 +7,7 @@ File này ghi mọi quyết định về phạm vi và hành vi của tool. Các
   dòng đó.
 - **`On`: còn mở.** Code xây theo phương án mặc định ghi trong dòng, nhưng không coi là đã chốt.
 
-Ngày chốt: 2026-10-06; cập nhật 2026-10-07 theo câu trả lời trong `plans/reports/261007-cau-hoi-export-t2-t10.md` (mục tiêu mới: hệ thống tự giao việc cho dev). Dữ liệu tham chiếu: `input/Maintain_update_Sprint_10_va_9.xlsx` (sheet Sprint 10 và Sprint 6–9) và `input/Tech_manager_T2-T10_2026.xlsx` (list Tech manager xuất từ CSDL, tháng 2–10/2026).
+Ngày chốt: 2026-10-06; cập nhật 2026-10-07 theo câu trả lời trong `plans/reports/261007-cau-hoi-export-t2-t10.md` (mục tiêu mới: hệ thống tự giao việc cho dev), rồi theo `plans/reports/261007-cau-hoi-luat-dong-tech-manager.md` (luật động của TM, D28–D35). Dữ liệu tham chiếu: `input/Maintain_update_Sprint_10_va_9.xlsx` (sheet Sprint 10 và Sprint 6–9) và `input/Tech_manager_T2-T10_2026.xlsx` (list Tech manager xuất từ CSDL, tháng 2–10/2026).
 
 ---
 
@@ -42,6 +42,14 @@ Ngày chốt: 2026-10-06; cập nhật 2026-10-07 theo câu trả lời trong `p
 | D25 | Người export **có thể thêm** cột `ID task cha`, `Mô tả`, `Ước lượng (h)` vào file Tech manager (câu B4). Hiện chưa cần vì dùng cả hai file (D6). File có cột `Ước lượng (h)` thì số giờ đó được gửi cho AI làm ví dụ (A19). |
 | D26 | Giới hạn chênh tải tính theo **số đơn**: chỉ xét dev có số đơn ≤ (ít đơn nhất) + 1. Số giờ vẫn là tiêu chí thứ 3 của spec §7 (câu C1, đóng O7 và O5). Khi mọi đơn là M, kết quả y hệt cách tính theo giờ cũ. |
 | D27 | Chấp nhận độ lớn AI thay đổi giữa các lần chạy (câu C2, đóng O6). Sau D26, độ lớn chỉ còn ảnh hưởng tới tiêu chí tải giờ. |
+| D28 | **TM truyền luật động cho tool bằng một file `.md`**, trong đó luật là một bảng markdown có cột cố định (`Loại` · `Dev` · `App` · `Số đơn` · `Từ ngày` · `Đến ngày` · `Ghi chú`), mỗi dòng một luật. Tool đọc bảng trực tiếp, **không qua AI**: AI vẫn chỉ ước lượng độ lớn, không đọc luật, không chọn người (câu L1, L2, 2026-10-07). Chữ ngoài bảng là ghi chú tự do, tool bỏ qua. |
+| D29 | Tool tìm file luật là **file `.md` duy nhất trong `input/`**, hoặc file chỉ định bằng `--rules FILE`. Không có file `.md` thì chạy không luật như trước; có từ hai file trở lên thì dừng và yêu cầu `--rules` (câu L2a). |
+| D30 | Bốn loại luật: **`Chỉ định`** dev cho app, **`Không giao`** (dev không nhận đơn của một app, hoặc của mọi app khi `App` trống), **`Tối đa đơn`** cho một dev (tính cả đơn giao sẵn), **`Ưu tiên`** dev cho app (câu L3). Luật chỉ tác động lên đơn còn trống; đơn giao sẵn giữ nguyên (D10). |
+| D31 | `Chỉ định` **vượt giới hạn cân tải** (D26) và bỏ qua khoá chọn PIC, như một đơn giao sẵn. Muốn giới hạn số đơn của dev được chỉ định thì thêm `Tối đa đơn` (câu L4). |
+| D32 | `Ưu tiên` là **tiêu chí đầu tiên của khoá chọn PIC**, đứng trước "quen app", nhưng **vẫn trong giới hạn cân tải**. Dev được ưu tiên đang giữ quá nhiều đơn thì giao theo luật thường và lý do ghi như cân tải hiện nay (câu L5). |
+| D33 | Luật có hiệu lực theo cột **`Từ ngày` / `Đến ngày`**; ô trống là không giới hạn phía đó. Một lần chạy dùng các luật có hiệu lực vào ngày chạy (câu L6; ngày chạy cụ thể: A34). |
+| D34 | **Backtest áp luật** theo `Từ ngày` / `Đến ngày` so với ngày giao lại đơn (ngày lên đơn, A29). Báo cáo backtest ghi rõ đơn nào chịu tác động của luật nào (câu L7). |
+| D35 | Luật sai: file không có bảng luật, `Dev` không có trong `devs.xlsx`, `Loại` không hợp lệ, `Số đơn` không phải số nguyên dương, ngày không đọc được, hoặc hai luật mâu thuẫn (hai `Chỉ định` khác dev cho cùng app; `Chỉ định` và `Không giao` cùng dev cùng app) → **lỗi input, dừng với exit 2**, báo tên file, số dòng, cột; không đoán luật nào thắng. Luật đúng nhưng dev `Nhận việc` = `N` hoặc nghỉ cả sprint → bỏ qua luật, cảnh báo WARN. Luật không khớp đơn nào → không báo (câu L8). |
 
 ## A: mặc định của Claude
 
@@ -76,6 +84,11 @@ Ngày chốt: 2026-10-06; cập nhật 2026-10-07 theo câu trả lời trong `p
 | A27 | Tên app chỉ chuẩn hoá theo A10, không có bảng tên gọi khác: `fakecal` và `Fake Call` là hai app (câu M6). | Bảng tên gọi phải có người giữ; chưa thấy đủ trường hợp để đáng làm. |
 | A28 | Giữ bộ test nghiệm thu A–D trên file Maintain (spec §12), thêm lần chạy với file Tech manager và backtest nhiều sprint (câu M7). | |
 | A29 | Backtest (D22): `assigntool --backtest`, chỉ cần file Tech manager và `devs.xlsx`. Với mỗi sprint Maintain: đơn của sprint mà TM đã giao cho dev trong danh sách được xoá `Người làm` rồi giao lại; đơn mang sang từ sprint Maintain trước giữ nguyên người TM giao (như đơn giao sẵn). Đơn được giao lại theo **ngày lên đơn**: đơn lên trước ngày bắt đầu được giao cùng lúc vào ngày bắt đầu, mỗi ngày sau là một lần chạy (D2). Mọi đơn là `M` và việc dở bằng 0. Khớp khi PIC của tool là một trong các dev TM đã giao. | File Tech manager không có `Mô tả` nên AI không ước lượng được; trạng thái trong file là trạng thái hiện tại, không phải lúc sprint bắt đầu, nên không tính được việc dở. |
+| A30 | Giới hạn cân tải (D26) tính trên các dev **còn lại sau luật `Không giao` / `Tối đa đơn`** của đơn đó: chỉ xét dev có số đơn ≤ (ít đơn nhất trong số đó) + 1. | Nếu tính cả dev bị luật loại, một dev "không nhận đơn" đang giữ 0 đơn sẽ kéo giới hạn của cả team xuống 1 đơn. Không có luật thì giống hệt D26. |
+| A31 | Luật loại **hết** dev khỏi một đơn → đơn đó được giao như khi không có luật `Không giao` / `Tối đa đơn` (vẫn áp `Chỉ định`, `Ưu tiên`), kèm cảnh báo WARN `RULE-NO-CANDIDATE`. | Mỗi đơn vẫn có PIC (A14) và báo cáo không đổi cấu trúc; TM thấy cảnh báo. Để trống đơn sẽ phải thêm trạng thái "chưa giao" vào báo cáo, backtest và màn hình. |
+| A32 | Dự phòng không gồm dev bị luật `Không giao` / `Tối đa đơn` loại khỏi đơn đó. | Luật là ý của TM; gợi ý đúng người TM vừa loại thì vô ích. Không có luật thì giống hệt spec §7. |
+| A33 | File luật: mỗi dòng một dev và một app; đọc **mọi bảng** có cột `Loại` và `Dev` (TM có thể chia bảng theo sprint); cột lạ bỏ qua; ô bọc trong `` ` `` hoặc `*` được bỏ các ký tự đó; `App` so khớp theo A10. `Chỉ định` và `Ưu tiên` bắt buộc có `App`; `Tối đa đơn` bắt buộc có `Số đơn` và không dùng `App`; ô điền ở cột mà loại luật không dùng là lỗi input. Mâu thuẫn còn gồm: `Ưu tiên` và `Không giao` cùng dev cùng app; hai `Tối đa đơn` khác số cho cùng dev. Hai luật chỉ mâu thuẫn khi khoảng ngày của chúng giao nhau. | Bảng một dev/một app đủ cho mọi ví dụ của TM; TM viết hai dòng cho hai app. Ô điền thừa thường là hiểu nhầm loại luật, nên báo lỗi thay vì bỏ qua lặng lẽ. |
+| A34 | Ngày áp luật của một lần chạy thường là **hôm nay, nhưng không sớm hơn ngày bắt đầu sprint** đang giao (khi sheet có ngày). | TM thường chạy trước khi sprint bắt đầu (vd thứ Sáu trước Sprint 10) với luật ghi ngày của sprint đó; lấy đúng hôm nay thì luật lặng lẽ không áp. Backtest cũng giao các đơn lên trước sprint vào ngày bắt đầu sprint (A29), nên hai nơi dùng cùng một cách tính. Lịch sử (A22) vẫn dùng hôm nay. |
 
 ## O: còn mở
 

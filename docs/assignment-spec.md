@@ -5,7 +5,7 @@ What the tool reads, how it sizes orders, how it picks a PIC for each order, and
 here as `Dn` (user-locked), `An` (defaults) and `On` (open).
 
 **Status:** approved 2026-10-06 and implemented; updated 2026-10-07 for the history export of list "Tech manager"
-(D6), the load cap in orders (D26) and the backtest (D22, §13). Every number in §12 and §13 is asserted by
+(D6), the load cap in orders (D26) and the backtest (D22, §13), then for the TM rules file (D28–D35, §14). Every number in §12 and §13 is asserted by
 `tests/test_real_input.py` and `tests/test_pipeline.py`; the §13 table was also reproduced by a separate script that
 shares no code with the tool.
 
@@ -27,6 +27,7 @@ exactly as the tool must print it.
 | 11 | Exit codes and terminal output |
 | 12 | Acceptance on the sample |
 | 13 | Backtest |
+| 14 | Input: TM rules |
 
 ---
 
@@ -43,12 +44,13 @@ exactly as the tool must print it.
 | Load | The orders a pool dev holds in the target sprint, pre-assigned or proposed: counted in orders for the load cap (§7, D26) and summed in hours (their sizes) for key part 3. |
 | Carry-over | Number of rows in the previous sprint assigned to the dev whose status is busy (D8). |
 | Familiarity | How well a dev knows the order's app, from the history (§5, §6.1). |
+| TM rule | One row of the TM's rules file (§14): pin a dev to an app, keep a dev off an app or off everything, cap a dev's orders, or prefer a dev for an app. Read without AI (D28). |
 | Board | List "Tech manager" holds two boards: Maintain (two-week sprints, the orders this tool assigns) and MVP / research (one- to two-month sprints). Only Maintain orders are assigned (D5); MVP orders are history only (D23). |
 
 ## 2 · Command line
 
 ```
-assigntool [--input DIR] [--sprint FILE] [--devs FILE] [--history FILE] [--sheet NAME] [--out DIR]
+assigntool [--input DIR] [--sprint FILE] [--devs FILE] [--history FILE] [--rules FILE] [--sheet NAME] [--out DIR]
            [--ai gemini|agy|off] [--ai-model NAME] [--ai-timeout SECONDS] [--backtest] [-v]
 ```
 
@@ -58,17 +60,19 @@ assigntool [--input DIR] [--sprint FILE] [--devs FILE] [--history FILE] [--sheet
 | `--sprint FILE` | the only `*.xlsx` in `--input`, other than `devs.xlsx`, that has a `Sprint N` sheet | Sprint workbook (§3). |
 | `--devs FILE` | `<input>/devs.xlsx` | Dev workbook (§4). |
 | `--history FILE` | the only other `*.xlsx` (no `Sprint N` sheet) or `*.csv` in `--input`; none → the workbook's older sprint sheets (§5) | History export (§5). |
+| `--rules FILE` | the only `*.md` in `--input`; none → no rules | TM rules (§14, D29). |
 | `--sheet NAME` | highest `Sprint N` | Target sprint sheet. The previous sprint is then `Sprint N-1`. |
 | `--out DIR` | `output/` | Where the report is written. Created if missing. |
 | `--ai` | `gemini` | AI tool used for sizing (§6.4, D16, A17). `agy` is for the dev machine; `off` sizes every order `M`. |
 | `--ai-model` | the AI tool's own default | Model name passed through to the AI tool. |
 | `--ai-timeout` | `180` | Seconds before the AI call is killed and sizes fall back to `M`. |
-| `--backtest` | off | Replay every Maintain sprint of the history export and compare with the TM (§13). Needs only `--history` and `--devs`; `--sprint`, `--sheet` and the `--ai` options are ignored. |
+| `--backtest` | off | Replay every Maintain sprint of the history export and compare with the TM (§13). Needs only `--history` and `--devs` (and uses `--rules`); `--sprint`, `--sheet` and the `--ai` options are ignored. |
 | `-v` | off | Show tracebacks for input errors and the AI tool's raw output. |
 
 Discovery reads content, not names (A2): each `.xlsx` other than `devs.xlsx` is opened, and the one with a `Sprint N`
-sheet is the sprint workbook; every other `.xlsx`, and every `.csv`, is a history candidate. Discovery never guesses:
-zero sprint workbooks, several, or several history candidates is an input error that names the candidates and the flag
+sheet is the sprint workbook; every other `.xlsx`, and every `.csv`, is a history candidate; an `.md` file is the
+rules file. Discovery never guesses: zero sprint workbooks, several, several history candidates or several `.md` files
+is an input error that names the candidates and the flag
 to use; an `.xlsx` that cannot be opened is an input error naming it. Files whose names start with `~$` (Excel lock
 files) and `.` are ignored.
 
@@ -303,16 +307,25 @@ report so the TM can see why a load is what it is. Tests never call a real AI ex
 
 1. **Pre-assigned orders are kept** (D10). Each pool dev named on one gets load + the order's size.
 2. **Remaining orders are processed one at a time** in the order of A5: priority, due date (empty last), creation
-   date, `STT`.
+   date, `STT`. The TM rules in force (§14.3) apply to these orders only.
 3. For each order:
+   - **Candidates:** the pool minus every dev a `Không giao` rule keeps off the order's app (or off every app), and
+     every dev who already holds the number of orders of their `Tối đa đơn` rule (pre-assigned orders count). When
+     the rules leave nobody, the order is assigned as if those two kinds of rule did not exist, with
+     `RULE-NO-CANDIDATE` (A31). Without rules the candidates are the pool.
+   - **Pin (D31):** when a `Chỉ định` rule names the order's app and its dev is a candidate, that dev is the PIC; the
+     load cap and the key below are skipped, as for a pre-assigned order. A pinned dev who is not a candidate (on
+     leave for the whole sprint, `Nhận việc` = `N`, or at their `Tối đa đơn`) does not pin; the order goes through
+     the steps below.
    - `needs_senior` is true when the priority is `urgent` or `high`, or the app is new (§6.1).
-   - **Load cap (D26):** only devs holding at most **one order more** than the dev with the fewest orders can be
-     chosen. This keeps a dev who knows many apps from taking every order. It counts orders, not hours: in hours, the
-     AI's sizes decided who was capped, and they vary between runs (D27; §12, "Sensitivity").
+   - **Load cap (D26, A30):** only candidates holding at most **one order more** than the candidate with the fewest
+     orders can be chosen. This keeps a dev who knows many apps from taking every order. It counts orders, not
+     hours: in hours, the AI's sizes decided who was capped, and they vary between runs (D27; §12, "Sensitivity").
    - Among them, the PIC is the dev with the **smallest key**, compared left to right:
 
      | # | Key part | Smaller is better |
      |---|---|---|
+     | 0 | TM preference (D32) | 0 when an `Ưu tiên` rule names this dev for the order's app; else 1 |
      | 1 | familiarity rank (§6.1) | 0 = latest version |
      | 2 | seniority gap | 0 when `needs_senior` is false or level ≥ `middle`; else 1 |
      | 3 | load (hours) | less work in this sprint |
@@ -321,8 +334,10 @@ report so the TM can see why a load is what it is. Tests never call a real AI ex
      | 6 | level, descending | higher level first |
      | 7 | `Mã` | alphabetical, so the result is deterministic |
 
-   - **Backups:** the next two devs by the same key over the **whole** pool, ignoring the load cap. A backup
-     excluded by the cap is still useful to the TM, who may prefer familiarity over balance.
+     Without rules, part 0 is 1 for everyone and the choice is exactly the one before rules existed.
+   - **Backups:** the next two candidates by the same key, ignoring the load cap. A backup excluded by the cap is
+     still useful to the TM, who may prefer familiarity over balance; a dev the TM's rules keep off the order is not
+     (A32).
    - The PIC's load is increased by the order's size before the next order.
 
 **Why a key and not a weighted score.** Every part of the key can be stated as a sentence in the reason (§8), and the
@@ -340,6 +355,9 @@ changes key part 3 (hours), never who is allowed to take the order.
 
 The `Lý do` cell joins these parts with ` · `, in this order, leaving out parts that do not apply:
 
+0. The TM rule that chose the PIC: `Luật TM dòng <n>: chỉ định <Mã> cho <app>` for a pin, or
+   `Luật TM dòng <n>: ưu tiên <Mã> cho <app>` when the PIC has key part 0 = 0; followed by ` (<Ghi chú>)` when the
+   rule has a note. `<n>` is the rule's line in the rules file.
 1. Familiarity text of §6.1.
 2. `Đơn <priority> → ưu tiên middle trở lên` when `needs_senior` is caused by priority; `App chưa ai trong team làm →
    ưu tiên middle trở lên` when it is caused by a new app. Only when the PIC is middle or above.
@@ -351,9 +369,21 @@ The `Lý do` cell joins these parts with ` · `, in this order, leaving out part
 7. For each dev with the same rank but a better seniority gap (middle or above when `needs_senior`) who was excluded
    by the load cap: `<Mã> là middle trở lên nhưng đang có <n> đơn (cân tải)`. Without it, a junior chosen for a
    new-app order looks like a mistake (first real run, §12 note).
+8. For each dev with a better TM preference (key part 0) who was excluded by the load cap:
+   `<Mã> được ưu tiên (luật TM dòng <n>) nhưng đang có <k> đơn (cân tải)` (D32).
+9. For each dev a rule kept off the order (not a candidate) whose key is smaller than the PIC's, or who is the dev of
+   a `Chỉ định` rule for the app: `<Mã> không nhận đơn (luật TM dòng <n>)` for `Không giao`, `<Mã> đã đủ <k> đơn
+   (luật TM dòng <n>)` for `Tối đa đơn`.
+
+Parts 6–8 compare keys from the left: a dev is listed under the first key part where they beat the PIC.
+
+A pinned order's reason is parts 0, 1, 3, 4 and 5: the pin decided, so the seniority and cap parts do not apply.
 
 Example: `Làm version gần nhất của PS Remote (Sprint 9 (9/21 - 10/2): 1.1.1 - Fix ads/FIx luồng/ fix policy) · Đơn
 urgent → ưu tiên middle trở lên · Tải sprint này: 0h (0 đơn) · Việc dở Sprint 9: 0`.
+
+With a pin: `Luật TM dòng 5: chỉ định LinhNV cho AR Dog (Linh giữ AR Dog) · Làm version gần nhất của AR Dog (…) ·
+Tải sprint này: 32h (2 đơn) · Việc dở Sprint 9: 1`.
 
 When the order has no app, part 1 is `Đơn không có App Name`. Pre-assigned orders get the reason
 `Đã giao sẵn trong file`. Dates in messages are written `DD/MM/YYYY`.
@@ -375,6 +405,8 @@ never renamed once released. Nothing is ever reported about people outside the p
 | `HISTORY-MISSING` | WARN | No history file and no sprint sheet older than the target (§5). | `Không có file lịch sử và workbook không có sheet sprint cũ; coi như chưa ai làm app nào.` |
 | `HISTORY-FROM-WORKBOOK` | INFO | No history file; the older sheets were used (§5). `where` = the sheet names. | `Không có file lịch sử; dùng sheet <các sheet> trong workbook làm lịch sử.` |
 | `DEV-ON-LEAVE` | INFO | A pool dev is off for every working day. | `<Mã> nghỉ cả sprint; không được giao đơn.` |
+| `RULE-DEV-UNAVAILABLE` | WARN | A `Chỉ định` or `Ưu tiên` rule in force names a dev who is not in the pool: `Nhận việc` = `N` or on leave for the whole sprint (D35). `where` = `Luật dòng <n>`. | `Luật dòng <n> (<Loại> <Mã>) không áp dụng: <Mã> không nhận việc hoặc nghỉ cả sprint.` |
+| `RULE-NO-CANDIDATE` | WARN | The `Không giao` and `Tối đa đơn` rules left no candidate for an order (§7, A31). | `Luật TM loại hết dev khỏi đơn STT <n>; đơn này được giao như khi không có luật Không giao và Tối đa đơn.` |
 
 ## 10 · Output workbook
 
@@ -422,7 +454,8 @@ findings writes a single row `Không có cảnh báo`.
 | `2` | Input or usage error. No report is written. The message names the file, sheet, row or column. |
 | `130` | Interrupted with Ctrl+C. |
 
-The terminal shows: where the history came from (`Lịch sử: file Tech_manager_T2-T10_2026.xlsx (172 đơn gốc)`, the
+The terminal shows: the rules file (`Luật TM: file luat.md (4 luật, 3 có hiệu lực ngày 06/10/2026)`, or `Luật TM:
+không có`); where the history came from (`Lịch sử: file Tech_manager_T2-T10_2026.xlsx (172 đơn gốc)`, the
 count being the root orders left after the window of §5.1, or `Lịch sử: sheet Sprint 6, Sprint 7, Sprint 8, Sprint 9
 trong workbook (không có file lịch sử)`); the target sprint; how sizing went (`Độ lớn: AI (gemini, 6/6 đơn)`, or the fallback and why);
 counts (orders, pre-assigned, proposed, findings by level); one line per proposed order
@@ -562,9 +595,10 @@ sprint of the history export. It needs the history export (§5) and `devs.xlsx` 
 2. Compared orders are replayed **by filing day** (D2: the tool runs whenever BA files orders): those filed before the
    sprint starts are assigned together on its first day, and each later filing day is one more run that sees the
    earlier choices as pre-assigned.
-3. Each run is the rule of §7 with: the history window of §5.1 on that day; every order `M` (the export has no `Mô tả`,
-   so the AI has nothing to read); carry-over 0 (the export's statuses are today's, not those at the start of a past
-   sprint); leave from `devs.xlsx`; the pool minus devs on leave for the whole sprint.
+3. Each run is the rule of §7 with: the history window of §5.1 on that day; the TM rules in force on that day
+   (§14.3, D34); every order `M` (the export has no `Mô tả`, so the AI has nothing to read); carry-over 0 (the
+   export's statuses are today's, not those at the start of a past sprint); leave from `devs.xlsx`; the pool minus
+   devs on leave for the whole sprint. Carried orders are pre-assigned, so rules never move them.
 4. An order **matches** when the tool's PIC is one of the pool devs the TM named (in the sample, the TM named 2 pool
    devs on 13 of the 92 compared orders; 10 of those match).
 
@@ -576,10 +610,15 @@ No threshold is set (D22).
 
 | Sheet | Columns |
 |---|---|
-| `Theo sprint` | `Sprint` · `Bắt đầu` · `Kết thúc` · `Đơn so sánh` · `Khớp` · `Tỉ lệ khớp` · `Đơn mang sang`; a last row `Tổng`. |
-| `Theo đơn` | `Sprint` · `Ngày lên đơn` · `App` · `Đơn` · `Ưu tiên` · `TM giao` · `Tool giao` · `Khớp` (`✓`/`✗`) · `Dự phòng 1` · `Dự phòng 2` · `Lý do của tool`; by sprint, then filing day. |
+| `Theo sprint` | `Sprint` · `Bắt đầu` · `Kết thúc` · `Đơn so sánh` · `Khớp` · `Tỉ lệ khớp` · `Đơn mang sang` · `Đơn theo luật TM`; a last row `Tổng`. |
+| `Theo đơn` | `Sprint` · `Ngày lên đơn` · `App` · `Đơn` · `Ưu tiên` · `TM giao` · `Tool giao` · `Khớp` (`✓`/`✗`) · `Dự phòng 1` · `Dự phòng 2` · `Lý do của tool` · `Luật TM`; by sprint, then filing day. |
 
-The terminal prints one line per sprint (`Sprint 9 (9/21 - 10/2): khớp 8/11 đơn (73%)`), the total and the report
+`Luật TM` lists the lines of the rules that shaped the tool's choice (`dòng 3, 5`): the pin or preference of §8 part
+0, and the rules of parts 8 and 9. `Đơn theo luật TM` counts the compared orders with a non-empty `Luật TM`. A rule
+derived from the same history raises the match rate by construction: with rules, the rate measures the TM's rules
+and the tool's rule together.
+
+The terminal prints the rules line of §11 (`Luật TM: file luat.md (4 luật, áp theo ngày giao lại)`), one line per sprint (`Sprint 9 (9/21 - 10/2): khớp 8/11 đơn (73%)`), the total and the report
 path. Rates are rounded half up. A history file with no Maintain sprint is an input error (exit 2).
 
 **Run F: the sample** (`input/Tech_manager_T2-T10_2026.xlsx`, the 4 devs of §4 with no leave):
@@ -604,6 +643,8 @@ path. Rates are rounded half up. A history file with no Maintain sprint is an in
 | Sprint 10 (10/6 - 10/17) | 5 | 4 | 0 |
 | **Total** | **92** | **43 (47%)** | 11 |
 
+Run F has no rules file; `Đơn theo luật TM` is 0 on every row.
+
 Reading it:
 
 - **History length matters most.** Sprints 14–19 (January–May, little history) match 3 of 19 orders; Sprints 1–10
@@ -615,3 +656,85 @@ Reading it:
   does not allow that, so 5 of the 7 misses are orders the TM gave LinhNV; the tool's reasons say
   `LinhNV quen app hơn nhưng đang có 3 đơn (cân tải)`. Whether the TM's concentration or the cap is right is the
   TM's call (D22).
+
+## 14 · Input: TM rules
+
+The TM steers the choice without editing code: a rules file pins a dev to an app, keeps a dev off an app or off every
+order, caps a dev's orders, or prefers a dev for an app (D28, D30). The rules are a fixed table read without AI, so
+every choice stays repeatable, explainable in `Lý do` (§8) and measurable by the backtest (§13). The AI never sees
+the rules (LLM.md §12).
+
+### 14.1 File
+
+A Markdown file (`.md`), UTF-8 with or without BOM, found as the only `*.md` in `--input` or given with `--rules`
+(D29); several `.md` files are an input error, none means no rules. Text outside the tables is the TM's free notes
+and is ignored. Example:
+
+```markdown
+# Luật giao việc
+
+| Loại       | Dev    | App       | Số đơn | Từ ngày    | Đến ngày   | Ghi chú                 |
+|------------|--------|-----------|--------|------------|------------|-------------------------|
+| Chỉ định   | LinhNV | AR Dog    |        |            |            | Linh giữ AR Dog         |
+| Không giao | MinhNM |           |        | 06/10/2026 | 17/10/2026 | Minh làm MVP sprint này |
+| Tối đa đơn | AnTD   |           | 1      | 06/10/2026 | 17/10/2026 |                         |
+| Ưu tiên    | TiếnBV | PS Remote |        |            |            | Cho Tiến học PS Remote  |
+```
+
+**Reading rules**
+
+1. A table is a run of consecutive lines starting with `|`, whose second line is a delimiter row (`|---|:--:|`). A
+   rules table is one whose header has `Loại` and `Dev`; every rules table in the file is read (A33), other tables are
+   ignored. Lines inside a fenced code block (```` ``` ```` or `~~~`) are text, not a table, as Markdown renders
+   them. A file with no rules table is an input error.
+2. Columns are found by header name (§3 rule 2), never by position; unknown columns are ignored. Cells are split on
+   `|` (an escaped `\|` stays in the cell), NFC-normalised and trimmed; surrounding `` ` `` and `*` are removed, so
+   `` `AR Dog` `` and `**LinhNV**` read as `AR Dog` and `LinhNV`. A row whose cells are all empty is skipped.
+3. A rule is identified by its **line number** in the file, quoted in messages and reasons.
+
+| Header | Use |
+|---|---|
+| `Loại` | `Chỉ định`, `Không giao`, `Tối đa đơn` or `Ưu tiên` (NFC, case-insensitive). |
+| `Dev` | A `Mã` of `devs.xlsx` (§4), compared like names (A10). One dev per row. |
+| `App` | One app, matched like `App Name` (A10). Required for `Chỉ định` and `Ưu tiên`; empty on `Không giao` means every app; not used by `Tối đa đơn`. |
+| `Số đơn` | A whole number ≥ 1. Required for `Tối đa đơn`; not used by the others. |
+| `Từ ngày`, `Đến ngày` | `DD/MM/YYYY` or `YYYY-MM-DD`; empty means no limit on that side (D33). |
+| `Ghi chú` | Free text, quoted in the reason (§8 part 0). |
+
+### 14.2 Input errors (D35, A33)
+
+A broken rule stops the run with exit 2 and a message naming the file, the line and, when known, the column. The tool
+never guesses which of two rules the TM meant.
+
+| Case | Message (Vietnamese) |
+|---|---|
+| No rules table | `File '<file>' không có bảng luật (bảng có cột Loại và Dev).` |
+| Unknown `Loại` | `File '<file>', dòng <n>, cột 'Loại': '<giá trị>' không hợp lệ; dùng Chỉ định, Không giao, Tối đa đơn hoặc Ưu tiên.` |
+| Empty `Dev` | `File '<file>', dòng <n>: thiếu Dev.` |
+| A required cell empty | `File '<file>', dòng <n>: luật <Loại> cần cột <cột>.` |
+| A cell the kind does not use | `File '<file>', dòng <n>: luật <Loại> không dùng cột <cột>.` |
+| `Số đơn` not a whole number ≥ 1 | `File '<file>', dòng <n>, cột 'Số đơn' phải là số nguyên từ 1 trở lên.` |
+| Unreadable date | `File '<file>', dòng <n>, cột '<cột>': không đọc được ngày '<giá trị>'` |
+| `Từ ngày` after `Đến ngày` | `File '<file>', dòng <n>: Từ ngày sau Đến ngày.` |
+| `Dev` not a `Mã` of `devs.xlsx` | `File '<file>', dòng <n>: không có dev mã '<Dev>' trong file dev.` |
+| Two `Chỉ định` for one app, different devs | `File '<file>', dòng <a> và <b>: hai luật Chỉ định khác dev cho app '<App>'.` |
+| `Chỉ định` or `Ưu tiên`, and `Không giao` (same app or every app), same dev | `File '<file>', dòng <a> và <b>: luật <Loại> và Không giao mâu thuẫn cho <Mã>.` |
+| Two `Tối đa đơn` for one dev, different numbers | `File '<file>', dòng <a> và <b>: hai luật Tối đa đơn khác số cho <Mã>.` |
+
+Two rules conflict only when their date ranges overlap. Conflicts and unknown devs are checked over the whole file,
+not only the rules in force, so a normal run and the backtest accept or reject the same file.
+
+A valid rule that cannot act is not an error: a `Chỉ định` or `Ưu tiên` for a dev outside the pool is a
+`RULE-DEV-UNAVAILABLE` finding (§9); a rule whose app has no order in the sprint is not reported (D35).
+
+### 14.3 Rules in force
+
+A rule is in force on a day when `Từ ngày` ≤ day ≤ `Đến ngày`. The day is:
+
+- **normal run:** today, but not earlier than the target sprint's first day when the sheet has dates (A34): a TM who
+  runs the tool on the Friday before Sprint 10 gets the rules dated for Sprint 10;
+- **backtest:** the day each batch is replayed (§13 step 2), so a rule dated for one sprint does not touch another
+  (D34).
+
+How each kind acts is in §7; what it writes in `Lý do` is in §8. Rules never touch pre-assigned orders (D10), never
+add a dev outside the pool (D7), and leave the cap's "+ 1 order" (D26) as it is.

@@ -8,8 +8,8 @@ Mục tiêu là tool tự ghi `Người làm` thẳng vào hệ thống, không 
 chưa có (`confirm.md` O8). Vì vậy hiện tại tool ghi kết quả ra file Excel, và người có quyền nhập vào hệ thống. Tool
 không sửa file input.
 
-> **Trạng thái (2026-10-07):** chạy được với file lịch sử Tech manager, giới hạn tải theo số đơn và backtest
-> (102 test pass).
+> **Trạng thái (2026-10-07):** chạy được với file lịch sử Tech manager, giới hạn tải theo số đơn, backtest và file
+> luật của TM (154 test pass).
 
 ## 1. Cài đặt
 
@@ -42,6 +42,7 @@ uv run assigntool --ai off                  # không gọi AI; mọi đơn tính
 uv run assigntool --ai agy                  # dùng Antigravity thay cho gemini (máy dev)
 uv run assigntool --sprint path/export.xlsx # chỉ định file export khi input/ có nhiều file .xlsx
 uv run assigntool --backtest                # giao lại các sprint cũ trong file lịch sử và so với TM (mục 4.2)
+uv run assigntool --rules path/luat.md      # dùng file luật TM nằm ngoài input/ (mục 3.5)
 uv run assigntool --help                    # mọi tuỳ chọn (mục 6)
 ```
 
@@ -51,14 +52,15 @@ uv run assigntool --help                    # mọi tuỳ chọn (mục 6)
 input/
 ├── <file export sprint>.xlsx       bắt buộc · file .xlsx có sheet "Sprint N"
 ├── devs.xlsx                       bắt buộc
-└── <file lịch sử Tech manager>     nên có · .xlsx (không có sheet "Sprint N") hoặc .csv · tối đa 1 file
+├── <file lịch sử Tech manager>     nên có · .xlsx (không có sheet "Sprint N") hoặc .csv · tối đa 1 file
+└── <file luật TM>.md               không bắt buộc · tối đa 1 file (mục 3.5)
 ```
 
 Mỗi lần chạy cần export lại **cả hai file** từ hệ thống: file export sprint (đơn cần giao, mô tả, việc dở) và file
 Tech manager (lịch sử ai làm app nào). Tool nhận ra file theo **nội dung**, không theo tên: file `.xlsx` có sheet
-`Sprint N` là file export sprint; file `.xlsx` còn lại hoặc file `.csv` là file lịch sử. Có 0 hoặc nhiều hơn một file
-ứng viên thì tool dừng, liệt kê các file tìm thấy và chỉ cờ cần dùng (`--sprint`, `--devs`, `--history`); tool không
-đoán. File bắt đầu bằng `~$` (file khoá khi Excel đang mở) và `.` bị bỏ qua. Khi export lại, **thay** file cũ bằng
+`Sprint N` là file export sprint; file `.xlsx` còn lại hoặc file `.csv` là file lịch sử; file `.md` là file luật. Có 0
+hoặc nhiều hơn một file ứng viên thì tool dừng, liệt kê các file tìm thấy và chỉ cờ cần dùng (`--sprint`, `--devs`,
+`--history`, `--rules`); tool không đoán. File bắt đầu bằng `~$` (file khoá khi Excel đang mở) và `.` bị bỏ qua. Khi export lại, **thay** file cũ bằng
 file mới, đừng để cả hai trong `input/`.
 
 ### 3.1 File export sprint (`.xlsx`)
@@ -149,6 +151,41 @@ Tool gọi AI **một lần** cho cả sprint, chỉ để xếp độ lớn t�
 - Cùng một input, hai lần chạy có thể ra độ lớn khác nhau. Độ lớn chỉ ảnh hưởng tới tiêu chí số giờ (mục 5), không
   quyết định ai được xét. Độ lớn và lý do của AI có trong báo cáo để kiểm tra.
 
+### 3.5 File luật TM (`.md`, không bắt buộc)
+
+TM dùng file này để điều khiển việc giao mà không phải sửa code: giữ một người cho một app, cho một người nghỉ nhận
+đơn, giới hạn số đơn, hoặc ưu tiên một người học app. Luật là **một bảng markdown có cột cố định**; chữ ngoài bảng là
+ghi chú tự do, tool bỏ qua. Tool đọc bảng trực tiếp, **AI không đọc luật** và không chọn người.
+
+```markdown
+| Loại       | Dev    | App       | Số đơn | Từ ngày    | Đến ngày   | Ghi chú                 |
+|------------|--------|-----------|--------|------------|------------|-------------------------|
+| Chỉ định   | LinhNV | AR Dog    |        |            |            | Linh giữ AR Dog         |
+| Không giao | MinhNM |           |        | 06/10/2026 | 17/10/2026 | Minh làm MVP sprint này |
+| Tối đa đơn | AnTD   |           | 1      | 06/10/2026 | 17/10/2026 |                         |
+| Ưu tiên    | TiếnBV | PS Remote |        |            |            | Cho Tiến học PS Remote  |
+```
+
+| Loại | Tác dụng | Cột cần |
+|---|---|---|
+| `Chỉ định` | Dev đó nhận mọi đơn của app, kể cả khi đang giữ nhiều đơn hơn người khác (vượt cân tải). | `App` |
+| `Không giao` | Dev không nhận đơn của app; `App` trống là không nhận đơn nào. | — |
+| `Tối đa đơn` | Dev đã giữ đủ số đơn (tính cả đơn giao sẵn) thì không nhận thêm; giới hạn được cả `Chỉ định`. | `Số đơn` |
+| `Ưu tiên` | Dev được ưu tiên trước cả người quen app, nhưng vẫn trong giới hạn cân tải. | `App` |
+
+- `Dev` là `Mã` trong `devs.xlsx`. Mỗi dòng một dev, một app; muốn hai app thì viết hai dòng. Có thể chia luật thành
+  nhiều bảng (vd mỗi sprint một bảng), miễn bảng có cột `Loại` và `Dev`.
+- `Từ ngày` / `Đến ngày` (`DD/MM/YYYY` hoặc `YYYY-MM-DD`) để trống là không giới hạn. Một lần chạy dùng luật có hiệu
+  lực **hôm nay, hoặc ngày bắt đầu sprint nếu chạy trước sprint** (vd chạy thứ Sáu trước Sprint 10 thì luật ghi ngày
+  của Sprint 10 vẫn áp).
+- Luật không bao giờ đổi đơn đã giao sẵn. Cột `Lý do` ghi luật nào đã quyết định, kèm số dòng và ghi chú, vd
+  `Luật TM dòng 5: chỉ định LinhNV cho AR Dog (Linh giữ AR Dog) · …`.
+- Luật viết sai (loại lạ, mã dev không có trong `devs.xlsx`, ngày sai, thiếu cột cần, hai luật mâu thuẫn như hai
+  `Chỉ định` khác người cho cùng một app) thì tool **dừng** và báo tên file, số dòng. Luật đúng nhưng dev đang nghỉ cả
+  sprint hoặc `Nhận việc` = `N` thì bị bỏ qua, kèm cảnh báo.
+- Trước khi dùng một luật mới, chạy `uv run assigntool --backtest` để xem luật đó làm tỉ lệ khớp với TM thay đổi thế
+  nào (mục 4.2).
+
 ## 4. Output
 
 ### 4.1 Báo cáo giao việc
@@ -197,6 +234,8 @@ Cột `Mức` · `Mã` · `Vị trí` · `Nội dung`; WARN xếp trước INFO.
 | `HISTORY-MISSING` | WARN | Không có file lịch sử và không có sheet sprint cũ; coi như chưa ai làm app nào. | Thêm file lịch sử Tech manager. |
 | `HISTORY-FROM-WORKBOOK` | INFO | Không có file lịch sử; dùng các sheet sprint cũ làm lịch sử. | Nên thêm file lịch sử Tech manager: nhiều lịch sử hơn thì giao đúng hơn. |
 | `DEV-ON-LEAVE` | INFO | Một dev nghỉ cả sprint nên không được giao. | Không cần làm gì. |
+| `RULE-DEV-UNAVAILABLE` | WARN | Luật `Chỉ định` / `Ưu tiên` nhắc tới dev đang nghỉ cả sprint hoặc `Nhận việc` = `N`; luật bị bỏ qua. | Sửa hoặc xoá dòng luật đó. |
+| `RULE-NO-CANDIDATE` | WARN | Luật `Không giao` / `Tối đa đơn` loại hết dev khỏi một đơn; đơn đó được giao như khi không có hai loại luật này. | Xem lại người được giao cho đơn đó, hoặc nới luật. |
 
 ### Sheet `Tải dev`
 
@@ -209,6 +248,7 @@ lớn, mỗi đơn một dòng) và `App đã làm`.
 Ví dụ trên file mẫu với `--ai off`:
 
 ```
+Luật TM: không có
 Lịch sử: file Tech_manager_T2-T10_2026.xlsx (172 đơn gốc)
 Sprint: Sprint 10
 Độ lớn: tắt AI (mọi đơn M)
@@ -218,7 +258,8 @@ Báo cáo: output/assignment_sprint-10_20261007-160752.xlsx
 ```
 
 Khi có AI, trước đó in thêm `Đang ước lượng độ lớn bằng gemini…` và dòng độ lớn thành `Độ lớn: AI (gemini, 6/6 đơn)`
-(số đơn AI ước lượng được trên tổng số đơn). Mỗi cảnh báo WARN được in một dòng `WARN <mã>: <nội dung>`. Chi tiết đầy
+(số đơn AI ước lượng được trên tổng số đơn). Có file luật thì dòng đầu là
+`Luật TM: file luat.md (4 luật, 3 có hiệu lực ngày 06/10/2026)`. Mỗi cảnh báo WARN được in một dòng `WARN <mã>: <nội dung>`. Chi tiết đầy
 đủ nằm trong file Excel.
 
 | Exit code | Ý nghĩa |
@@ -229,7 +270,7 @@ Khi có AI, trước đó in thêm `Đang ước lượng độ lớn bằng gem
 
 Các lỗi input dừng tool: thiếu file hoặc có nhiều file ứng viên; file `.xlsx` không mở được; thiếu cột bắt buộc;
 `Level` sai; `Nhận việc` không phải `Y`/`N`; trùng `Tên` hoặc `Mã`; ngày không đọc được; không còn dev nào để giao sau
-khi trừ người nghỉ.
+khi trừ người nghỉ; file luật viết sai hoặc có hai luật mâu thuẫn (mục 3.5).
 
 ### 4.2 Backtest: tool có giao giống TM không
 
@@ -248,12 +289,16 @@ rồi so với người TM đã giao.
 - **Mọi đơn tính là M và việc dở bằng 0**: file Tech manager không có mô tả để AI ước lượng, và trạng thái trong file
   là trạng thái hôm nay, không phải lúc sprint đó bắt đầu.
 - **Khớp** khi người tool chọn là một trong các dev TM đã giao. Lệch chưa chắc là sai: luật cố ý cân tải.
+- Có file luật TM (mục 3.5) thì backtest **áp luật** theo `Từ ngày` / `Đến ngày` so với ngày giao lại từng đơn. Luật
+  rút ra từ chính lịch sử thì tất nhiên làm tỉ lệ khớp tăng; khi đó tỉ lệ đo cả luật của TM lẫn luật của tool.
 
 File `output/backtest_<thời gian>.xlsx` có hai sheet: `Theo sprint` (số đơn so sánh, số khớp, tỉ lệ, số đơn mang
-sang; dòng cuối là tổng) và `Theo đơn` (mỗi đơn: TM giao ai, tool giao ai, khớp hay không, lý do của tool).
+sang, số đơn chịu tác động của luật TM; dòng cuối là tổng) và `Theo đơn` (mỗi đơn: TM giao ai, tool giao ai, khớp hay
+không, lý do của tool, các dòng luật TM đã tác động).
 
-Kết quả trên file mẫu: **khớp 43/92 đơn (47%)**. Các sprint tháng 1–5 (ít lịch sử) chỉ khớp 3/19; từ Sprint 1 (tháng
-5) khớp 40/73 (55%); Sprint 9 khớp 8/11, Sprint 10 khớp 4/5. Chi tiết và cách đọc: spec §13.
+Kết quả trên file mẫu, không có file luật: **khớp 43/92 đơn (47%)**. Các sprint tháng 1–5 (ít lịch sử) chỉ khớp 3/19;
+từ Sprint 1 (tháng 5) khớp 40/73 (55%); Sprint 9 khớp 8/11, Sprint 10 khớp 4/5. Chi tiết và cách đọc: spec §13. Thêm
+hai dòng `Chỉ định LinhNV` cho AR Dog và VPN thì khớp 50/92 (54%): AR Dog 9/9, VPN 6/7 (chạy thử ngày 2026-10-07).
 
 ## 5. Tool chọn PIC thế nào
 
@@ -268,9 +313,11 @@ Kết quả trên file mẫu: **khớp 43/92 đơn (47%)**. Các sprint tháng 1
 
 2. **Đơn giao sẵn giữ nguyên**, chỉ cộng giờ vào tải của dev được ghi tên.
 3. **Đơn trống được xét lần lượt**: urgent → high → normal → low, rồi hạn sớm, rồi ngày tạo, rồi `STT`.
-4. Với mỗi đơn, chỉ xét dev có **số đơn không vượt quá người ít đơn nhất + 1** (để một người quen nhiều app không ôm
-   hết). Tính theo số đơn chứ không theo giờ, vì độ lớn do AI ước lượng thay đổi giữa các lần chạy. Trong số đó, chọn
-   người tốt nhất theo thứ tự ưu tiên:
+4. Với mỗi đơn, bỏ những dev mà luật TM (mục 3.5) không cho nhận đơn này (`Không giao`, `Tối đa đơn`). Có luật
+   `Chỉ định` cho app thì giao luôn cho người đó. Nếu không, chỉ xét dev có **số đơn không vượt quá người ít đơn nhất
+   + 1** (để một người quen nhiều app không ôm hết). Tính theo số đơn chứ không theo giờ, vì độ lớn do AI ước lượng
+   thay đổi giữa các lần chạy. Trong số đó, chọn người tốt nhất theo thứ tự ưu tiên:
+   0. Được luật TM `Ưu tiên` cho app này.
    1. Đã làm version gần nhất của app → từng làm app → chưa làm.
    2. Đơn urgent/high, hoặc app chưa ai trong team làm: ưu tiên level middle trở lên.
    3. Ít giờ việc hơn trong sprint này.
@@ -290,12 +337,13 @@ Kết quả trên file mẫu: **khớp 43/92 đơn (47%)**. Các sprint tháng 1
 | `--sprint FILE` | file `.xlsx` duy nhất có sheet `Sprint N` | File export sprint. |
 | `--devs FILE` | `<input>/devs.xlsx` | File dev. |
 | `--history FILE` | file `.xlsx` không có sheet `Sprint N`, hoặc file `.csv`; không có thì dùng sheet sprint cũ | File lịch sử Tech manager. |
+| `--rules FILE` | file `.md` duy nhất trong `input/`; không có thì không dùng luật | File luật TM (mục 3.5). |
 | `--sheet NAME` | `Sprint N` lớn nhất | Sheet cần giao, vd `--sheet "Sprint 9"`. |
 | `--out DIR` | `output/` | Thư mục ghi báo cáo; tự tạo nếu chưa có. |
 | `--ai gemini\|agy\|off` | `gemini` | Công cụ AI. `agy` cho máy dev; `off` tính mọi đơn là M. |
 | `--ai-model NAME` | mặc định của công cụ AI | Tên model truyền thẳng cho công cụ AI. |
 | `--ai-timeout SECONDS` | `180` | Số giây chờ AI. |
-| `--backtest` | tắt | Giao lại các sprint Maintain trong file lịch sử và so với TM (mục 4.2). Bỏ qua `--sprint`, `--sheet`, `--ai…`. |
+| `--backtest` | tắt | Giao lại các sprint Maintain trong file lịch sử và so với TM (mục 4.2), có áp file luật. Bỏ qua `--sprint`, `--sheet`, `--ai…`. |
 | `-v` | tắt | In traceback khi lỗi và nội dung trao đổi với AI. |
 
 ## 7. Dành cho người phát triển

@@ -62,6 +62,11 @@ Every rule states what breaking it costs. A rule with no reason gets ignored, th
 - **One parser per export, two file formats.** The history export comes as `.xlsx` or `.csv` with the same columns
   (D6); both go through the same row function in `history_reader.py`. Two parsers for one layout drift apart, and the
   `.csv` path is the one nobody runs until the day the exporter switches format.
+- **The TM rules `.md`: tables by header, everything else ignored.** `rules_reader.py` opens the file with
+  `encoding="utf-8-sig"` (editors on Windows add a BOM), finds tables by their delimiter row and keeps those whose
+  header has `Loại` and `Dev`; columns go by header name like the workbooks. Text outside the tables is the TM's
+  notes. A parser that read the file line by line as rules would turn a note into an input error, and one that read
+  columns by position would swap `App` and `Ghi chú` the first time the TM reorders the table.
 
 ## 4 · Calling the AI tool (subprocess)
 
