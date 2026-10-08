@@ -146,6 +146,7 @@ def test_ai_failure_falls_back_to_m_and_still_writes_the_report(tmp_path: Path, 
         (["a.xlsx:sprint", "devs.xlsx:devs"], ["--rules", "missing.md"], "Không có file 'missing.md' (--rules)."),
         (["a.xlsx:sprint", "devs.xlsx:devs", "a.md:rules"], [], "dòng 5: không có dev mã 'Nobody' trong file dev."),
         (["devs.xlsx:devs", "t.xlsx:history", "a.md:rules"], ["--backtest"], "không có dev mã 'Nobody'"),
+        (["a.xlsx:sprint", "devs.xlsx:devs"], ["--today", "31/02/2026"], "--today '31/02/2026': không đọc được ngày"),
     ],
 )
 def test_input_errors_exit_2_with_a_message(tmp_path: Path, capsys, files, flags, message) -> None:
@@ -283,3 +284,37 @@ def test_backtest_applies_the_rules_and_reports_which_orders_they_shaped(tmp_pat
     assert summary[0][-1] == "Đơn theo luật TM" and summary[1][-1] == 1 and summary[-1][-1] == 1
     detail = list(workbook["Theo đơn"].iter_rows(values_only=True))
     assert (detail[0][-1], detail[1][5:8], detail[1][-1]) == ("Luật TM", ("DevB", "DevB", "✓"), "dòng 5")
+
+
+@pytest.mark.parametrize(
+    ("today", "shown", "count"), [("2026-09-15", "15/09/2026", 0), ("30/09/2026", "30/09/2026", 1)]
+)
+def test_today_replaces_the_clock_for_the_history_window(tmp_path: Path, capsys, today, shown, count) -> None:
+    """The history order's sprint starts 22/09: on 15/09 it has not started, so it is not history yet (spec §5.1)."""
+    source = _inputs(tmp_path / "input")
+
+    assert main(["--input", str(source), "--out", str(tmp_path / "out"), "--ai", "off", "--today", today]) == 0
+
+    printed = capsys.readouterr().out
+    assert f"Ngày chạy: {shown} (--today)" in printed
+    assert f"Lịch sử: file history.csv ({count} đơn gốc)" in printed
+
+
+@pytest.mark.parametrize(
+    ("today", "rules_day", "pic"), [("2026-10-20", "20/10/2026", "DevB"), ("2026-10-01", "06/10/2026", "DevA")]
+)
+def test_today_replaces_the_clock_for_the_rules_day(tmp_path: Path, capsys, today, rules_day, pic) -> None:
+    """A pin dated 18/10–31/10 acts on 20/10; on 01/10 the rules day is the sprint's first day, 06/10 (A34)."""
+    source = _inputs(tmp_path / "input")
+    build_devs(source / "devs.xlsx", TWO_DEVS)
+    dated = (
+        "| Loại | Dev | App | Từ ngày | Đến ngày |\n|---|---|---|---|---|\n"
+        "| Chỉ định | DevB | Demo | 18/10/2026 | 31/10/2026 |\n"
+    )
+    (source / "luat.md").write_text(dated, encoding="utf-8")
+
+    assert main(["--input", str(source), "--out", str(tmp_path / "out"), "--ai", "off", "--today", today]) == 0
+
+    printed = capsys.readouterr().out
+    assert f"có hiệu lực ngày {rules_day})" in printed
+    assert f"STT 1 · Demo 1.0.1 - Add ads [M] → {pic} " in printed
