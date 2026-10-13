@@ -193,6 +193,7 @@ Kết luận (PIC đề xuất, lý do, dự phòng, độ lớn) · thông tin 
 
 | File | Đọc khi |
 |---|---|
+| [`HOW_TO_USE.md`](HOW_TO_USE.md) | Dùng tool từng bước: cài đặt, input, output, luật TM |
 | [`docs/bot-spec.md`](docs/bot-spec.md) | Nguồn API, sổ rủi ro, bộ nhớ, báo cáo |
 | [`docs/assignment-spec.md`](docs/assignment-spec.md) | Luật giao PIC, lý do, cảnh báo dữ liệu, luật TM |
 | [`docs/api-doc-he-thong.md`](docs/api-doc-he-thong.md) | Tham chiếu API `/api/doc/` |
