@@ -84,7 +84,6 @@ def capacity_risks(context: RiskContext) -> tuple[Risk, ...]:
                 f"Có thể không xong hết đơn trước {context.sheet.end:%d/%m/%Y}.",
                 action,
                 "TM",
-                covers=tuple(item.order.row.stt for item in mine),
             )
         )
     risks.extend(_sprint_risk(context, held, sum(caps.values())))
@@ -111,7 +110,6 @@ def carry_risks(context: RiskContext) -> tuple[Risk, ...]:
                 f"Sức chứa thật của {dev.code} ở sprint này thấp hơn tính toán.",
                 f"Hỏi {dev.code} khi nào xong việc dở; tính tới khi giao thêm đơn.",
                 "TM",
-                covers=mine,
             )
         )
     return tuple(risks)
@@ -138,7 +136,7 @@ def _sprint_risk(context: RiskContext, held: list[Assignment], capacity: int) ->
             f"{len(late)} đơn lên sau ngày đầu sprint (STT {stt_list(late)}: {late_hours}h) làm tải vượt sức chứa "
             f"({total}h > {capacity}h)"
         )
-        return (_sprint(context, "SCOPE-ADDED", sprint, problem, impact, action, deferred or tuple(late)),)
+        return (_sprint(context, "SCOPE-ADDED", sprint, problem, impact, action),)
     deferred = defer_list(held, total - capacity)
     action = (
         f"Đề xuất đẩy sang sprint sau: STT {stt_list(deferred)} ({_hours(deferred)}h), hoặc thêm người ngoài team"
@@ -146,24 +144,11 @@ def _sprint_risk(context: RiskContext, held: list[Assignment], capacity: int) ->
         else "Không còn đơn chưa bắt đầu để đẩy; cân nhắc thêm người ngoài team."
     )
     problem = f"Sprint còn {total}h việc, sức chứa của team còn {capacity}h"
-    return (_sprint(context, "CAPACITY-SPRINT", sprint, problem, impact, action, deferred or tuple(held)),)
+    return (_sprint(context, "CAPACITY-SPRINT", sprint, problem, impact, action),)
 
 
-def _sprint(
-    context: RiskContext, code: str, where: str, problem: str, impact: str, action: str, covered: tuple[Assignment, ...]
-) -> Risk:
-    return make(
-        context,
-        RiskLevel.HIGH,
-        code,
-        RiskGroup.CAPACITY,
-        where,
-        problem,
-        impact,
-        action,
-        "TM",
-        covers=tuple(item.order.row.stt for item in covered),
-    )
+def _sprint(context: RiskContext, code: str, where: str, problem: str, impact: str, action: str) -> Risk:
+    return make(context, RiskLevel.HIGH, code, RiskGroup.CAPACITY, where, problem, impact, action, "TM")
 
 
 def _hours(items: tuple[Assignment, ...]) -> int:

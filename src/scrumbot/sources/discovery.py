@@ -1,40 +1,13 @@
-"""Find the input files by content (assignment spec §2, A2, D29). Never guesses: zero or several candidates where one
-is needed is an input error naming the candidates and the flag to use."""
+"""Find devs.xlsx and the TM rules file in the input folder (assignment spec §2, D29). Never guesses: zero or several
+candidates where one is needed is an input error naming the candidates and the flag to use."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 
 from scrumbot.errors import InputError
-from scrumbot.sources.sprint_reader import has_sprint_sheets
 
 DEVS_FILE = "devs.xlsx"
-
-
-@dataclass(frozen=True, slots=True)
-class FileInputs:
-    sprint: Path
-    devs: Path
-    history: Path | None
-    rules: Path | None
-
-
-def file_inputs(
-    input_dir: Path, sprint: str | None, devs: str | None, history: str | None, rules: str | None
-) -> FileInputs:
-    """The export files of a `--source file` run."""
-    workbooks = [path for path in files(input_dir, ".xlsx") if path.name.lower() != DEVS_FILE]
-    sprint_books = [path for path in workbooks if has_sprint_sheets(path)]
-    sprint_path = explicit(sprint, "--sprint") or only_one(
-        sprint_books, "file .xlsx export sprint (có sheet Sprint N)", "--sprint"
-    )
-    history_path = explicit(history, "--history") or at_most_one(
-        [*files(input_dir, ".csv"), *(path for path in workbooks if path not in sprint_books)],
-        "file lịch sử",
-        "--history",
-    )
-    return FileInputs(sprint_path, devs_path(input_dir, devs), history_path, rules_path(input_dir, rules))
 
 
 def devs_path(input_dir: Path, value: str | None) -> Path:

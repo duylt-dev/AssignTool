@@ -29,7 +29,7 @@ from scrumbot.rules.risk_register import RiskContext, register
 from scrumbot.rules.summary import summarize
 from scrumbot.rules.team_rules import relaxed_findings, rules_day, unavailable_findings
 
-MORNING = time(8, 30)  # the full scheduled run (D54); a run day with no clock time is read as this moment
+MORNING = time(8, 30)  # a run day with no clock time is read as the start of the working day
 
 
 def build_result(

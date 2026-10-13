@@ -1,13 +1,11 @@
-"""What changed since the stored state (bot spec §5): ORDER-CHANGED, the "Thay đổi" rows, the state to store, and
-the report fingerprint of A78. Pure."""
+"""What changed since the stored state (bot spec §5): ORDER-CHANGED, the "Thay đổi" rows and the state to store.
+Pure."""
 
 from __future__ import annotations
 
-import hashlib
-import json
 from datetime import date
 
-from scrumbot.model import Assignment, Dev, Result
+from scrumbot.model import Assignment, Dev
 from scrumbot.model_risk import Change, ChangeKind, OrderMark, Outcome, Risk, RiskGroup, RiskLevel
 from scrumbot.normalize import clean, text_key
 from scrumbot.rules.risk_register import RiskContext, escalate, make, order_where, pic_codes
@@ -53,7 +51,6 @@ def changed_risks(context: RiskContext) -> tuple[Risk, ...]:
                 action,
                 "TM",
                 stt=row.stt,
-                covers=(row.stt,),
             )
         )
     return tuple(risks)
@@ -100,19 +97,6 @@ def change_rows(
         )
     rows.sort(key=lambda pair: (_KIND_ORDER.index(pair[1].kind), pair[0], pair[1].order))
     return tuple(change for _, change in rows)
-
-
-def fingerprint(result: Result) -> str:
-    """What makes a report new (A78): who holds which order, the register's (code, where, level), the changes."""
-    payload = {
-        "assignments": sorted(
-            [item.order.row.id or str(item.order.row.stt), sorted(item.pic_codes), item.source.name]
-            for item in result.assignments
-        ),
-        "risks": sorted([risk.code, risk.where, int(risk.level)] for risk in result.risks),
-        "changes": sorted([change.kind.name, change.order, change.before, change.after] for change in result.changes),
-    }
-    return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
 
 
 def _codes(item: Assignment, active: tuple[Dev, ...]) -> tuple[str, ...]:

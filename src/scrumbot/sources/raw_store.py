@@ -1,5 +1,5 @@
-"""Raw API replies on disk and where a run gets them (bot spec §2.3, §2.4; A57, A58): live from the API with the
-list cache and a snapshot of what was read, or from a stored snapshot or clone."""
+"""Where a run gets the raw API replies (bot spec §2.3; A57, A58): live from the API, with lists that no longer change
+kept in a cache on disk."""
 
 from __future__ import annotations
 
@@ -13,9 +13,6 @@ from scrumbot.errors import InputError
 from scrumbot.model_board import MAINTAIN_FOLDER, SprintInfo
 from scrumbot.sources.api_client import ApiClient
 
-META = "meta.json"
-SPRINTS = "sprints"
-HISTORY = "lich-su"
 LISTS = "don"
 
 
@@ -55,35 +52,17 @@ def read_json(folder: Path, name: str) -> dict[str, object]:
     raise InputError(f"Thư mục '{folder}' không có {name}.json.gz.")
 
 
-def has_json(folder: Path, name: str) -> bool:
-    return (folder / f"{name}.json.gz").is_file() or (folder / f"{name}.json").is_file()
-
-
-class Recorder:
-    """Writes every reply a run used into one folder: a snapshot, or a clone (bot spec §2.4)."""
-
-    def __init__(self, folder: Path, *, kind: str, host: str, now: datetime) -> None:
-        self.folder = folder
-        folder.mkdir(parents=True, exist_ok=True)
-        meta = {"kind": kind, "host": host, "fetched_at": now.strftime("%Y-%m-%d %H:%M:%S")}
-        (folder / META).write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
-
-    def save(self, name: str, value: object) -> None:
-        write_json(self.folder / f"{name}.json.gz", value)
-
-
 class LiveSource:
-    """Reads the API; lists that no longer change come from `cache_dir` (A58); everything used is recorded."""
+    """Reads the API; lists that no longer change come from `cache_dir` (A58)."""
 
-    def __init__(self, client: ApiClient, cache_dir: Path, recorder: Recorder | None, today: date) -> None:
+    def __init__(self, client: ApiClient, cache_dir: Path, today: date) -> None:
         self._client = client
         self._cache = cache_dir
-        self._recorder = recorder
         self._today = today
         self.label = f"API {client.host}"
 
     def sprints(self) -> dict[str, object]:
-        return self._record(SPRINTS, self._client.sprints(MAINTAIN_FOLDER))
+        return self._client.sprints(MAINTAIN_FOLDER)
 
     def orders(self, list_id: str, sprint: SprintInfo | None) -> dict[str, object]:
         cached = self._cache / LISTS / f"{list_id}.json.gz"
@@ -94,42 +73,10 @@ class LiveSource:
             value = self._client.orders(list_id)
             if policy is not None:
                 write_json(cached, value)
-        return self._record(f"{LISTS}/{list_id}", value)
-
-    def history(self, ids: list[str]) -> dict[str, object]:
-        return self._record(HISTORY, self._client.history(ids))
-
-    def _record(self, name: str, value: dict[str, object]) -> dict[str, object]:
-        if self._recorder is not None:
-            self._recorder.save(name, value)
         return value
 
-
-class StoredSource:
-    """Reads a snapshot or a clone; lists missing from it come from the cache when one is given (bot spec §2.4)."""
-
-    def __init__(self, folder: Path, cache_dir: Path | None) -> None:
-        if not folder.is_dir():
-            raise InputError(f"Không có thư mục '{folder}'.")
-        self._folder = folder
-        self._cache = cache_dir
-        kind = _meta(folder).get("kind")
-        self.label = f"{'Bản sao' if kind == 'clone' else 'Snapshot'} {folder}"
-        self.fetched_at = _fetched_at(folder)
-
-    def sprints(self) -> dict[str, object]:
-        return read_json(self._folder, SPRINTS)
-
-    def orders(self, list_id: str, sprint: SprintInfo | None) -> dict[str, object]:
-        lists = self._folder / LISTS
-        if not has_json(lists, list_id) and self._cache is not None and has_json(self._cache / LISTS, list_id):
-            return read_json(self._cache / LISTS, list_id)
-        return read_json(lists, list_id)
-
     def history(self, ids: list[str]) -> dict[str, object]:
-        if not has_json(self._folder, HISTORY):
-            return {"ok": True, "ids": [], "doi_trang_thai": [], "comment": [], "nguoi": [], "khong_thay": []}
-        return read_json(self._folder, HISTORY)
+        return self._client.history(ids)
 
 
 def _cache_policy(sprint: SprintInfo | None, today: date) -> str | None:
@@ -144,22 +91,3 @@ def _cache_policy(sprint: SprintInfo | None, today: date) -> str | None:
 
 def _written_on(path: Path, day: date) -> bool:
     return path.is_file() and datetime.fromtimestamp(path.stat().st_mtime).date() == day
-
-
-def _meta(folder: Path) -> dict[str, object]:
-    path = folder / META
-    if not path.is_file():
-        return {}
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-        return {}
-    return value if isinstance(value, dict) else {}
-
-
-def _fetched_at(folder: Path) -> datetime | None:
-    raw = _meta(folder).get("fetched_at")
-    try:
-        return datetime.strptime(str(raw), "%Y-%m-%d %H:%M:%S")
-    except ValueError:
-        return None

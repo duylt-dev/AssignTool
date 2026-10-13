@@ -8,7 +8,7 @@ from scrumbot.model import HistoryOrder
 
 
 def in_sprint(order: HistoryOrder, number: int, start: date | None, end: date | None) -> bool:
-    """True when one of the order's sprint labels is this sprint. Unknown dates match any date (spec §3 rule 4)."""
+    """True when one of the order's sprint labels is this sprint. Unknown dates match any date."""
     return any(
         label.number == number and (start is None or label.start == start) and (end is None or label.end == end)
         for label in order.sprints
@@ -19,8 +19,7 @@ def history_for(
     history: tuple[HistoryOrder, ...], number: int, start: date | None, end: date | None, day: date
 ) -> tuple[HistoryOrder, ...]:
     """History for assigning sprint `number` on `day`: not that sprint's own orders, nothing filed after `day`, and
-    nothing whose first sprint starts after `day`. The backtest calls it with the day each order was filed, so a
-    replayed sprint never sees an assignment made later."""
+    nothing whose first sprint starts after `day`, so a run with --today never sees an assignment made later."""
     return tuple(
         order
         for order in history

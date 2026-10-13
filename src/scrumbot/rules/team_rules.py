@@ -15,7 +15,7 @@ _CHOOSING = (RuleKind.PIN, RuleKind.PREFER)
 
 def check_rules(rules: tuple[TeamRule, ...], devs: tuple[Dev, ...], source: str) -> None:
     """Raise InputError for a dev missing from devs.xlsx or two rules in conflict (spec §14.2). Checked over the whole
-    file, so a normal run and the backtest accept or reject the same file."""
+    file, so a run on any day accepts or rejects the same file."""
     codes = {text_key(dev.code) for dev in devs}
     for rule in rules:
         if text_key(rule.dev) not in codes:

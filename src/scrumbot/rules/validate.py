@@ -6,30 +6,6 @@ from scrumbot.model import Finding, Order, Priority, Severity, SprintSheet
 from scrumbot.normalize import app_key, parse_priority, text_key
 
 
-def history_findings(file_used: bool, sheet_names: tuple[str, ...]) -> tuple[Finding, ...]:
-    """Say where familiarity came from when there was no history file (spec §5, §9)."""
-    if file_used:
-        return ()
-    if sheet_names:
-        sheets = ", ".join(sheet_names)
-        return (
-            Finding(
-                Severity.INFO,
-                "HISTORY-FROM-WORKBOOK",
-                sheets,
-                f"Không có file lịch sử; dùng sheet {sheets} trong workbook làm lịch sử.",
-            ),
-        )
-    return (
-        Finding(
-            Severity.WARN,
-            "HISTORY-MISSING",
-            "Lịch sử",
-            "Không có file lịch sử và workbook không có sheet sprint cũ; coi như chưa ai làm app nào.",
-        ),
-    )
-
-
 def orders_and_findings(target: SprintSheet) -> tuple[tuple[Order, ...], tuple[Finding, ...]]:
     """Return assignable orders and the validation findings for a target sheet."""
     orders: list[Order] = []

@@ -26,12 +26,3 @@ def load_board(
     ids = [task.id for task in read_tasks(lists[current.id], current.id)]
     raw_history = source.history(ids) if ids else None
     return read_board(raw_sprints, lists, raw_history, fetched_at, source.label), current
-
-
-def load_everything(source: RawSource, fetched_at: datetime) -> Board:
-    """A whole clone: every list it holds and its whole history (bot spec §8)."""
-    raw_sprints = source.sprints()
-    sprints = read_sprints(raw_sprints)
-    lists = {sprint.id: source.orders(sprint.id, sprint) for sprint in maintain_sprints(sprints)}
-    lists[TECH_MANAGER_LIST] = source.orders(TECH_MANAGER_LIST, None)
-    return read_board(raw_sprints, lists, source.history([]), fetched_at, source.label)

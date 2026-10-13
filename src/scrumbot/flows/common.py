@@ -1,5 +1,5 @@
-"""What every flow shares: options, devs and TM rules, AI sizes with memory, the "Tóm tắt" rows and the terminal
-lines. Flows never print; they hand lines to `say`, which `cli.py` binds to print (LLM.md §2)."""
+"""What the run needs besides the API: options, devs and TM rules, AI sizes with memory, the "Tóm tắt" rows and the
+terminal lines. The flow never prints; it hands lines to `say`, which `cli.py` binds to print (LLM.md §2)."""
 
 from __future__ import annotations
 
@@ -31,16 +31,11 @@ class Options:
     state_dir: Path = Path("state")
     out_dir: Path = Path("output")
     today: date | None = None  # --today
-    snapshot: Path | None = None  # --snapshot
     sprint_id: str | None = None  # --sprint-id
     ai: str = "gemini"
     ai_model: str | None = None
     ai_timeout: int = 180
     env_file: Path = Path(".env")
-    # --source file only
-    sprint: str | None = None
-    history: str | None = None
-    sheet: str | None = None
 
 
 def load_team(options: Options) -> tuple[tuple[Dev, ...], tuple[TeamRule, ...], Path | None]:

@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
-from scrumbot.actions.housekeeping import prune
 from scrumbot.actions.state_store import StateStore
 from scrumbot.actions.xlsx_report import write_report
 from scrumbot.flows.common import (
@@ -21,9 +20,8 @@ from scrumbot.flows.common import (
     summary_rows,
 )
 from scrumbot.flows.fetch import load_board
-from scrumbot.model import Dev, Result, Source, TeamRule
-from scrumbot.model_board import Board, SprintInfo
-from scrumbot.model_risk import KeptProposal, Outcome, RiskLevel
+from scrumbot.model import Source
+from scrumbot.model_risk import KeptProposal
 from scrumbot.rules.board import (
     empty_backlog,
     history_orders,
@@ -40,75 +38,24 @@ from scrumbot.rules.team_rules import in_force, rules_day
 from scrumbot.rules.validate import orders_and_findings
 from scrumbot.sources.api_client import ApiClient
 from scrumbot.sources.env_config import load_config
-from scrumbot.sources.raw_store import LiveSource, RawSource, Recorder, StoredSource
+from scrumbot.sources.raw_store import LiveSource
 
-NOT_COMPARED = "Không so khi chạy với --today hoặc --snapshot."
+NOT_COMPARED = "Không so khi chạy với --today."
 NO_BASELINE = "Chưa có lần chạy trước để so"
 
 
-@dataclass(frozen=True)
-class ApiRun:
-    """One run decided but not yet written: the flow that calls `prepare` chooses whether to write (bot spec §7)."""
-
-    result: Result
-    sprint: SprintInfo
-    board: Board
-    source: RawSource  # for what a flow reads after deciding, e.g. the end-of-sprint history
-    devs: tuple[Dev, ...]
-    rules: tuple[TeamRule, ...]
-    headers: tuple[str, ...]
-    store: StateStore
-    live: bool  # live data of today: the memory is read and written (A66)
-    run_at: datetime
-    snapshot: Path | None
-    note: str  # the D50 description note
-    proposals: tuple[KeptProposal, ...]  # new proposals of this run
-    outcomes: tuple[Outcome, ...]  # outcomes found by this run
-    forget: tuple[str, ...]  # order ids whose remembered proposal no longer stands
-
-    @property
-    def high_risks(self) -> tuple[str, ...]:
-        return tuple(f"{risk.code}|{risk.where}" for risk in self.result.risks if risk.level is RiskLevel.HIGH)
-
-    @property
-    def proposed_ids(self) -> tuple[str, ...]:
-        return tuple(
-            item.order.row.id
-            for item in self.result.assignments
-            if item.source is Source.PROPOSED and item.order.row.id
-        )
-
-
 def run_api(options: Options, say: Say, now: datetime) -> Path:
-    """A manual run: always writes its report to `--out` (D54: `output/` is for manual runs)."""
-    run = prepare(options, say, now)
-    path = write_report(run.result, run.headers, options.out_dir, now)
-    commit(run)
-    for line in result_lines(run.result, path):
-        say(line)
-    return path
-
-
-def prepare(options: Options, say: Say, now: datetime) -> ApiRun:
+    """Read the API, decide, write the report to `--out`, then update the memory (bot spec §2–§6)."""
     today = options.today or now.date()
     run_at = now if options.today is None else datetime.combine(options.today, now.time())
-    live = options.today is None and options.snapshot is None
+    live = options.today is None  # live data of today: the memory is read and written (A66)
     devs, rules, rules_file = load_team(options)
     state = options.state_dir
-    snapshot: Path | None = None
-    source: RawSource
-    if options.snapshot is not None:
-        stored = StoredSource(options.snapshot, state / "cache")
-        source, fetched_at = stored, stored.fetched_at or now
-    else:
-        config = load_config(os.environ, options.env_file)
-        prune(state / "snapshots", now)
-        snapshot = state / "snapshots" / f"{now:%Y%m%d-%H%M%S}"
-        recorder = Recorder(snapshot, kind="snapshot", host=config.host, now=now)
-        source, fetched_at = LiveSource(ApiClient(config), state / "cache", recorder, today), now
+    config = load_config(os.environ, options.env_file)
+    source = LiveSource(ApiClient(config), state / "cache", today)
     if options.today is not None:
         say(f"Ngày chạy: {today:%d/%m/%Y} (--today)")
-    board, sprint = load_board(source, day=today, sprint_id=options.sprint_id, fetched_at=fetched_at)
+    board, sprint = load_board(source, day=today, sprint_id=options.sprint_id, fetched_at=now)
     freshness = newest_update(board)
     say(f"Nguồn: {board.source}" + (f" (dữ liệu mới nhất {freshness:%d/%m/%Y %H:%M})" if freshness else ""))
     target = sprint_sheet(board, sprint)
@@ -165,36 +112,21 @@ def prepare(options: Options, say: Say, now: datetime) -> ApiRun:
         note=note,
         backlog=empty_backlog(board, today),
     )
-    standing_ids = {proposal.order_id for proposal in standing.values()}
-    return ApiRun(
-        result=replace(result, summary=rows),
-        sprint=sprint,
-        board=board,
-        source=source,
-        devs=devs,
-        rules=rules,
-        headers=target.headers,
-        store=store,
-        live=live,
-        run_at=run_at,
-        snapshot=snapshot,
-        note=note,
-        proposals=tuple(
-            KeptProposal(item.order.row.id, item.pic_codes[0], item.reason, item.backups, run_at)
-            for item in result.assignments
-            if item.source is Source.PROPOSED and not item.kept and item.order.row.id
-        ),
-        outcomes=outcomes,
-        forget=tuple(proposal.order_id for proposal in kept_before if proposal.order_id not in standing_ids),
-    )
-
-
-def commit(run: ApiRun) -> None:
-    """Store what the next runs need (A62, A66). Only runs on live data of today touch the memory."""
-    if not run.live:
-        return
-    active = tuple(summary.dev for summary in run.result.devs)
-    run.store.save_outcomes(run.sprint.id, run.outcomes)
-    run.store.forget_proposals(run.forget)
-    run.store.save_proposals(run.sprint.id, run.proposals)
-    run.store.save_marks(run.sprint.id, marks(run.result.assignments, active), run.run_at)
+    result = replace(result, summary=rows)
+    path = write_report(result, target.headers, options.out_dir, now)
+    if live:  # only runs on live data of today touch the memory (A62, A66)
+        standing_ids = {proposal.order_id for proposal in standing.values()}
+        store.save_outcomes(sprint.id, outcomes)
+        store.forget_proposals(tuple(p.order_id for p in kept_before if p.order_id not in standing_ids))
+        store.save_proposals(
+            sprint.id,
+            tuple(
+                KeptProposal(item.order.row.id, item.pic_codes[0], item.reason, item.backups, run_at)
+                for item in result.assignments
+                if item.source is Source.PROPOSED and not item.kept and item.order.row.id
+            ),
+        )
+        store.save_marks(sprint.id, marks(result.assignments, tuple(s.dev for s in result.devs)), run_at)
+    for line in result_lines(result, path):
+        say(line)
+    return path

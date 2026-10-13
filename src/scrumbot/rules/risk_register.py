@@ -87,9 +87,8 @@ def make(
     owner: str,
     *,
     stt: int | None = None,
-    covers: tuple[int, ...] = (),
 ) -> Risk:
-    return Risk(level, code, group, where, problem, impact, action, owner, due_for(level, context.base), stt, covers)  # type: ignore[arg-type]
+    return Risk(level, code, group, where, problem, impact, action, owner, due_for(level, context.base), stt)  # type: ignore[arg-type]
 
 
 def is_open(row: SprintRow) -> bool:

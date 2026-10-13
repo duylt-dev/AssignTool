@@ -92,7 +92,6 @@ def unfamiliar_risks(context: RiskContext) -> tuple[Risk, ...]:
                 action,
                 "TM",
                 stt=row.stt,
-                covers=(row.stt,),
             )
         )
     return tuple(risks)
@@ -132,7 +131,6 @@ def absent_risks(context: RiskContext) -> tuple[Risk, ...]:
                 action,
                 "TM",
                 stt=row.stt,
-                covers=(row.stt,),
             )
         )
     return tuple(risks)

@@ -60,4 +60,4 @@ class Board:
     changes: tuple[StatusChange, ...]
     status_kinds: Mapping[str, str]  # text_key(status name) -> kind, over every status table read (A74)
     fetched_at: datetime
-    source: str  # "API devclickup.datlt.site", "Snapshot <dir>", "Bản sao <dir>"
+    source: str  # "API devclickup.datlt.site"

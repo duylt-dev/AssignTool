@@ -1,6 +1,6 @@
 """Core value objects shared by sources, rules and actions (LLM.md §2). No I/O here.
 
-API items live in `model_board.py`; risks, changes and replay results in `model_risk.py`.
+API items live in `model_board.py`; risks and changes in `model_risk.py`.
 """
 
 from __future__ import annotations
@@ -72,7 +72,7 @@ class Dev:
 
 @dataclass(frozen=True, slots=True)
 class SprintRow:
-    """One data row of a sprint sheet (spec §3). Text fields are NFC-normalised; missing columns give defaults."""
+    """One row of the target sprint, built from the API (assignment spec §3, bot spec §2.5). Text is NFC-normalised."""
 
     stt: int
     title: str  # leading spaces and "└ " removed
@@ -85,7 +85,7 @@ class SprintRow:
     created: date | None
     description: str  # "Mô tả"
     cells: tuple[object, ...]  # every original cell value, in the sheet's column order (for the report)
-    hours: float | None = None  # "Ước lượng (h)"; read only for history built from older sheets (spec §5)
+    hours: float | None = None  # "Ước lượng (h)" (`uoc_luong_gio`); never sizes a target order (D3)
     # Filled by the API source only (bot spec §2.5); file rows keep the defaults.
     id: str = ""
     root_id: str = ""  # id of the nearest root order; the row's own id for a root
@@ -99,7 +99,7 @@ class SprintRow:
 class SprintSheet:
     name: str  # "Sprint 10"
     number: int
-    start: date | None  # from row 3 (spec §3 rule 4)
+    start: date | None  # the sprint's first day
     end: date | None
     headers: tuple[str, ...]  # original header texts, in column order
     rows: tuple[SprintRow, ...]
@@ -129,7 +129,7 @@ class Order:
 
 @dataclass(frozen=True, slots=True)
 class SprintLabel:
-    """One sprint named in the history's "Sprint" cell, e.g. "Sprint 10 (10/6 - 10/17)" (spec §5, A24).
+    """One sprint an order belongs to, e.g. "Sprint 10 (10/6 - 10/17)" (assignment spec §5, A24).
 
     Two labels are the same sprint when number, start and end agree: "Sprint 1" exists on two boards with the same
     start date (A21).
@@ -143,7 +143,7 @@ class SprintLabel:
 
 @dataclass(frozen=True, slots=True)
 class HistoryOrder:
-    """One root order of the history: a row of the Tech manager export (spec §5) or of an older sprint sheet."""
+    """One root order of the history (assignment spec §5)."""
 
     sprint: str  # quoted in reasons: the "Sprint" cell as written ("" when empty), or the sheet name
     app: str
@@ -152,8 +152,8 @@ class HistoryOrder:
     hours: float | None  # "Ước lượng (h)", when the file has it
     created: date  # "Ngày lên đơn" / "Ngày tạo"
     sprints: tuple[SprintLabel, ...] = ()  # parsed from `sprint`; empty for sheet history
-    priority_raw: str = ""  # "Ưu tiên" as written; used by the backtest
-    due: date | None = None  # "Due date"; used by the backtest
+    priority_raw: str = ""  # "Ưu tiên" as written
+    due: date | None = None  # "Due date"
 
 
 @dataclass(frozen=True, slots=True)
@@ -198,7 +198,7 @@ class Assignment:
     pic_codes: tuple[str, ...]  # codes of the pool devs among pic_names
     reason: str  # spec §8
     backups: tuple[str, ...]  # codes, at most 2; empty for PREASSIGNED
-    rule_lines: tuple[int, ...] = ()  # lines of the TM rules that shaped the choice ("Luật TM" of the replay)
+    rule_lines: tuple[int, ...] = ()  # lines of the TM rules that shaped the choice
     rules_relaxed: bool = False  # the rules left no candidate, so EXCLUDE and MAX_ORDERS were ignored (A31)
     kept: bool = False  # a proposal remembered from an earlier run (A66)
 

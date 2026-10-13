@@ -1,7 +1,7 @@
 """The memory between runs (bot spec §5, A51): one SQLite file in `state/`. The only module that imports sqlite3.
 
 Tables: kept proposals (A66), AI answers by order id + title (A67), the per-day state of each order (A62),
-outcomes of proposals (bot spec §5.2), runs and their report fingerprints (A78), end-of-sprint reports (A72).
+and the outcomes of proposals (bot spec §5.2).
 """
 
 from __future__ import annotations
@@ -33,10 +33,6 @@ CREATE TABLE IF NOT EXISTS order_marks (
 CREATE TABLE IF NOT EXISTS outcomes (
     order_id TEXT PRIMARY KEY, sprint_id TEXT NOT NULL, title TEXT NOT NULL, proposed TEXT NOT NULL,
     actual TEXT NOT NULL, at TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS runs (
-    at TEXT NOT NULL, sprint_id TEXT NOT NULL, kind TEXT NOT NULL, fingerprint TEXT NOT NULL,
-    high_risks TEXT NOT NULL, proposed TEXT NOT NULL, report TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS sprint_ends (sprint_id TEXT PRIMARY KEY, at TEXT NOT NULL, report TEXT NOT NULL);
 """
 
 
@@ -167,54 +163,6 @@ class StateStore:
         )
         found = (Outcome(r[0], r[1], r[2], tuple(json.loads(r[3])), _time(r[4])) for r in rows)
         return tuple(item for item in found if day is None or item.at.date() == day)
-
-    # A78: runs and fingerprints
-    def record_run(
-        self,
-        sprint_id: str,
-        kind: str,
-        fingerprint: str,
-        high_risks: tuple[str, ...],
-        proposed: tuple[str, ...],
-        report: str,
-        now: datetime,
-    ) -> None:
-        self._many(
-            "INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?, ?)",
-            [
-                (
-                    now.strftime(_TIME),
-                    sprint_id,
-                    kind,
-                    fingerprint,
-                    json.dumps(high_risks, ensure_ascii=False),
-                    json.dumps(proposed),
-                    report,
-                )
-            ],
-        )
-
-    def full_run_on(self, day: date) -> bool:
-        row = self._one("SELECT 1 FROM runs WHERE kind = 'full' AND substr(at, 1, 10) = ?", (day.isoformat(),))
-        return row is not None
-
-    def last_report(self, sprint_id: str) -> tuple[str, tuple[str, ...], tuple[str, ...]] | None:
-        """(fingerprint, Cao risks as "code|where", proposed order ids) of the last run that wrote a report."""
-        row = self._one(
-            "SELECT fingerprint, high_risks, proposed FROM runs WHERE sprint_id = ? AND report != '' "
-            "ORDER BY at DESC, rowid DESC LIMIT 1",
-            (sprint_id,),
-        )
-        if row is None:
-            return None
-        return row[0], tuple(json.loads(row[1])), tuple(json.loads(row[2]))
-
-    # A72: end-of-sprint reports
-    def sprint_end_done(self, sprint_id: str) -> bool:
-        return self._one("SELECT 1 FROM sprint_ends WHERE sprint_id = ?", (sprint_id,)) is not None
-
-    def record_sprint_end(self, sprint_id: str, report: str, now: datetime) -> None:
-        self._many("INSERT OR REPLACE INTO sprint_ends VALUES (?, ?, ?)", [(sprint_id, now.strftime(_TIME), report)])
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.path, timeout=30)

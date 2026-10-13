@@ -236,4 +236,4 @@ def _order_risk(
     owner: str,
 ) -> Risk:
     stt = item.order.row.stt
-    return make(context, level, code, group, order_where(stt), problem, impact, action, owner, stt=stt, covers=(stt,))
+    return make(context, level, code, group, order_where(stt), problem, impact, action, owner, stt=stt)
