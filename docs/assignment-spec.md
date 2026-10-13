@@ -1,13 +1,17 @@
-# Assignment spec: `assigntool`
+# Assignment spec: the assignment core of `scrumbot`
 
-What the tool reads, how it sizes orders, how it picks a PIC for each order, and what it writes.
+What the bot reads from the export files, how it sizes orders, how it picks a PIC for each order, and what it
+writes. Reading the internal system's API, the risk register, the memory between runs, scheduled runs and the replay
+are in [`bot-spec.md`](bot-spec.md); this file stays the reference for the rule itself (§6–§8) and for the export
+files that `eval/` still uses (D51).
 [`LLM.md`](../LLM.md) says where each part lives in code; [`confirm.md`](../confirm.md) holds the decisions cited
 here as `Dn` (user-locked), `An` (defaults) and `On` (open).
 
 **Status:** approved 2026-10-06 and implemented; updated 2026-10-07 for the history export of list "Tech manager"
-(D6), the load cap in orders (D26) and the backtest (D22, §13), then for the TM rules file (D28–D35, §14). Every number in §12 and §13 is asserted by
-`tests/test_real_input.py` and `tests/test_pipeline.py`; the §13 table was also reproduced by a separate script that
-shares no code with the tool.
+(D6), the load cap in orders (D26) and the backtest (D22, §13), then for the TM rules file (D28–D35, §14); renamed
+`scrumbot` on 2026-10-13 (D46, D57): the package is split in four layers, the CLI has sub-commands (bot spec §1), the
+run day matters for leave (bot spec §3) and the report has six sheets (bot spec §6). Every number in §12 is asserted
+by `tests/test_real_input.py` and `tests/test_pipeline.py`.
 
 User-facing text (column headers, finding messages, reasons, terminal lines) is Vietnamese (D12). It is quoted here
 exactly as the tool must print it.
@@ -50,9 +54,11 @@ exactly as the tool must print it.
 ## 2 · Command line
 
 ```
-assigntool [--input DIR] [--sprint FILE] [--devs FILE] [--history FILE] [--rules FILE] [--sheet NAME] [--today DATE]
-           [--out DIR] [--ai gemini|agy|off] [--ai-model NAME] [--ai-timeout SECONDS] [--backtest] [-v]
+scrumbot run --source file [--input DIR] [--sprint FILE] [--devs FILE] [--history FILE] [--rules FILE] [--sheet NAME]
+             [--today DATE] [--out DIR] [--ai gemini|agy|off] [--ai-model NAME] [--ai-timeout SECONDS] [-v]
 ```
+
+The other commands and the API source (the default of `scrumbot run`) are in bot spec §1.
 
 | Option | Default | Meaning |
 |---|---|---|
@@ -67,7 +73,6 @@ assigntool [--input DIR] [--sprint FILE] [--devs FILE] [--history FILE] [--rules
 | `--ai` | `gemini` | AI tool used for sizing (§6.4, D16, A17). `agy` is for the dev machine; `off` sizes every order `M`. |
 | `--ai-model` | the AI tool's own default | Model name passed through to the AI tool. |
 | `--ai-timeout` | `180` | Seconds before the AI call is killed and sizes fall back to `M`. |
-| `--backtest` | off | Replay every Maintain sprint of the history export and compare with the TM (§13). Needs only `--history` and `--devs` (and uses `--rules`); `--sprint`, `--sheet`, `--today` and the `--ai` options are ignored. |
 | `-v` | off | Show tracebacks for input errors and the AI tool's raw output. |
 
 Discovery reads content, not names (A2): each `.xlsx` other than `devs.xlsx` is opened, and the one with a `Sprint N`
@@ -189,8 +194,8 @@ A run uses the history orders that existed **before it**:
 3. its earliest sprint, if it has one, started on or before the run day.
 
 The run day is today for a normal run (or the day given with `--today`, A35), and the day the order was filed for
-the backtest (§13). The same rule in both
-places means the backtest measures exactly what a normal run does, and never sees an assignment made later.
+the replay (bot spec §8.1; the backtest of §13 before 2026-10-13). The same rule in both places means the replay
+measures exactly what a normal run does, and never sees an assignment made later.
 History includes MVP / research orders and orders with no sprint (A23, D23). A history file is never combined with
 the workbook's older sheets (A8).
 
@@ -243,7 +248,8 @@ done) is not busy. Statuses are compared after NFC, trimming and casefolding. `�
 ### 6.3 Leave
 
 Working days of the sprint are Monday to Friday between the dates of §3 rule 4, inclusive. A dev whose leave days
-cover every working day is removed from the pool (`DEV-ON-LEAVE`). A pre-assigned order held by such a dev and by no other pool dev is kept (D10) and reported (`PRE-ASSIGNED-ON-LEAVE`, A43): nobody in the pool works on it. Otherwise the number of leave days on working days
+cover every working day is removed from the pool (`DEV-ON-LEAVE`); since 2026-10-13 a dev off every **remaining**
+working day is removed too (`DEV-ON-LEAVE-REST`, bot spec §3, A75), and key part 5 counts the remaining days only. A pre-assigned order held by such a dev and by no other pool dev is kept (D10) and reported (`PRE-ASSIGNED-ON-LEAVE`, A43): nobody in the pool works on it. Otherwise the number of leave days on working days
 is a tie-breaker only (A12). Leave days outside the sprint are ignored.
 
 ### 6.4 Size (AI)
@@ -417,12 +423,15 @@ never renamed once released. Nothing is ever reported about people outside the p
 | `PRE-ASSIGNED-ON-LEAVE` | WARN | A pre-assigned order names a dev who is off for every working day (`DEV-ON-LEAVE`) and no other pool dev, so nobody in the pool works on it (A43). The order is still kept (D10). `where` = `Đơn STT <n>`. | `Đơn STT <n> giao sẵn cho <Mã> nhưng <Mã> nghỉ cả sprint; đơn chưa có ai làm, cân nhắc giao lại.` |
 | `RULE-DEV-UNAVAILABLE` | WARN | A `Chỉ định` or `Ưu tiên` rule in force names a dev who is not in the pool: `Nhận việc` = `N` or on leave for the whole sprint (D35). `where` = `Luật dòng <n>`. | `Luật dòng <n> (<Loại> <Mã>) không áp dụng: <Mã> không nhận việc hoặc nghỉ cả sprint.` |
 | `RULE-NO-CANDIDATE` | WARN | The `Không giao` and `Tối đa đơn` rules left no candidate for an order (§7, A31). | `Luật TM loại hết dev khỏi đơn STT <n>; đơn này được giao như khi không có luật Không giao và Tối đa đơn.` |
+| `DUE-MISSING` | WARN | An `urgent` or `high` order has no `Hạn` (D53, bot spec §3). | `Đơn STT <n> là đơn <urgent\|high> nhưng chưa có Hạn.` |
+| `DEV-ON-LEAVE-REST` | INFO | A pool dev is off every remaining working day, not every day of the sprint (A75, bot spec §3). | `<Mã> nghỉ hết các ngày còn lại của sprint (từ <ngày gốc>); không được giao đơn mới.` |
 
 ## 10 · Output workbook
 
 `output/assignment_<sheet slug>_<YYYYMMDD-HHMMSS>.xlsx`, e.g. `assignment_sprint-10_20261006-143000.xlsx`. Written to
 `<name>.tmp`, then renamed (A14). A fresh name each run, so a report left open in Excel never blocks the next one.
-The backtest writes its own workbook (§13).
+Since 2026-10-13 the workbook has six sheets (`Tóm tắt`, `Phân công`, `Rủi ro`, `Thay đổi`, `Cảnh báo`, `Tải dev`) and
+`Phân công` has more columns: bot spec §6. This section describes the three sheets that existed before.
 
 Until the tool can write into the internal system (D19, O8), this report **is** the assignment: whoever has access
 enters each `PIC` into the system. The column `Nguồn` still says `Tool đề xuất` for the tool's choices.
@@ -474,7 +483,8 @@ as `WARN <code>: <message>`; and the report path. The full detail is in the work
 
 ## 12 · Acceptance on the sample
 
-Inputs: `input/Maintain_update_Sprint_10_va_9.xlsx`; `devs.xlsx` = the 4 rows of §4. Runs A and B: history = the
+Inputs: `input/Maintain_update_Sprint_10_va_9.xlsx`; `devs.xlsx` = the 4 rows of §4. Every run is pinned to
+`--today 2026-10-06`, Sprint 10's first day, so the remaining-days leave of bot spec §3 never depends on the clock. Runs A and B: history = the
 12 orders of sheet Sprint 9 as a CSV in the Tech manager format of §5, labelled `Sprint 9 (9/21 - 10/2)` (the
 acceptance test builds both files from the sample in `tmp_path` at run time; they are never written to disk
 elsewhere). Runs C and D: no history file, so the history is sheets Sprint 6–9 (§5). Run E: history =
@@ -502,7 +512,8 @@ TiếnBV 16h. One order is empty:
 |---|---|---|---|---|---|
 | 10 | Roblox skin 1.0.4 | yes (new app) | **MinhNM** | LinhNV, TiếnBV | Nobody knows the app; LinhNV and MinhNM are ≥ middle; MinhNM has the lower load (16h vs 32h). |
 
-Findings: none. The sheet `Cảnh báo` holds the single row `Không có cảnh báo`.
+Findings: `DUE-MISSING` on STT 7 (PS Remote 1.1.2 is urgent with no `Hạn`, added 2026-10-13 by D53); before that
+finding existed the sheet held the single row `Không có cảnh báo`.
 
 **Run B: backtest.** The same inputs with `Người làm` cleared on the 6 Sprint 10 orders, compared with what the TM
 actually did:
@@ -532,7 +543,8 @@ Cleaner stays a new app:
 
 **Run C: the file as exported.** Loads after the pre-assigned orders as in run A (LinhNV 32h, MinhNM 16h, AnTD 32h,
 TiếnBV 16h). Roblox skin → **AnTD** (backups MinhNM, TiếnBV): the only dev on its latest version, and 2 orders are
-within the cap (1 + 1). Final loads 32/16/48/16 h. Findings: the single INFO `HISTORY-FROM-WORKBOOK` naming the four sheets.
+within the cap (1 + 1). Final loads 32/16/48/16 h. Findings: `DUE-MISSING` on STT 7 and the INFO
+`HISTORY-FROM-WORKBOOK` naming the four sheets.
 
 **Run D: backtest** (`Người làm` cleared, as in run B):
 
@@ -550,7 +562,8 @@ Final loads 32/32/32/0 h. The rule matches the TM on 4 of 5 (run B: 3 of 5).
 **Run E: history = the Tech manager export, file as exported.** 178 root orders; the window of §5.1 drops the six of
 Sprint 10, leaving 172. All six Sprint 10 apps now have history (Phone Cleaner through its MVP order). Roblox skin →
 **AnTD** (backups MinhNM, TiếnBV), reason `Làm version gần nhất của Roblox skin (Sprint 8 (9/4 - 9/18): 1.0.1 - Add
-ads) · Tải sprint này: 32h (2 đơn) · Việc dở Sprint 9: 0`. Final loads 32/16/48/16 h, as run C. Findings: none.
+ads) · Tải sprint này: 32h (2 đơn) · Việc dở Sprint 9: 0`. Final loads 32/16/48/16 h, as run C. Findings:
+`DUE-MISSING` on STT 7.
 
 **Not asserted:** a run with AI sizes. Its sizes vary between runs (§6.4); the opt-in smoke test only checks that a
 real call returns a valid size for every order.
@@ -591,87 +604,19 @@ examples: the export has no hours, D25). Loads after the pre-assigned orders: Li
 AnTD 80h (2), TiếnBV 64h (1). Roblox skin → AnTD, as with `--ai off` (run E): 2 orders are within the cap of 1 + 1
 whatever the sizes.
 
-## 13 · Backtest
+## 13 · Backtest (removed 2026-10-13)
 
-`assigntool --backtest` (D22, A29) answers "would the tool have assigned what the TM assigned?" on every Maintain
-sprint of the history export. It needs the history export (§5) and `devs.xlsx` only.
-
-**Replay.** For each Maintain sprint (§5.2), oldest first:
-
-1. The sprint's root orders that name at least one active pool dev are taken. Those also listed in an earlier
-   Maintain sprint are **carried**: kept with the TM's `Người làm`, like pre-assigned orders (D10), and not compared.
-   The others are **compared**: their `Người làm` is cleared and the tool assigns them. Orders naming nobody from the
-   pool (outside people, or empty) are left out: there is no TM choice to compare with.
-2. Compared orders are replayed **by filing day** (D2: the tool runs whenever BA files orders): those filed before the
-   sprint starts are assigned together on its first day, and each later filing day is one more run that sees the
-   earlier choices as pre-assigned.
-3. Each run is the rule of §7 with: the history window of §5.1 on that day; the TM rules in force on that day
-   (§14.3, D34); every order `M` (the export has no `Mô tả`, so the AI has nothing to read); carry-over 0 (the
-   export's statuses are today's, not those at the start of a past sprint); leave from `devs.xlsx`; the pool minus
-   devs on leave for the whole sprint. Carried orders are pre-assigned, so rules never move them.
-4. An order **matches** when the tool's PIC is one of the pool devs the TM named (in the sample, the TM named 2 pool
-   devs on 13 of the 92 compared orders; 10 of those match).
-
-A miss is not necessarily wrong: the rule balances load on purpose, and the backtest knows neither sizes nor
-carry-over.
-No threshold is set (D22).
-
-**Output.** `output/backtest_<YYYYMMDD-HHMMSS>.xlsx`, written through `.tmp`:
-
-| Sheet | Columns |
-|---|---|
-| `Theo sprint` | `Sprint` · `Bắt đầu` · `Kết thúc` · `Đơn so sánh` · `Khớp` · `Tỉ lệ khớp` · `Đơn mang sang` · `Đơn theo luật TM`; a last row `Tổng`. |
-| `Theo đơn` | `Sprint` · `Ngày lên đơn` · `App` · `Đơn` · `Ưu tiên` · `TM giao` · `Tool giao` · `Khớp` (`✓`/`✗`) · `Dự phòng 1` · `Dự phòng 2` · `Lý do của tool` · `Luật TM`; by sprint, then filing day. |
-
-`Luật TM` lists the lines of the rules that shaped the tool's choice (`dòng 3, 5`): the pin or preference of §8 part
-0, and the rules of parts 8 and 9. `Đơn theo luật TM` counts the compared orders with a non-empty `Luật TM`. A rule
-derived from the same history raises the match rate by construction: with rules, the rate measures the TM's rules
-and the tool's rule together.
-
-The terminal prints the rules line of §11 (`Luật TM: file luat.md (4 luật, áp theo ngày giao lại)`), one line per sprint (`Sprint 9 (9/21 - 10/2): khớp 8/11 đơn (73%)`), the total and the report
-path. Rates are rounded half up. A history file with no Maintain sprint is an input error (exit 2).
-
-**Run F: the sample** (`input/Tech_manager_T2-T10_2026.xlsx`, the 4 devs of §4 with no leave):
-
-| Sprint | Compared | Matched | Carried |
-|---|---|---|---|
-| Sprint 14 (1/26 - 2/12) | 1 | 0 | 0 |
-| Sprint 15 (2/24 - 3/13) | 5 | 2 | 0 |
-| Sprint 16 (3/16 - 3/31) | 4 | 1 | 2 |
-| Sprint 17 (4/2 - 4/14) | 3 | 0 | 3 |
-| Sprint 18 (4/17 - 4/29) | 3 | 0 | 3 |
-| Sprint 19 (5/6 - 5/20) | 3 | 0 | 3 |
-| Sprint 1 (5/22 - 6/5) | 7 | 3 | 0 |
-| Sprint 2 (6/5 - 6/19) | 8 | 5 | 0 |
-| Sprint 3 (6/22 - 7/3) | 6 | 2 | 0 |
-| Sprint 4 (7/7 - 7/17) | 11 | 7 | 0 |
-| Sprint 5 (7/28 - 8/10) | 6 | 4 | 0 |
-| Sprint 6 (8/10 - 8/14) | 3 | 2 | 0 |
-| Sprint 7 (8/17 - 8/28) | 7 | 3 | 0 |
-| Sprint 8 (9/4 - 9/18) | 9 | 2 | 0 |
-| Sprint 9 (9/21 - 10/2) | 11 | 8 | 0 |
-| Sprint 10 (10/6 - 10/17) | 5 | 4 | 0 |
-| **Total** | **92** | **43 (47%)** | 11 |
-
-Run F has no rules file; `Đơn theo luật TM` is 0 on every row.
-
-Reading it:
-
-- **History length matters most.** Sprints 14–19 (January–May, little history) match 3 of 19 orders; Sprints 1–10
-  match 40 of 73 (55%), and Sprint 9 matches 8/11.
-- **Sprint 10:** the one miss is PS Remote (urgent): LinhNV and MinhNM both built version 1.1.1, and with carry-over 0
-  the level decides for LinhNV. In a normal run (run B) MinhNM wins on carry-over (LinhNV has a `qa - need fix` row in
-  Sprint 9), which is what the TM did.
-- **Sprint 8 (2/9):** the TM gave LinhNV 6 of the 9 orders. The cap (at most one order more than the least-loaded dev)
-  does not allow that, so 5 of the 7 misses are orders the TM gave LinhNV; the tool's reasons say
-  `LinhNV quen app hơn nhưng đang có 3 đơn (cân tải)`. Whether the TM's concentration or the cap is right is the
-  TM's call (D22).
+`assigntool --backtest` replayed the Maintain sprints of the Tech manager export and compared the rule with the TM
+(D22, A29). D51 replaced it with the replay on a copy of the API data, which also scores the risk register: bot spec
+§8. The last backtest on `input/Tech_manager_T2-T10_2026.xlsx` (Sprint 14 to Sprint 10, 4 devs, every order `M`,
+carry-over 0) matched the TM on **43 of 92 orders (47%)**; the first replay on the API copy of 2026-10-13 (29 sprints,
+pool by join date, carry-over from the previous sprint) matched **111 of 174 (64%)**.
 
 ## 14 · Input: TM rules
 
 The TM steers the choice without editing code: a rules file pins a dev to an app, keeps a dev off an app or off every
 order, caps a dev's orders, or prefers a dev for an app (D28, D30). The rules are a fixed table read without AI, so
-every choice stays repeatable, explainable in `Lý do` (§8) and measurable by the backtest (§13). The AI never sees
+every choice stays repeatable, explainable in `Lý do` (§8) and measurable by the replay (bot spec §8). The AI never sees
 the rules (LLM.md §12).
 
 ### 14.1 File
@@ -732,7 +677,7 @@ never guesses which of two rules the TM meant.
 | Two `Tối đa đơn` for one dev, different numbers | `File '<file>', dòng <a> và <b>: hai luật Tối đa đơn khác số cho <Mã>.` |
 
 Two rules conflict only when their date ranges overlap. Conflicts and unknown devs are checked over the whole file,
-not only the rules in force, so a normal run and the backtest accept or reject the same file.
+not only the rules in force, so a normal run and the replay accept or reject the same file.
 
 A valid rule that cannot act is not an error: a `Chỉ định` or `Ưu tiên` for a dev outside the pool is a
 `RULE-DEV-UNAVAILABLE` finding (§9); a rule whose app has no order in the sprint is not reported (D35).
@@ -743,8 +688,8 @@ A rule is in force on a day when `Từ ngày` ≤ day ≤ `Đến ngày`. The da
 
 - **normal run:** today (or `--today`, A35), but not earlier than the target sprint's first day when the sheet has
   dates (A34): a TM who runs the tool on the Friday before Sprint 10 gets the rules dated for Sprint 10;
-- **backtest:** the day each batch is replayed (§13 step 2), so a rule dated for one sprint does not touch another
-  (D34).
+- **replay:** the day each batch is replayed (bot spec §8.1 step 2), so a rule dated for one sprint does not touch
+  another (D34).
 
 How each kind acts is in §7; what it writes in `Lý do` is in §8. Rules never touch pre-assigned orders (D10), never
 add a dev outside the pool (D7), and leave the cap's "+ 1 order" (D26) as it is.

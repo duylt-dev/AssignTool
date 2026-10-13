@@ -1,4 +1,4 @@
-# Python best practices for `assigntool`
+# Python best practices for `scrumbot`
 
 [`LLM.md`](../LLM.md) says **where** code goes; this file says **how** it is written. Read the section that matches
 what you are touching before writing code, and run §11 before reporting a change as done.
@@ -18,15 +18,18 @@ Every rule states what breaking it costs. A rule with no reason gets ignored, th
 | 9 | Types and value objects |
 | 10 | Testing |
 | 11 | Checklist before reporting done |
+| 12 | The internal system's API, the memory and scheduled runs |
 
 ---
 
 ## 1 · Toolchain
 
 - Python `>=3.11`, `.python-version` 3.13, environment and lock file managed by **uv** (A1). Commands: `uv sync`,
-  `uv run assigntool …`, `uv run pytest`, `uv run ruff check .`, `uv run ruff format .`; the evaluation set:
+  `uv run scrumbot …`, `uv run pytest`, `uv run ruff check .`, `uv run ruff format .` (ruff skips `*.md`: it would
+  rewrap the Python examples in the docs); the evaluation set:
   `uv run python eval/build_cases.py`, `uv run python eval/run_eval.py` (A36).
-- Runtime dependency: `openpyxl` only. Dev dependencies: `pytest`, `ruff`. Nothing else without a reason written in
+- Runtime dependency: `openpyxl` only; HTTP is `urllib`, the memory `sqlite3`, notifications `osascript` (A52).
+  Dev dependencies: `pytest`, `ruff`. Nothing else without a reason written in
   `confirm.md`: pandas, for instance, would add tens of MB to read a few hundred rows, and its type inference turns
   an empty `Hạn` into `NaN` and a `STT` into a float. No AI SDK either: the AI is reached through the user's own CLI
   (A17), which already holds the user's authentication.
@@ -38,7 +41,7 @@ Every rule states what breaking it costs. A rule with no reason gets ignored, th
 - Module names are `snake_case.py`. This overrides the kebab-case rule in `.claude/rules/development-rules.md`: a
   module named with `-` cannot be imported.
 - Keep files under about 200 lines. A file that grows past that is usually doing two jobs.
-- **Pure core, thin edges.** `rules/*` and `normalize.py` do no I/O (LLM.md §2). Readers turn files into `model.py`
+- **Pure core, thin edges.** `rules/*`, `understanding/sizing.py` and `normalize.py` do no I/O (LLM.md §2). Readers turn files into `model.py`
   values and contain no decisions; `ai_cli.py` runs a command and returns text. If a decision creeps into an edge
   module, move it into `rules/`: a rule inside a reader can only be tested with a real file shaped for it.
 - No module-level mutable state. A cache or a counter at module level leaks between test cases and makes their result
@@ -159,6 +162,9 @@ The tool runs on Windows, Linux and macOS (A2).
 - **`ai_cli.py`: a real child process** (`tests/fake_ai.py`), never a mocked `subprocess` (LLM.md §8).
 - **The acceptance test on `input/`** runs with `--ai off` and asserts spec §12 exactly; it is skipped with a printed
   reason when the sample is absent.
+- **The API client: a real local HTTP server** (`tests/http_server.py`), never a mocked urllib. **No test reaches the
+  dev server:** `tests/conftest.py` points `SCRUMBOT_API_BASE` at a closed local port for every test; a test that
+  forgets to start the fake server fails in milliseconds instead of calling the dev server with the real token.
 - **No network in the default run.** The one real AI test is marker `ai`, opt-in through `ASSIGNTOOL_TEST_AI=gemini`
   (or `=agy` on the dev machine).
 - Never weaken an assertion or add a skip to make a run green. If a test is wrong, fix it and say why in the change.
@@ -168,11 +174,36 @@ The tool runs on Windows, Linux and macOS (A2).
 1. `uv run ruff check .` and `uv run ruff format --check .` pass.
 2. `uv run pytest` passes; report the counts, and whether `real_input` tests ran or were skipped.
 3. Changed a rule, a finding or the prompt: spec §6–§9 updated, with a test that fails without the change.
-4. Ran `uv run assigntool --ai off` on `input/` and opened the report: it matches spec §12, or §12 was updated with
-   the new fact and the reason.
+4. Ran `uv run scrumbot run --source file --ai off --today 2026-10-06` on `input/` and opened the report: it
+   matches assignment spec §12, or §12 was updated with the new fact and the reason. Changed the API source, a risk
+   or a flow: also ran `uv run scrumbot run --ai off --state <scratch dir> --out <scratch dir>` against the dev
+   server and read the report.
 5. Changed `ai_cli.py` or `rules/sizing.py`: ran `ASSIGNTOOL_TEST_AI=gemini uv run pytest -m ai` (or `=agy`) once with a real AI tool,
    or the report says plainly that it did not run.
 6. No `shell=True`; no file opened without `encoding=`; no column read by index; no `datetime` compared with a
    `date` (§3–§5).
 7. `LLM.md`, the spec and `confirm.md` updated as `LLM.md` §10 requires, in the same change.
 8. Nothing contradicts a `D` decision in `confirm.md`. A changed `A` default is updated there with the reason.
+
+## 12 · The internal system's API, the memory and scheduled runs
+
+- **One HTTP client, GET only** (`sources/api_client.py`): `Authorization: Bearer`, `User-Agent: scrumbot/<version>`,
+  timeout 60 s, `429` waits 30 s and retries three times, every other failure an `ApiError` with a Vietnamese message.
+  Measured 2026-10-13: urllib's default User-Agent gets a Cloudflare 403 (code 1010), and 4,816 history rows need 97
+  requests against a limit of 120 a minute; a client without the header or the retry fails on the first run.
+- **The token never leaves its header.** `ApiConfig.token` is `repr=False`; error messages, logs, snapshots and
+  reports never carry it. A token in a log line ends up in a screenshot or a committed file.
+- **Read the configuration from the environment first, then `.env`, leniently** (spaces around `=`, quotes). The
+  user's `.env` had `KEY = value`; a strict parser reported a missing token that was there.
+- **Store raw replies, decide from model values.** `raw_store.py` writes what a run read (gzip JSON) and
+  `api_reader.py` turns it into `model_board` values; rules never see JSON. An offline re-run (`--snapshot`) and the
+  replay then go through exactly the code a live run used.
+- **The memory is one SQLite file with one owner** (`actions/state_store.py`); each method opens, writes and commits
+  on its own. A long-lived connection shared by flows would hold a lock while `agy` thinks for two minutes and make
+  the next scheduled run fail.
+- **Only live runs write the memory** (A66). `--today` and `--snapshot` read nothing from it but AI answers.
+- **Scheduled runs log, they do not print for anyone.** `scrumbot auto` writes one line per run in `state/log/`;
+  stdout and stderr go to `state/log/launchd.*.log`. A notification never fails a run: the report is already written.
+- **Times are naive local times,** like the API's (`YYYY-MM-DD HH:MM:SS`, server time = the team's time zone).
+  Mixing an aware `datetime` with the API's naive ones raises `TypeError` in the middle of a comparison.
+

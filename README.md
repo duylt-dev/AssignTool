@@ -1,51 +1,58 @@
-# assigntool
+# scrumbot
 
-Tool dòng lệnh **giao dev phụ trách (PIC)** cho các đơn còn trống của board Maintain. Đơn do BA lên trên hệ thống nội
-bộ. Chạy tool lúc nào cũng được trong sprint (đầu sprint, và mỗi khi BA lên đơn mới): đơn đã có người thì giữ nguyên,
-đơn trống thì tool chọn người và ghi lý do vào file báo cáo.
+Bot **scrum master** cho team Android (trước đây là `scrumbot`). Mỗi lần chạy, bot đọc sprint đang chạy của board
+Maintain từ API chỉ đọc `/api/doc/` của hệ thống nội bộ (server **dev**), giao dev phụ trách (PIC) cho các đơn gốc
+còn trống, lập **sổ rủi ro** (quá tải, trễ hạn, kẹt trạng thái, QA trả về nhiều, PIC vắng, …), nhớ đề xuất của lần
+trước và ghi một file Excel. Bot chạy tay được, và chạy theo lịch trên máy Mac này (8h30 và mỗi 30 phút trong giờ
+hành chính).
 
-Mục tiêu là tool tự ghi `Người làm` thẳng vào hệ thống, không cần duyệt. Việc đó cần API và một token cho tool, hiện
-chưa có (`confirm.md` O8). Vì vậy hiện tại tool ghi kết quả ra file Excel, và người có quyền nhập vào hệ thống. Tool
-không sửa file input.
+Bot **chưa ghi gì vào hệ thống**: API chỉ đọc. Người có quyền nhập `PIC` từ báo cáo vào hệ thống (`confirm.md` O8).
+Các quyết định: `confirm.md` D36–D57; đặc tả: `docs/bot-spec.md` (bot) và `docs/assignment-spec.md` (luật giao PIC).
 
-> **Trạng thái (2026-10-07):** chạy được với file lịch sử Tech manager, giới hạn tải theo số đơn, backtest và file
-> luật của TM (154 test pass).
+> **Trạng thái (2026-10-13):** giai đoạn 1 xong (228 test). Đã chạy thật trên API dev, sao dữ liệu và giao lại 29
+> sprint cũ: `plans/reports/261013-bao-cao-trien-khai-scrumbot-gd1.md`.
 
 ## 1. Cài đặt
 
 | Cần | Ghi chú |
 |---|---|
-| Python ≥ 3.11 và [`uv`](https://docs.astral.sh/uv/) | Chạy `uv sync` một lần trong thư mục repo để cài thư viện. |
-| Gemini CLI (`gemini`) trong `PATH` | Dùng để AI ước lượng độ lớn đơn. |
-| Biến môi trường `GEMINI_API_KEY` với một key hợp lệ | Gemini CLI không còn đăng nhập bằng tài khoản Google được; phải có key. |
+| Python ≥ 3.11 và [`uv`](https://docs.astral.sh/uv/) | Chạy `uv sync` một lần trong thư mục repo. |
+| File `.env` trong thư mục repo | Hai dòng `SCRUMBOT_API_TOKEN=<token TM cấp>` và `SCRUMBOT_API_BASE=https://devclickup.datlt.site` (mẫu: `.env.example`). Không commit `.env`. Bot từ chối địa chỉ production. |
+| `input/devs.xlsx` | 4 dev và ngày nghỉ (mục 3.2). File luật TM `.md` trong `input/` nếu có (mục 3.5). |
+| AI: `agy` (Antigravity) ở `~/.gemini/bin/agy`, hoặc `gemini` có `GEMINI_API_KEY` | AI ước lượng độ lớn và loại đơn từ tiêu đề. Thiếu AI thì bot vẫn chạy, mọi đơn tính là `M`. |
 
-Thiếu Gemini CLI hoặc key thì tool **vẫn chạy và vẫn ra báo cáo**, nhưng mọi đơn được tính cùng độ lớn `M` và sheet
-`Cảnh báo` ghi lý do.
-
-## 2. Chạy nhanh
-
-1. Đặt file vào `input/` (mục 3). Repo đã có sẵn file export Sprint 6–10, file lịch sử Tech manager tháng 2–10/2026
-   và `devs.xlsx` của 4 dev.
-2. Chạy:
-
-   ```bash
-   uv run assigntool
-   ```
-
-3. Mở file `output/assignment_<sprint>_<thời gian>.xlsx` (mục 4): người được giao ở sheet `Phân công`, các dòng cần
-   xử lý ở sheet `Cảnh báo`. Nhập `PIC` vào hệ thống nội bộ.
-
-Các cách chạy khác:
+## 2. Chạy
 
 ```bash
-uv run assigntool --ai off                  # không gọi AI; mọi đơn tính là M (16h)
-uv run assigntool --ai agy                  # dùng Antigravity thay cho gemini (máy dev)
-uv run assigntool --sprint path/export.xlsx # chỉ định file export khi input/ có nhiều file .xlsx
-uv run assigntool --backtest                # giao lại các sprint cũ trong file lịch sử và so với TM (mục 4.2)
-uv run assigntool --rules path/luat.md      # dùng file luật TM nằm ngoài input/ (mục 3.5)
-uv run assigntool --today 2026-10-19        # chạy như thể hôm nay là 19/10/2026 (lịch sử và ngày áp luật)
-uv run assigntool --help                    # mọi tuỳ chọn (mục 6)
+uv run scrumbot run --ai agy            # một lần chạy trên API: báo cáo vào output/
+uv run scrumbot run --ai off            # không gọi AI; mọi đơn tính là M (16h)
+uv run scrumbot run --today 2026-10-15  # như thể hôm nay là 15/10 (không đụng bộ nhớ của bot)
+uv run scrumbot clone                   # sao toàn bộ dữ liệu về state/clone/<giờ> (chỉ GET)
+uv run scrumbot replay --clone state/clone/<giờ>   # giao lại và chấm rủi ro 29 sprint cũ, không gọi API
+uv run scrumbot sprint-end              # báo cáo cuối sprint của sprint vừa kết thúc
+uv run scrumbot --help                  # mọi lệnh
 ```
+
+**Chạy theo lịch** trên máy Mac này (8h30 chạy đầy đủ; 9h00–17h30 cứ 30 phút chạy lại, chỉ ghi báo cáo khi có thay
+đổi; máy ngủ thì chạy bù khi thức):
+
+```bash
+scripts/lich-chay.sh install    # cài lịch
+scripts/lich-chay.sh run-now    # chạy thử ngay một lượt; lần đầu macOS có thể hỏi quyền truy cập Desktop: bấm Allow
+scripts/lich-chay.sh status     # lịch có bật không, các dòng log mới nhất
+scripts/lich-chay.sh uninstall  # gỡ lịch
+```
+
+Báo cáo theo lịch nằm ở `state/bao-cao/`, log ở `state/log/`. Khi có đơn mới được giao hoặc rủi ro mức Cao mới,
+macOS hiện thông báo kèm tên file. `state/` không commit (có tên người).
+
+**Báo cáo** có 6 sheet: `Tóm tắt` (đọc trước), `Phân công` (PIC đề xuất và lý do), `Rủi ro` (mức, vấn đề, đề xuất, ai
+xử lý, hạn), `Thay đổi` (so với hôm trước: đơn mới, đổi hạn/ưu tiên/tên, TM đã giao có khớp đề xuất không),
+`Cảnh báo` (dữ liệu thiếu), `Tải dev` (tải, sức chứa còn lại). Đề xuất của bot được giữ giữa các lần chạy cho tới khi
+đơn có người làm trên hệ thống.
+
+**Chạy trên file export** (chỉ để bộ đánh giá `eval/` chạy như cũ, `confirm.md` D51): `uv run scrumbot run --source
+file`. Các mục 3–6 dưới đây mô tả cách đó và luật chọn PIC.
 
 ## 3. Input
 
@@ -184,7 +191,7 @@ ghi chú tự do, tool bỏ qua. Tool đọc bảng trực tiếp, **AI không �
 - Luật viết sai (loại lạ, mã dev không có trong `devs.xlsx`, ngày sai, thiếu cột cần, hai luật mâu thuẫn như hai
   `Chỉ định` khác người cho cùng một app) thì tool **dừng** và báo tên file, số dòng. Luật đúng nhưng dev đang nghỉ cả
   sprint hoặc `Nhận việc` = `N` thì bị bỏ qua, kèm cảnh báo.
-- Trước khi dùng một luật mới, chạy `uv run assigntool --backtest` để xem luật đó làm tỉ lệ khớp với TM thay đổi thế
+- Trước khi dùng một luật mới, chạy `uv run scrumbot replay --clone state/clone/<giờ> --rules <file>` để xem luật đó làm tỉ lệ khớp với TM thay đổi thế
   nào (mục 4.2).
 
 ## 4. Output
@@ -273,33 +280,22 @@ Các lỗi input dừng tool: thiếu file hoặc có nhiều file ứng viên; 
 `Level` sai; `Nhận việc` không phải `Y`/`N`; trùng `Tên` hoặc `Mã`; ngày không đọc được; không còn dev nào để giao sau
 khi trừ người nghỉ; file luật viết sai hoặc có hai luật mâu thuẫn (mục 3.5).
 
-### 4.2 Backtest: tool có giao giống TM không
+### 4.2 Giao lại sprint cũ: bot có giao giống TM không, có báo rủi ro đúng không
 
 ```bash
-uv run assigntool --backtest
+uv run scrumbot clone                               # chụp dữ liệu từ API (chỉ GET) vào state/clone/<giờ>
+uv run scrumbot replay --clone state/clone/<giờ>    # không gọi API
 ```
 
-Chỉ cần file lịch sử Tech manager và `devs.xlsx`. Với mỗi sprint Maintain trong file lịch sử (file mẫu: 16 sprint,
-tháng 1–10/2026), tool xoá `Người làm` của các đơn TM đã giao cho dev trong danh sách, giao lại theo đúng luật ở mục 5,
-rồi so với người TM đã giao.
+Bot giao lại từng sprint Maintain trên bản sao (29 sprint, 08/2025–10/2026): xoá `Người làm` trong bộ nhớ, giao lại
+theo ngày lên đơn bằng luật ở mục 5, rồi so với người TM đã giao. Mỗi dev chỉ vào pool từ sprint đầu tiên họ làm PIC;
+việc dở lấy từ sprint trước. Bot cũng lập sổ rủi ro ở 3 mốc mỗi sprint (ngày đầu, ngày làm việc thứ 5, lúc còn 3 ngày)
+và so với kết cục thật của từng đơn (xong sau ngày kết thúc, có mặt ở sprint sau, xong sau hạn, từ 5 bug).
 
-- Đơn được giao lại theo **ngày lên đơn**, như khi chạy tool mỗi lần BA lên đơn: đơn lên trước ngày bắt đầu sprint
-  được giao cùng lúc vào ngày bắt đầu, mỗi ngày sau là một lần chạy. Lịch sử của mỗi lần chạy chỉ gồm việc đã có
-  trước ngày đó.
-- Đơn mang sang từ sprint trước giữ nguyên người TM giao (không so sánh). Đơn không có dev trong danh sách bị bỏ qua.
-- **Mọi đơn tính là M và việc dở bằng 0**: file Tech manager không có mô tả để AI ước lượng, và trạng thái trong file
-  là trạng thái hôm nay, không phải lúc sprint đó bắt đầu.
-- **Khớp** khi người tool chọn là một trong các dev TM đã giao. Lệch chưa chắc là sai: luật cố ý cân tải.
-- Có file luật TM (mục 3.5) thì backtest **áp luật** theo `Từ ngày` / `Đến ngày` so với ngày giao lại từng đơn. Luật
-  rút ra từ chính lịch sử thì tất nhiên làm tỉ lệ khớp tăng; khi đó tỉ lệ đo cả luật của TM lẫn luật của tool.
-
-File `output/backtest_<thời gian>.xlsx` có hai sheet: `Theo sprint` (số đơn so sánh, số khớp, tỉ lệ, số đơn mang
-sang, số đơn chịu tác động của luật TM; dòng cuối là tổng) và `Theo đơn` (mỗi đơn: TM giao ai, tool giao ai, khớp hay
-không, lý do của tool, các dòng luật TM đã tác động).
-
-Kết quả trên file mẫu, không có file luật: **khớp 43/92 đơn (47%)**. Các sprint tháng 1–5 (ít lịch sử) chỉ khớp 3/19;
-từ Sprint 1 (tháng 5) khớp 40/73 (55%); Sprint 9 khớp 8/11, Sprint 10 khớp 4/5. Chi tiết và cách đọc: spec §13. Thêm
-hai dòng `Chỉ định LinhNV` cho AR Dog và VPN thì khớp 50/92 (54%): AR Dog 9/9, VPN 6/7 (chạy thử ngày 2026-10-07).
+File `output/replay_<thời gian>.xlsx`: giao người theo sprint và theo đơn, điểm rủi ro theo loại (tất cả và riêng các
+sprint có lịch sử trạng thái), theo sprint, kết cục từng đơn, sổ rủi ro ở các mốc. Kết quả lần đầu (13/10): khớp TM
+111/174 đơn (64%); chi tiết trong `plans/reports/261013-bao-cao-trien-khai-scrumbot-gd1.md`. Lệnh `--backtest` trên
+file Tech manager cũ đã bỏ (lần cuối khớp 43/92).
 
 ## 5. Tool chọn PIC thế nào
 
@@ -349,7 +345,6 @@ hai dòng `Chỉ định LinhNV` cho AR Dog và VPN thì khớp 50/92 (54%): AR 
 | `--ai gemini\|agy\|off` | `gemini` | Công cụ AI. `agy` cho máy dev; `off` tính mọi đơn là M. |
 | `--ai-model NAME` | mặc định của công cụ AI | Tên model truyền thẳng cho công cụ AI. |
 | `--ai-timeout SECONDS` | `180` | Số giây chờ AI. |
-| `--backtest` | tắt | Giao lại các sprint Maintain trong file lịch sử và so với TM (mục 4.2), có áp file luật. Bỏ qua `--sprint`, `--sheet`, `--today`, `--ai…`. |
 | `-v` | tắt | In traceback khi lỗi và nội dung trao đổi với AI. |
 
 ## 7. Dành cho người phát triển
