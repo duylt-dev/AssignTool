@@ -1,17 +1,15 @@
 # Assignment spec: the assignment core of `scrumbot`
 
-What the bot reads from the export files, how it sizes orders, how it picks a PIC for each order, and what it
-writes. Reading the internal system's API, the risk register, the memory between runs, scheduled runs and the replay
-are in [`bot-spec.md`](bot-spec.md); this file stays the reference for the rule itself (§6–§8) and for the export
-files that `eval/` still uses (D51).
+How the bot sizes orders, picks a PIC for each empty order, and what it writes. Reading the internal system's API,
+the risk register and the memory between runs are in [`bot-spec.md`](bot-spec.md); this file is the reference for the
+rule itself (§6–§8), the findings (§9), the report columns (§10–§11) and the TM rules (§14).
 [`LLM.md`](../LLM.md) says where each part lives in code; [`confirm.md`](../confirm.md) holds the decisions cited
 here as `Dn` (user-locked), `An` (defaults) and `On` (open).
 
-**Status:** approved 2026-10-06 and implemented; updated 2026-10-07 for the history export of list "Tech manager"
-(D6), the load cap in orders (D26) and the backtest (D22, §13), then for the TM rules file (D28–D35, §14); renamed
-`scrumbot` on 2026-10-13 (D46, D57): the package is split in four layers, the CLI has sub-commands (bot spec §1), the
-run day matters for leave (bot spec §3) and the report has six sheets (bot spec §6). Every number in §12 is asserted
-by `tests/test_real_input.py` and `tests/test_pipeline.py`.
+**Status:** approved 2026-10-06 and implemented; the load cap in orders (D26) and the TM rules file (D28–D35, §14)
+added 2026-10-07; renamed `scrumbot` on 2026-10-13 (D46, D57). The same day the export-file source, the acceptance
+run on the sample and the backtest were removed (D59): the orders come from the API (bot spec §2.5), and §3, §5, §12
+and §13 keep their numbers so that citations stay valid.
 
 User-facing text (column headers, finding messages, reasons, terminal lines) is Vietnamese (D12). It is quoted here
 exactly as the tool must print it.
@@ -19,18 +17,18 @@ exactly as the tool must print it.
 | § | Contents |
 |---|---|
 | 1 | Terms |
-| 2 | Command line |
-| 3 | Input: sprint workbook |
+| 2 | Command line and input files |
+| 3 | Input: the target sprint |
 | 4 | Input: dev workbook |
-| 5 | Input: history export (list "Tech manager") |
+| 5 | History |
 | 6 | Derived facts: familiarity, carry-over, leave, size |
 | 7 | Choosing the PIC |
 | 8 | Reason text |
 | 9 | Findings |
 | 10 | Output workbook |
 | 11 | Exit codes and terminal output |
-| 12 | Acceptance on the sample |
-| 13 | Backtest |
+| 12 | Acceptance on the sample (removed) |
+| 13 | Backtest (removed) |
 | 14 | Input: TM rules |
 
 ---
@@ -39,98 +37,46 @@ exactly as the tool must print it.
 
 | Term | Meaning |
 |---|---|
-| Order (*đơn*) | A row whose `Loại` is `Task`: one version of one app, e.g. `1.0.2 - Add ads/Add SDK` for Phone Cleaner. The unit of assignment (D5). |
+| Order (*đơn*) | A root item of the target sprint whose `Loại` is `Task`: one version of one app, e.g. `1.0.2 - Add ads/Add SDK` for Phone Cleaner. The unit of assignment (D5). |
 | PIC | The one dev who owns an order and later splits it into subtasks (D5). |
 | Pool | Devs in `devs.xlsx` with `Nhận việc` = `Y`, minus those on leave for the whole sprint (A12). Today: LinhNV, MinhNM, AnTD, TiếnBV (D7). Everyone else is ignored everywhere, silently (D14). |
-| Target sprint | The sheet the tool assigns: the highest `Sprint N` (A3). The tool may run at any time during it (D2): orders already assigned are kept, empty ones are assigned. |
-| Previous sprint | Sheet `Sprint N-1` of the same workbook. Source of carry-over only (A9). |
+| Target sprint | The running sprint of board Maintain (bot spec §2.3, A59), or the one given with `--sprint-id`. The tool may run at any time during it (D2): orders already assigned are kept, empty ones are assigned. |
+| Previous sprint | The Maintain sprint that ended last before the target's first day (A59). Source of carry-over only (A60). |
 | Size | The AI's class for an order, `S`/`M`/`L`/`XL`, worth 4/16/32/64 hours (§6.4, A7). |
 | Load | The orders a pool dev holds in the target sprint, pre-assigned or proposed: counted in orders for the load cap (§7, D26) and summed in hours (their sizes) for key part 3. |
-| Carry-over | Number of rows in the previous sprint assigned to the dev whose status is busy (D8). |
+| Carry-over | Number of rows (orders and subtasks) of the previous sprint assigned to the dev whose status is busy (D8, A60). |
 | Familiarity | How well a dev knows the order's app, from the history (§5, §6.1). |
 | TM rule | One row of the TM's rules file (§14): pin a dev to an app, keep a dev off an app or off everything, cap a dev's orders, or prefer a dev for an app. Read without AI (D28). |
-| Board | List "Tech manager" holds two boards: Maintain (two-week sprints, the orders this tool assigns) and MVP / research (one- to two-month sprints). Only Maintain orders are assigned (D5); MVP orders are history only (D23). |
+| Board | List "Tech manager" holds every order: Maintain orders (in a two-week Maintain sprint, A56) and MVP / research or unscheduled ones. Only Maintain orders are assigned (D5); the rest are history only (D23). |
 
-## 2 · Command line
+## 2 · Command line and input files
 
 ```
-scrumbot run --source file [--input DIR] [--sprint FILE] [--devs FILE] [--history FILE] [--rules FILE] [--sheet NAME]
-             [--today DATE] [--out DIR] [--ai gemini|agy|off] [--ai-model NAME] [--ai-timeout SECONDS] [-v]
+scrumbot run [--input DIR] [--devs FILE] [--rules FILE] [--sprint-id ID] [--today DATE] [--state DIR] [--out DIR]
+             [--ai gemini|agy|off] [--ai-model NAME] [--ai-timeout SECONDS] [-v]
 ```
 
-The other commands and the API source (the default of `scrumbot run`) are in bot spec §1.
+Every option is in bot spec §1. `--today DATE` (`YYYY-MM-DD` or `DD/MM/YYYY`, A35) is the run day of the history
+window (§5.1) and of the rules day (§14.3); the report's file name still uses the clock; unreadable is an input error.
+`--ai off` sizes every order `M` (§6.4).
 
-| Option | Default | Meaning |
-|---|---|---|
-| `--input DIR` | `input/` | Where inputs are discovered. |
-| `--sprint FILE` | the only `*.xlsx` in `--input`, other than `devs.xlsx`, that has a `Sprint N` sheet | Sprint workbook (§3). |
-| `--devs FILE` | `<input>/devs.xlsx` | Dev workbook (§4). |
-| `--history FILE` | the only other `*.xlsx` (no `Sprint N` sheet) or `*.csv` in `--input`; none → the workbook's older sprint sheets (§5) | History export (§5). |
-| `--rules FILE` | the only `*.md` in `--input`; none → no rules | TM rules (§14, D29). |
-| `--sheet NAME` | highest `Sprint N` | Target sprint sheet. The previous sprint is then `Sprint N-1`. |
-| `--today DATE` | today (the clock) | The run day, `YYYY-MM-DD` or `DD/MM/YYYY` (A35): the day of the history window (§5.1) and the day the rules day is computed from (§14.3). Lets a past sprint be replayed without seeing later orders, and keeps an evaluation run reproducible (`eval/`). The report's file name still uses the clock. Unreadable: input error. |
-| `--out DIR` | `output/` | Where the report is written. Created if missing. |
-| `--ai` | `gemini` | AI tool used for sizing (§6.4, D16, A17). `agy` is for the dev machine; `off` sizes every order `M`. |
-| `--ai-model` | the AI tool's own default | Model name passed through to the AI tool. |
-| `--ai-timeout` | `180` | Seconds before the AI call is killed and sizes fall back to `M`. |
-| `-v` | off | Show tracebacks for input errors and the AI tool's raw output. |
+**Input files** (A2, D29): in `--input`, `devs.xlsx` is the dev workbook (§4) and the only `*.md` is the TM rules file
+(§14); no `.md` means no rules. Discovery never guesses: no `devs.xlsx`, or several `.md` files, is an input error that
+names the candidates and the flag to use (`--devs`, `--rules`). Files whose names start with `~$` (Excel lock files)
+and `.` are ignored.
 
-Discovery reads content, not names (A2): each `.xlsx` other than `devs.xlsx` is opened, and the one with a `Sprint N`
-sheet is the sprint workbook; every other `.xlsx`, and every `.csv`, is a history candidate; an `.md` file is the
-rules file. Discovery never guesses: zero sprint workbooks, several, several history candidates or several `.md` files
-is an input error that names the candidates and the flag
-to use; an `.xlsx` that cannot be opened is an input error naming it. Files whose names start with `~$` (Excel lock
-files) and `.` are ignored.
+## 3 · Input: the target sprint
 
-## 3 · Input: sprint workbook
-
-The export of the internal tool, one sheet per sprint. Layout as observed in the sample:
-
-| Rows | Content |
-|---|---|
-| 1 | `Sprint 10 (10/6 - 10/17)` |
-| 2 | Project name |
-| 3 | `Thời gian: 2026-10-06 → 2026-10-17   ·   Tiến độ: …` |
-| 5 | Header row |
-| 6 … | Data rows; column A (`STT`) is an integer |
-| after the data | A formula footer, a blank row and a note; column A is not an integer |
-
-**Reading rules**
-
-1. Sheets are selected by name `Sprint <N>` (regex `^Sprint\s+(\d+)$` after trimming). Other sheets are ignored.
-2. The header row is the first row within rows 1–10 whose column A is `STT`. Columns are found **by header name**,
-   never by position. Header names are compared after NFC, trimming, removing a trailing `.` and casefolding, so
-   `App Name.` and `App Name` both match.
-3. Data rows run from the row after the header while column A is an integer, and stop at the first row where it is
-   not. The workbook is opened with cached values (`data_only=True`) so the formula footer is never read as text.
-4. Sprint dates come from row 3, regex `(\d{4}-\d{2}-\d{2})\s*→\s*(\d{4}-\d{2}-\d{2})`. If absent, the sprint has no
-   known dates: leave days are ignored (§6.3) and nobody is excluded for leave.
-5. Indentation of `Task` gives the tree: each `└` level is 4 leading spaces. The title is the cell with leading spaces
-   and `└ ` removed. The tree is used only to skip subtasks; `Task cha` is not used (A4).
-
-**Columns**
-
-| Header | Required | Use |
-|---|---|---|
-| `STT` | ✓ | Row identity in findings, output and the AI exchange; last sort key. |
-| `Task` | ✓ | Order title. Sent to the AI (§6.4). |
-| `Loại` | ✓ | `Task` = order; `Subtask` = skipped. Any other value: the row is skipped with `TYPE-UNKNOWN`. |
-| `App Name.` | ✓ | Order's app (A10 matching). Empty on an order: `APP-MISSING`, treated as an app nobody knows. |
-| `Trạng thái` | ✓ | Previous sprint only: busy statuses (D8, §6.2). |
-| `Người làm` | ✓ | Comma-separated full names. A non-empty value on a target-sprint order means pre-assigned and kept (D10), whoever is named. Only pool devs named get load; other names are ignored silently (D14). |
-| `Ưu tiên` | ✓ | `urgent`, `high`, `normal`, `low` or empty (= normal). Other: `PRIORITY-UNKNOWN`, treated as normal. |
-| `Hạn` | ✓ | Date or empty. Sort key (A5). Before `Ngày tạo`: `DUE-BEFORE-CREATED`. |
-| `Ngày tạo` | ✓ | Date. Sort key (A5). |
-| `Mô tả` | — | Sent to the AI, with links removed and truncated (§6.4). |
-| `Ước lượng (h)` | — | **Ignored** on the target sprint (D3, A19). |
-| all other columns | — | Copied to the output unchanged (§10). |
-
-A required header missing from the **target** sheet is an input error. On the **previous** sheet only `Loại`,
-`Trạng thái` and `Người làm` are required.
+The orders come from the API (bot spec §2.5): the target sprint becomes rows with the columns `STT` · `ID` · `Task` ·
+`App Name` · `Trạng thái` · `Người làm` · `Ưu tiên` · `Hạn` · `Ngày tạo` · `Bug mở` · `Bug tổng` (A76), and the
+sprint's first and last days come from the sprint list. An order with a `Người làm` is **pre-assigned**: kept as it
+is (D10), its size added to its devs' load. An empty one is assigned by §7. Subtasks are never assigned and never
+measure size (D5, D9). The export workbook this section once described was removed on 2026-10-13 (D59).
 
 ## 4 · Input: dev workbook
 
-`devs.xlsx`, maintained by hand (D11). First sheet, header on row 1, one dev per row, empty rows ignored.
+`devs.xlsx`, maintained by hand (D11). First sheet, header on row 1, one dev per row, empty rows ignored. Headers
+are matched by name, never by position, after NFC, trimming, removing a trailing `.` and casefolding.
 
 | Header | Required | Values |
 |---|---|---|
@@ -140,7 +86,7 @@ A required header missing from the **target** sheet is an input error. On the **
 | `Nhận việc` | ✓ | `Y` or `N`. `N` takes a dev out of the pool without deleting the row. |
 | `Ngày nghỉ` | — | Leave days inside the sprint, separated by `,`: `YYYY-MM-DD` or `DD/MM/YYYY`, or real date cells. |
 
-Example (the pool of D7; the full names are the ones the sample export uses):
+Example (the pool of D7; the full names are the ones the system uses):
 
 | Tên | Mã | Level | Nhận việc | Ngày nghỉ |
 |---|---|---|---|---|
@@ -152,71 +98,27 @@ Example (the pool of D7; the full names are the ones the sample export uses):
 Input errors: a missing required header, an invalid level, `Nhận việc` not `Y`/`N`, a duplicate `Tên` or `Mã`, an
 unreadable date, and an empty pool after leave exclusion.
 
-**Known cost of D14:** a pool dev's name spelled differently in an export (missing diacritic, extra word) is treated
+**Known cost of D14:** a pool dev's name spelled differently in the system (missing diacritic, extra word) is treated
 as a stranger, so that dev's load is silently too low. NFC and whitespace normalisation (A10) remove the common
 cases; the remaining ones are not reported.
 
-## 5 · Input: history export (list "Tech manager")
+## 5 · History
 
-The export of list "Tech manager" from the internal system's database (D6, D20), as `.xlsx` or `.csv`. It replaces
-the history CSV the project once defined itself (A20). The sample, `input/Tech_manager_T2-T10_2026.xlsx`, covers
-February to October 2026: 3,144 rows, 178 root orders.
-
-**Layout.** `.xlsx`: one sheet per month (`Tháng 2` … `Tháng 10`), header on row 1, data from row 2; a sheet whose
-row 1 has no `Ngày lên đơn` (the sample's `Tổng hợp` summary) is skipped, and a file with no such sheet is an input
-error. `.csv`: the same columns in one file; encoding, delimiter and dates as A15 (UTF-8 with or without BOM, `,` or
-`;`, `YYYY-MM-DD` or `DD/MM/YYYY`). Header names are matched like §3 rule 2; extra columns are ignored.
-
-**Rows used.** Only **root orders**: `Loại` = `Task` and `Task cha` empty. Subtasks (`Task cha` set) and bugs
-(`Loại` = `Bug`) are skipped: the PIC splits subtasks (D5), and familiarity counts the root order's `Người làm`
-only (A26). `Task cha` holds a name, not an ID, so the task tree is never rebuilt from this file.
-
-| Header | Required | Use |
-|---|---|---|
-| `Ngày lên đơn` | ✓ | Filing date (`2026-09-22 09:36`): recency for the latest version (§6.1), the history window (§5.1), the replay day (§13). Empty or unreadable on a root order: input error naming the sheet, row and column. |
-| `Tên task` | ✓ | Quoted in the reason text; sent to the AI as an example when it has hours. |
-| `Loại` | ✓ | `Task` = order or subtask; `Bug` = skipped. |
-| `Task cha` | ✓ | Empty = root order; set = subtask, skipped. |
-| `App Name` | ✓ | App (A10 matching, no alias table: A27). Root orders with an empty app are kept but never make anyone familiar. |
-| `Người làm` | ✓ | Comma-separated full names; names outside the pool are ignored (D14). |
-| `Sprint` | ✓ | Sprint labels, §5.2. Quoted in the reason text as written (A25). |
-| `Ưu tiên` | — | Order of the replay (§13), as A5. |
-| `Due date` | — | Order of the replay (§13). Unreadable: input error. |
-| `Ước lượng (h)` | — | Not in the export today (D25). When present: hours sent to the AI as examples (A19). |
-| `ID`, `Trạng thái`, `Người tạo`, `Điểm`, … | — | Not used. `Điểm` is not hours (4h → 2.5, 24h → 9, 83h → 21.5). `Trạng thái` is the status today, not at the time of a past sprint, so carry-over still comes from the sprint workbook (§6.2). |
+The history is every root order the API returns for the Maintain sprints and list "Tech manager" (bot spec §2.3,
+A56), MVP / research orders and orders with no sprint included (A23, D23). Familiarity counts the root order's
+`Người làm` only (A26); an order with no app never makes anyone familiar. The hours of an old order
+(`uoc_luong_gio`) are only sent to the AI as examples (§6.4, A19). The reason text quotes the order's sprint name
+(A25).
 
 ### 5.1 History window (A22)
 
 A run uses the history orders that existed **before it**:
 
-1. not an order of the target sprint (a label equal to it, §5.2): an order never serves as its own history;
-2. filed (`Ngày lên đơn`) on or before the run day;
+1. not an order of the target sprint: an order never serves as its own history;
+2. created on or before the run day;
 3. its earliest sprint, if it has one, started on or before the run day.
 
-The run day is today for a normal run (or the day given with `--today`, A35), and the day the order was filed for
-the replay (bot spec §8.1; the backtest of §13 before 2026-10-13). The same rule in both places means the replay
-measures exactly what a normal run does, and never sees an assignment made later.
-History includes MVP / research orders and orders with no sprint (A23, D23). A history file is never combined with
-the workbook's older sheets (A8).
-
-### 5.2 Sprint labels (A24)
-
-A `Sprint` cell holds zero, one or several labels `Sprint <n> (<m>/<d> - <m>/<d>)`, comma-separated:
-`Sprint 18 (4/17 - 4/29), Sprint 19 (5/6 - 5/20)`. An order belongs to every sprint it lists. A label has no year:
-the start gets the year that puts it nearest to `Ngày lên đơn`, and the end the first date on or after the start, so a
-sprint across New Year is dated right. Text that is not a label is skipped. Two labels are the same sprint when the
-number, the start and the end all agree: `Sprint 1 (5/22 - 6/5)` (Maintain) and `Sprint 1 (5/22 - 7/15)` (MVP) share
-number and start date. A label of at most 21 days is a Maintain sprint, longer is MVP / research (A21; Maintain
-sprints last 4–17 days in the sample, MVP sprints 27–54).
-
-The target sprint of a normal run is matched by its sheet number and the dates of §3 rule 4; when the sheet has no
-dates, by number only.
-
-**No history file (A8).** When `--history` is not given and discovery finds no candidate, the history is every sprint
-sheet of the workbook numbered below the target (the sample: `Sprint 6` to `Sprint 9`, 34 orders): `Task` rows with an
-app, a name and a `Ngày tạo`, `Ước lượng (h)` as hours, the sheet name as the sprint quoted in reasons. Required headers
-on those sheets: `Loại`, `App Name.`, `Người làm`, `Ngày tạo`. The run then reports `HISTORY-FROM-WORKBOOK`, or
-`HISTORY-MISSING` when there is no older sheet either.
+The run day is today, or the day given with `--today` (A35), so a run on a past day never sees a later assignment.
 
 ## 6 · Derived facts
 
@@ -231,7 +133,7 @@ research order is not a version a pool dev worked on.
 
 | Rank | Meaning | Reason text |
 |---|---|---|
-| 0 | The dev is named on the app's latest version. | `Làm version gần nhất của <app> (<Sprint>: <Task>)`; `<Sprint>` is the history order's `Sprint` cell as written, `Tháng <m>/<yyyy>` of `Ngày lên đơn` when it is empty, or the sheet name for workbook history (A25) |
+| 0 | The dev is named on the app's latest version. | `Làm version gần nhất của <app> (<Sprint>: <Task>)`; `<Sprint>` is the history order's `Sprint` cell as written, `Tháng <m>/<yyyy>` of the creation date when it is empty (A25) |
 | 1 | The dev is named on an older version only. | `Từng làm <app> (<k> version)` |
 | 2 | Never named on this app. | `Chưa làm <app>` |
 
@@ -240,14 +142,14 @@ An app with no history order naming a pool dev is a **new app**: every dev has r
 ### 6.2 Carry-over
 
 For each pool dev: the number of previous-sprint rows (orders **and** subtasks) that name the dev in `Người làm` and
-whose `Trạng thái` is busy (D8): `qa - need fix`, `all issue`, `in progress`, `ready to progress`, `need to be clean`,
+whose `Trạng thái` is busy (D8, compared by name, A60): `qa - need fix`, `all issue`, `in progress`, `ready to progress`, `need to be clean`,
 `internal - cant fix`, `internal - need fix`, `đã ro`. Every other status (`pending`, `qa - cant fix`, waiting for test,
 done) is not busy. Statuses are compared after NFC, trimming and casefolding. `đã ro` is busy by the user's choice
-(D8), although in the sample it occurs only in Sprint 8, whose 11 orders are all done.
+(D8), although the system counts it as done.
 
 ### 6.3 Leave
 
-Working days of the sprint are Monday to Friday between the dates of §3 rule 4, inclusive. A dev whose leave days
+Working days of the sprint are Monday to Friday between its first and last days, inclusive. A dev whose leave days
 cover every working day is removed from the pool (`DEV-ON-LEAVE`); since 2026-10-13 a dev off every **remaining**
 working day is removed too (`DEV-ON-LEAVE-REST`, bot spec §3, A75), and key part 5 counts the remaining days only. A pre-assigned order held by such a dev and by no other pool dev is kept (D10) and reported (`PRE-ASSIGNED-ON-LEAVE`, A43): nobody in the pool works on it. Otherwise the number of leave days on working days
 is a tie-breaker only (A12). Leave days outside the sprint are ignored.
@@ -268,7 +170,7 @@ load (D13). The AI only sizes; it never sees people and never picks a PIC.
 
 The prompt also tells the AI that an order is one release of one app whose PIC does every item listed, and that items
 written as "Fix" (`Fix ads`, `Fix luồng`, `Fix UI`) rework existing screens and each takes days (A44). Without that,
-the AI read "Fix ads/Fix luồng/fix policy" as a policy fix (`S`) when it took 68h (`eval/`, 2026-10-08).
+the AI read "Fix ads/Fix luồng/fix policy" as a policy fix (`S`) when it took 68h (measured 2026-10-08).
 
 **Tool selection** (`--ai`, A17):
 
@@ -287,13 +189,10 @@ The child runs in a **fresh empty temporary directory** with the user's environm
 
 1. Instructions: the class table above; "judge from the text only, do not open links or use tools"; the output
    format below.
-2. Up to 30 **examples**: history orders with `Ước lượng (h)` > 0, the target sprint's apps first, then most recent
-   first. Each line: app · title · hours. No names. When the history has no hours (the Tech manager export today,
-   D25), the examples come from the sprint workbook's older sheets (`Sprint 1` … `Sprint N-1`, read as in §5 "No
-   history file"), which carry `Ước lượng (h)`; they serve only as examples, familiarity still comes from the history
-   file alone (A8, A19). Older sheets that cannot be read give no examples.
-3. The **orders**: each line `STT` · app · priority · title · description. In the description every URL is replaced
-   by `[link]` and the text is cut to 600 characters.
+2. Up to 30 **examples**: history orders with hours > 0 (A19), the target sprint's apps first, then most recent
+   first. Each line: app · title · hours. No names.
+3. The **orders**: each line `STT` · app · priority · title · description. The API returns no description today
+   (D50); when there is one, every URL is replaced by `[link]` and the text is cut to 600 characters.
 4. If the prompt is longer than 30,000 characters, descriptions are cut to 200 characters, then dropped. This keeps
    the `agy` argument under Windows' 32,767-character command-line limit.
 
@@ -412,13 +311,11 @@ never renamed once released. Nothing is ever reported about people outside the p
 |---|---|---|---|
 | `SIZE-AI-FAILED` | WARN | The AI call failed (§6.4). | `Không ước lượng được độ lớn bằng AI (<lý do ngắn>); mọi đơn tính là M (16h).` |
 | `SIZE-AI-INVALID` | WARN | The call worked but some orders have no valid element. One finding listing them. | `AI không trả độ lớn hợp lệ cho đơn STT <danh sách>; các đơn này tính là M (16h).` |
-| `APP-MISSING` | WARN | An order has an empty `App Name.`. | `Đơn STT <n> không có App Name; coi như app chưa ai làm.` |
+| `APP-MISSING` | WARN | An order has an empty `App Name`. | `Đơn STT <n> không có App Name; coi như app chưa ai làm.` |
 | `PRIORITY-UNKNOWN` | WARN | `Ưu tiên` is not urgent/high/normal/low/empty. | `Đơn STT <n> có Ưu tiên "<giá trị>" không hợp lệ; coi như normal.` |
 | `DUE-BEFORE-CREATED` | WARN | `Hạn` is before `Ngày tạo`. | `Đơn STT <n> có Hạn <hạn> trước Ngày tạo <ngày tạo>.` |
 | `TYPE-UNKNOWN` | WARN | `Loại` is neither `Task` nor `Subtask`. | `Dòng STT <n> có Loại "<giá trị>" không hợp lệ; bỏ qua dòng này.` |
-| `PREV-SPRINT-MISSING` | WARN | No sheet `Sprint N-1`. | `Không có sheet <tên>; coi như không dev nào còn việc dở.` |
-| `HISTORY-MISSING` | WARN | No history file and no sprint sheet older than the target (§5). | `Không có file lịch sử và workbook không có sheet sprint cũ; coi như chưa ai làm app nào.` |
-| `HISTORY-FROM-WORKBOOK` | INFO | No history file; the older sheets were used (§5). `where` = the sheet names. | `Không có file lịch sử; dùng sheet <các sheet> trong workbook làm lịch sử.` |
+| `PREV-SPRINT-MISSING` | WARN | No previous Maintain sprint (A59). | `Không có sheet <tên>; coi như không dev nào còn việc dở.` |
 | `DEV-ON-LEAVE` | INFO | A pool dev is off for every working day. | `<Mã> nghỉ cả sprint; không được giao đơn.` |
 | `PRE-ASSIGNED-ON-LEAVE` | WARN | A pre-assigned order names a dev who is off for every working day (`DEV-ON-LEAVE`) and no other pool dev, so nobody in the pool works on it (A43). The order is still kept (D10). `where` = `Đơn STT <n>`. | `Đơn STT <n> giao sẵn cho <Mã> nhưng <Mã> nghỉ cả sprint; đơn chưa có ai làm, cân nhắc giao lại.` |
 | `RULE-DEV-UNAVAILABLE` | WARN | A `Chỉ định` or `Ưu tiên` rule in force names a dev who is not in the pool: `Nhận việc` = `N` or on leave for the whole sprint (D35). `where` = `Luật dòng <n>`. | `Luật dòng <n> (<Loại> <Mã>) không áp dụng: <Mã> không nhận việc hoặc nghỉ cả sprint.` |
@@ -428,8 +325,8 @@ never renamed once released. Nothing is ever reported about people outside the p
 
 ## 10 · Output workbook
 
-`output/assignment_<sheet slug>_<YYYYMMDD-HHMMSS>.xlsx`, e.g. `assignment_sprint-10_20261006-143000.xlsx`. Written to
-`<name>.tmp`, then renamed (A14). A fresh name each run, so a report left open in Excel never blocks the next one.
+`output/assignment_<sprint slug>_<YYYYMMDD-HHMMSS>.xlsx`, e.g. `assignment_sprint-10_20261006-143000.xlsx`. Written to
+`<name>.tmp`, then renamed (best practices §6). A fresh name each run, so a report left open in Excel never blocks the next one.
 Since 2026-10-13 the workbook has six sheets (`Tóm tắt`, `Phân công`, `Rủi ro`, `Thay đổi`, `Cảnh báo`, `Tải dev`) and
 `Phân công` has more columns: bot spec §6. This section describes the three sheets that existed before.
 
@@ -474,149 +371,27 @@ findings writes a single row `Không có cảnh báo`.
 | `130` | Interrupted with Ctrl+C. |
 
 The terminal shows: the run day when `--today` is given (`Ngày chạy: 22/10/2026 (--today)`); the rules file (`Luật TM: file luat.md (4 luật, 3 có hiệu lực ngày 06/10/2026)`, or `Luật TM:
-không có`); where the history came from (`Lịch sử: file Tech_manager_T2-T10_2026.xlsx (172 đơn gốc)`, the
-count being the root orders left after the window of §5.1, or `Lịch sử: sheet Sprint 6, Sprint 7, Sprint 8, Sprint 9
-trong workbook (không có file lịch sử)`); the target sprint; how sizing went (`Độ lớn: AI (gemini, 6/6 đơn)`, or the fallback and why);
+không có`); the history (`Lịch sử: API (374 đơn gốc)`, the count being the root orders left
+after the window of §5.1); the target sprint; how sizing went (`Độ lớn: AI (gemini, 6/6 đơn)`, or the fallback and why);
 counts (orders, pre-assigned, proposed, findings by level); one line per proposed order
 (`STT 10 · Roblox skin 1.0.4 - Fix luồng/Add Ads/Fix UI [M] → MinhNM (dự phòng: LinhNV, TiếnBV)`); each WARN finding
 as `WARN <code>: <message>`; and the report path. The full detail is in the workbook.
 
-## 12 · Acceptance on the sample
+## 12 · Acceptance on the sample (removed 2026-10-13)
 
-Inputs: `input/Maintain_update_Sprint_10_va_9.xlsx`; `devs.xlsx` = the 4 rows of §4. Every run is pinned to
-`--today 2026-10-06`, Sprint 10's first day, so the remaining-days leave of bot spec §3 never depends on the clock. Runs A and B: history = the
-12 orders of sheet Sprint 9 as a CSV in the Tech manager format of §5, labelled `Sprint 9 (9/21 - 10/2)` (the
-acceptance test builds both files from the sample in `tmp_path` at run time; they are never written to disk
-elsewhere). Runs C and D: no history file, so the history is sheets Sprint 6–9 (§5). Run E: history =
-`input/Tech_manager_T2-T10_2026.xlsx`. Carry-over comes from sheet Sprint 9 in every run. **`--ai off`**, so every
-order is `M` (16h). Runs A–D were first computed with the load cap in hours (16h); with equal sizes that is the same
-as the cap in orders (D26), so the tables did not change.
-
-**Derived facts** (history = Sprint 9)
-
-| Dev | Level | Carry-over (Sprint 9) | Apps, rank 0 (latest version) | Apps, rank 1 |
-|---|---|---|---|---|
-| LinhNV | middle+ | 1 (`qa - need fix`) | PS Remote, AR Dog, metal detector, Santa prank, SpeakerCleaner | — |
-| MinhNM | middle | 0 (its 9 `pending` rows do not count, D8) | PS Remote, Speak2 | — |
-| AnTD | junior+ | 0 | Game Emulator | AR Dog |
-| TiếnBV | junior | 2 (`need to be clean`, `internal - cant fix`) | Game mode 2 | — |
-
-The most recent PS Remote order in Sprint 9 is an RnD research order naming nobody from the pool, so the latest
-version is `1.1.1` (LinhNV, MinhNM), §6.1.
-
-**Run A: the file as exported.** Five orders are pre-assigned (Phone Cleaner: LinhNV + TiếnBV; PS Remote: MinhNM;
-Auto click: AnTD; spin wheel 2: LinhNV; Game Emulator: AnTD), giving loads LinhNV 32h, AnTD 32h, MinhNM 16h,
-TiếnBV 16h. One order is empty:
-
-| STT | Order | needs_senior | PIC | Backups | Why |
-|---|---|---|---|---|---|
-| 10 | Roblox skin 1.0.4 | yes (new app) | **MinhNM** | LinhNV, TiếnBV | Nobody knows the app; LinhNV and MinhNM are ≥ middle; MinhNM has the lower load (16h vs 32h). |
-
-Findings: `DUE-MISSING` on STT 7 (PS Remote 1.1.2 is urgent with no `Hạn`, added 2026-10-13 by D53); before that
-finding existed the sheet held the single row `Không có cảnh báo`.
-
-**Run B: backtest.** The same inputs with `Người làm` cleared on the 6 Sprint 10 orders, compared with what the TM
-actually did:
-
-| Step | Order (priority) | Familiarity | Loads before, h (Linh/Minh/An/Tiến) | PIC | TM's choice |
-|---|---|---|---|---|---|
-| 1 | PS Remote 1.1.2 (urgent) | LinhNV, MinhNM rank 0 | 0/0/0/0 | MinhNM: carry-over 0 vs 1 | MinhNM ✓ |
-| 2 | Game Emulator (high) | AnTD rank 0 | 0/16/0/0 | AnTD: familiarity first | AnTD ✓ |
-| 3 | Auto click 1.1.1 | new app | 0/16/16/0 | LinhNV: ≥ middle, lower load | AnTD ✗ |
-| 4 | Roblox skin 1.0.4 | new app | 16/16/16/0 | MinhNM: carry-over 0 vs 1 | — (empty) |
-| 5 | Phone Cleaner 1.0.2 | new app | 16/32/16/0 | LinhNV: MinhNM capped (2 orders > 0 + 1) | LinhNV (+ TiếnBV) ✓ |
-| 6 | spin wheel 2 1.0.2 | new app | 32/32/16/0 | TiếnBV: only AnTD and TiếnBV under the cap | LinhNV ✗ |
-
-Final loads 32/32/16/16 h. The rule matches the TM on 3 of the 5 orders the TM assigned. The two misses are apps
-absent from Sprint 9; run D shows them becoming rank 0 once Sprint 6–8 are in the history. The test asserts this
-table as it is.
-
-**Runs C and D: history = sheets Sprint 6–9.** The sample gained sheets Sprint 6, 7 and 8 on 2026-10-06 (34 history
-orders in all). Same `devs.xlsx`, same carry-over, `--ai off`. Familiarity changes for three of the six apps; Phone
-Cleaner stays a new app:
-
-| App | History = Sprint 9 | History = Sprint 6–9 |
-|---|---|---|
-| Auto click | new app | AnTD rank 0 (Sprint 8) |
-| Roblox skin | new app | AnTD rank 0 (Sprint 8) |
-| spin wheel 2 | new app | LinhNV rank 0 (Sprint 8) |
-
-**Run C: the file as exported.** Loads after the pre-assigned orders as in run A (LinhNV 32h, MinhNM 16h, AnTD 32h,
-TiếnBV 16h). Roblox skin → **AnTD** (backups MinhNM, TiếnBV): the only dev on its latest version, and 2 orders are
-within the cap (1 + 1). Final loads 32/16/48/16 h. Findings: `DUE-MISSING` on STT 7 and the INFO
-`HISTORY-FROM-WORKBOOK` naming the four sheets.
-
-**Run D: backtest** (`Người làm` cleared, as in run B):
-
-| Step | Order (priority) | Familiarity | Loads before, h (Linh/Minh/An/Tiến) | PIC | TM's choice |
-|---|---|---|---|---|---|
-| 1 | PS Remote 1.1.2 (urgent) | LinhNV, MinhNM rank 0 | 0/0/0/0 | MinhNM: carry-over 0 vs 1 | MinhNM ✓ |
-| 2 | Game Emulator (high) | AnTD rank 0 | 0/16/0/0 | AnTD: familiarity first | AnTD ✓ |
-| 3 | Auto click 1.1.1 | AnTD rank 0 | 0/16/16/0 | AnTD: familiarity first (1 order ≤ 0 + 1) | AnTD ✓ |
-| 4 | Roblox skin 1.0.4 | AnTD rank 0 | 0/16/32/0 | LinhNV: AnTD capped (2 orders > 0 + 1); carry-over 1 vs 2 | — (empty) |
-| 5 | Phone Cleaner 1.0.2 | new app | 16/16/32/0 | MinhNM: ≥ middle, same load, carry-over 0 vs 1 | LinhNV (+ TiếnBV) ✗ |
-| 6 | spin wheel 2 1.0.2 | LinhNV rank 0 | 16/32/32/0 | LinhNV: familiarity first (1 order ≤ 0 + 1) | LinhNV ✓ |
-
-Final loads 32/32/32/0 h. The rule matches the TM on 4 of 5 (run B: 3 of 5).
-
-**Run E: history = the Tech manager export, file as exported.** 178 root orders; the window of §5.1 drops the six of
-Sprint 10, leaving 172. All six Sprint 10 apps now have history (Phone Cleaner through its MVP order). Roblox skin →
-**AnTD** (backups MinhNM, TiếnBV), reason `Làm version gần nhất của Roblox skin (Sprint 8 (9/4 - 9/18): 1.0.1 - Add
-ads) · Tải sprint này: 32h (2 đơn) · Việc dở Sprint 9: 0`. Final loads 32/16/48/16 h, as run C. Findings:
-`DUE-MISSING` on STT 7.
-
-**Not asserted:** a run with AI sizes. Its sizes vary between runs (§6.4); the opt-in smoke test only checks that a
-real call returns a valid size for every order.
-
-**Sensitivity to AI sizes (scratch analysis, 2026-10-06, not asserted).** Every one of the 4^6 = 4,096 size
-combinations of the six orders, run through §7:
-
-| Run | Load cap in hours (before D26) | Load cap in orders (D26, today) |
-|---|---|---|
-| A (Sprint 9), Roblox skin → | MinhNM 68%, LinhNV 15%, TiếnBV 12%, AnTD 5% | MinhNM 81%, LinhNV 19% |
-| C (Sprint 6–9), Roblox skin → | MinhNM 42%, AnTD 30%, TiếnBV 28% | AnTD 100% |
-| B (Sprint 9), matches with the TM | 4/5: 16%, 3/5: 65%, 2/5: 19% | 3/5: 62%, 2/5: 38% |
-| D (Sprint 6–9), matches with the TM | 5/5: 10%, 4/5: 41%, 3/5: 38%, 2/5: 11% | 4/5: 100% |
-
-More history improves the matches, but with the cap in hours the proposal still depended on the sizes: a dev whose
-pre-assigned orders the AI sized L + XL was capped out of an app they built. This table is why the cap now counts
-orders (D26); with every order `M` the two caps agree, so runs A–D did not change.
-
-**First real run with Gemini (2026-10-06, for the record, not asserted).** Sizes: Phone Cleaner M, PS Remote XL,
-Roblox skin XL, Auto click M, spin wheel 2 L, Game Emulator XL. Loads after the pre-assigned orders: LinhNV 48h,
-MinhNM 64h, AnTD 80h, TiếnBV 16h. The 16h cap left only TiếnBV, so Roblox skin went to TiếnBV (junior) although
-the app is new; LinhNV and MinhNM appear in the reason as "là middle trở lên nhưng đang có …h (cân tải)" (§8 part 7).
-Whether the cap should yield to seniority on large new-app orders was `confirm.md` O5, closed by D26: with the cap
-in orders, two pre-assigned orders each for LinhNV and AnTD and one each for MinhNM and TiếnBV leave MinhNM eligible. A second run on the same
-input sized Phone Cleaner `XL` instead of `M`, and Roblox skin went to MinhNM: sizes, and so proposals, vary between
-runs (`confirm.md` O6).
-
-**Real runs with Gemini on history Sprint 6–9 (2026-10-06, for the record, not asserted).** Four runs of the
-default command. Three sized almost every order L or XL (the history examples now include 40–97h orders), giving
-loads after the pre-assigned orders of 128/64/96/64, 96/64/96/64 and 128/64/96/64 h (Linh/Minh/An/Tiến); each time
-AnTD, the only dev on Roblox skin's latest version, was capped (96 > 64 + 16) and Roblox skin went to MinhNM, with
-AnTD as first backup. One run hit the 180s timeout, so every order was `M` and Roblox skin went to AnTD as in run C. More
-history did not make the AI-sized proposal stable; the cap in hours was why (`confirm.md` O7, now D26).
-
-**Real run with Gemini after D26 (2026-10-07, history = the Tech manager export, for the record, not asserted).**
-Sizes: Phone Cleaner XL, PS Remote XL, Roblox skin L, Auto click M, spin wheel 2 L, Game Emulator XL (no calibration
-examples: the export has no hours, D25). Loads after the pre-assigned orders: LinhNV 96h (2 orders), MinhNM 64h (1),
-AnTD 80h (2), TiếnBV 64h (1). Roblox skin → AnTD, as with `--ai off` (run E): 2 orders are within the cap of 1 + 1
-whatever the sizes.
+The acceptance runs on the export sample in `input/` were removed with the sample (D59). The command line and a run
+are covered end to end against a local fake API: `tests/test_cli.py` and `tests/test_flows.py`.
 
 ## 13 · Backtest (removed 2026-10-13)
 
-`assigntool --backtest` replayed the Maintain sprints of the Tech manager export and compared the rule with the TM
-(D22, A29). D51 replaced it with the replay on a copy of the API data, which also scores the risk register: bot spec
-§8. The last backtest on `input/Tech_manager_T2-T10_2026.xlsx` (Sprint 14 to Sprint 10, 4 devs, every order `M`,
-carry-over 0) matched the TM on **43 of 92 orders (47%)**; the first replay on the API copy of 2026-10-13 (29 sprints,
-pool by join date, carry-over from the previous sprint) matched **111 of 174 (64%)**.
+The backtest, and the replay on a copy of the API data that replaced it, were removed (D59). Their last numbers: the
+backtest matched the TM on 43 of 92 orders (47%); the replay of 2026-10-13 (29 sprints) on 111 of 174 (64%).
 
 ## 14 · Input: TM rules
 
 The TM steers the choice without editing code: a rules file pins a dev to an app, keeps a dev off an app or off every
 order, caps a dev's orders, or prefers a dev for an app (D28, D30). The rules are a fixed table read without AI, so
-every choice stays repeatable, explainable in `Lý do` (§8) and measurable by the replay (bot spec §8). The AI never sees
+every choice stays repeatable and explainable in `Lý do` (§8). The AI never sees
 the rules (LLM.md §12).
 
 ### 14.1 File
@@ -642,7 +417,7 @@ and is ignored. Example:
    rules table is one whose header has `Loại` and `Dev`; every rules table in the file is read (A33), other tables are
    ignored. Lines inside a fenced code block (```` ``` ```` or `~~~`) are text, not a table, as Markdown renders
    them. A file with no rules table is an input error.
-2. Columns are found by header name (§3 rule 2), never by position; unknown columns are ignored. Cells are split on
+2. Columns are found by header name (as §4), never by position; unknown columns are ignored. Cells are split on
    `|` (an escaped `\|` stays in the cell), NFC-normalised and trimmed; surrounding `` ` `` and `*` are removed, so
    `` `AR Dog` `` and `**LinhNV**` read as `AR Dog` and `LinhNV`. A row whose cells are all empty is skipped.
 3. A rule is identified by its **line number** in the file, quoted in messages and reasons.
@@ -677,19 +452,16 @@ never guesses which of two rules the TM meant.
 | Two `Tối đa đơn` for one dev, different numbers | `File '<file>', dòng <a> và <b>: hai luật Tối đa đơn khác số cho <Mã>.` |
 
 Two rules conflict only when their date ranges overlap. Conflicts and unknown devs are checked over the whole file,
-not only the rules in force, so a normal run and the replay accept or reject the same file.
+not only the rules in force, so a run on any day accepts or rejects the same file.
 
 A valid rule that cannot act is not an error: a `Chỉ định` or `Ưu tiên` for a dev outside the pool is a
 `RULE-DEV-UNAVAILABLE` finding (§9); a rule whose app has no order in the sprint is not reported (D35).
 
 ### 14.3 Rules in force
 
-A rule is in force on a day when `Từ ngày` ≤ day ≤ `Đến ngày`. The day is:
-
-- **normal run:** today (or `--today`, A35), but not earlier than the target sprint's first day when the sheet has
-  dates (A34): a TM who runs the tool on the Friday before Sprint 10 gets the rules dated for Sprint 10;
-- **replay:** the day each batch is replayed (bot spec §8.1 step 2), so a rule dated for one sprint does not touch
-  another (D34).
+A rule is in force on a day when `Từ ngày` ≤ day ≤ `Đến ngày`. The day is today (or `--today`, A35), but not earlier
+than the target sprint's first day (A34): a TM who runs the tool on the Friday before Sprint 10 gets the rules dated
+for Sprint 10.
 
 How each kind acts is in §7; what it writes in `Lý do` is in §8. Rules never touch pre-assigned orders (D10), never
 add a dev outside the pool (D7), and leave the cap's "+ 1 order" (D26) as it is.

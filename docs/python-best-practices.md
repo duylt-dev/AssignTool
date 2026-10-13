@@ -9,7 +9,7 @@ Every rule states what breaking it costs. A rule with no reason gets ignored, th
 |---|---|
 | 1 | Toolchain |
 | 2 | Modules and files |
-| 3 | Reading Excel and CSV |
+| 3 | Reading `devs.xlsx` and the TM rules |
 | 4 | Calling the AI tool (subprocess) |
 | 5 | Cross-platform |
 | 6 | Files on disk |
@@ -18,7 +18,7 @@ Every rule states what breaking it costs. A rule with no reason gets ignored, th
 | 9 | Types and value objects |
 | 10 | Testing |
 | 11 | Checklist before reporting done |
-| 12 | The internal system's API, the memory and scheduled runs |
+| 12 | The internal system's API and the memory |
 
 ---
 
@@ -26,9 +26,8 @@ Every rule states what breaking it costs. A rule with no reason gets ignored, th
 
 - Python `>=3.11`, `.python-version` 3.13, environment and lock file managed by **uv** (A1). Commands: `uv sync`,
   `uv run scrumbot …`, `uv run pytest`, `uv run ruff check .`, `uv run ruff format .` (ruff skips `*.md`: it would
-  rewrap the Python examples in the docs); the evaluation set:
-  `uv run python eval/build_cases.py`, `uv run python eval/run_eval.py` (A36).
-- Runtime dependency: `openpyxl` only; HTTP is `urllib`, the memory `sqlite3`, notifications `osascript` (A52).
+  rewrap the Python examples in the docs).
+- Runtime dependency: `openpyxl` only; HTTP is `urllib`, the memory `sqlite3` (A52).
   Dev dependencies: `pytest`, `ruff`. Nothing else without a reason written in
   `confirm.md`: pandas, for instance, would add tens of MB to read a few hundred rows, and its type inference turns
   an empty `Hạn` into `NaN` and a `STT` into a float. No AI SDK either: the AI is reached through the user's own CLI
@@ -47,11 +46,10 @@ Every rule states what breaking it costs. A rule with no reason gets ignored, th
 - No module-level mutable state. A cache or a counter at module level leaks between test cases and makes their result
   depend on order.
 
-## 3 · Reading Excel and CSV
+## 3 · Reading `devs.xlsx` and the TM rules
 
-- **Columns by header name, never by index.** The export's column order is the internal tool's choice; a column
-  added in the middle silently shifts every index. Header names are compared after NFC, trim, trailing-`.` removal
-  and casefold (spec §3).
+- **Columns by header name, never by index.** A column added in the middle of a hand-edited file silently shifts every
+  index. Header names are compared after NFC, trim, trailing-`.` removal and casefold (assignment spec §4).
 - **Open workbooks with `load_workbook(path, read_only=True, data_only=True)`.** `data_only` returns cached values,
   so the footer's `=COUNTIF(…)` never arrives as text; `read_only` keeps memory flat. Close the workbook in a
   `finally` (or use `contextlib.closing`): on Windows an unclosed read-only workbook keeps the file locked.
@@ -59,16 +57,12 @@ Every rule states what breaking it costs. A rule with no reason gets ignored, th
   whitespace collapsed. Excel on macOS and copy-pasted names can be NFD; two spellings of "Linh" in different forms
   compare unequal, and a dev's load is then silently wrong.
 - **Dates:** a cell may hold a `datetime`, a `date`, a string or nothing. The reader converts all of them to
-  `datetime.date | None` and raises `InputError` naming the sheet, row and column for an unreadable string. Never
+  `datetime.date | None` and raises `InputError` naming the sheet, row and column for an unreadable string. The
+  API's times are strings too (§12). Never
   compare a `datetime` with a `date`; it raises `TypeError` at runtime in the middle of a sort.
-- **CSV:** open with `encoding="utf-8-sig"` (accepts files with and without BOM) and `newline=""` (the `csv` module
-  requires it, or quoted multi-line cells break). Detect `,` vs `;` from the header line only.
-- **One parser per export, two file formats.** The history export comes as `.xlsx` or `.csv` with the same columns
-  (D6); both go through the same row function in `history_reader.py`. Two parsers for one layout drift apart, and the
-  `.csv` path is the one nobody runs until the day the exporter switches format.
 - **The TM rules `.md`: tables by header, everything else ignored.** `rules_reader.py` opens the file with
   `encoding="utf-8-sig"` (editors on Windows add a BOM), finds tables by their delimiter row and keeps those whose
-  header has `Loại` and `Dev`; columns go by header name like the workbooks. Text outside the tables is the TM's
+  header has `Loại` and `Dev`; columns go by header name like `devs.xlsx`. Text outside the tables is the TM's
   notes. A parser that read the file line by line as rules would turn a note into an input error, and one that read
   columns by position would swap `App` and `Ghi chú` the first time the TM reorders the table.
 
@@ -108,8 +102,8 @@ The tool runs on Windows, Linux and macOS (A2).
   Vietnamese.
 - Find executables with `shutil.which`, which applies `PATHEXT` on Windows; then check `~/.gemini/bin/` for `agy`.
 - Never rely on ANSI colours or `\r` redraws in the terminal; plain lines work in every console.
-- File names written by the tool use only `[A-Za-z0-9._-]`. The sheet name `Sprint 10` becomes `sprint-10`; a `:` or
-  `/` from a sheet name is replaced, because `:` is illegal in Windows file names.
+- File names written by the tool use only `[A-Za-z0-9._-]`. The sprint `Sprint 10` becomes `sprint-10`; a `:` or `/`
+  from a sprint name is replaced, because `:` is illegal in Windows file names.
 
 ## 6 · Files on disk
 
@@ -117,8 +111,8 @@ The tool runs on Windows, Linux and macOS (A2).
   half report that looks complete.
 - **A new file name every run** (timestamp). A report left open in Excel holds a lock on Windows; overwriting it would
   fail on the TM's machine and nowhere else.
-- **Never write into `input/`.** It holds the user's originals; a tool that "normalises" an export in place destroys
-  the only copy of what the internal tool produced.
+- **Never write into `input/`.** It holds the user's hand-kept files (`devs.xlsx`, the TM rules); a tool that
+  "normalises" one in place destroys the only copy.
 
 ## 7 · Errors and exit codes
 
@@ -148,7 +142,7 @@ The tool runs on Windows, Linux and macOS (A2).
   `Priority.LOW` (3), smaller first; `Size` values are the hours (`S = 4` … `XL = 64`), so a load is a plain sum.
 - **Test a parsed enum with `is None`, never with truthiness.** `Priority.URGENT` and `Level.JUNIOR` are 0, so
   `parse_priority(raw) or Priority.NORMAL` turns every urgent order into a normal one without an error. This happened
-  in the first backtest (2026-10-07): urgent orders lost their place in the queue until an independent recount
+  on 2026-10-07: urgent orders lost their place in the queue until an independent recount
   disagreed on Sprint 10.
 - `Severity` is an `enum.Enum` ordered WARN > INFO.
 
@@ -156,12 +150,9 @@ The tool runs on Windows, Linux and macOS (A2).
 
 - **Pure modules: table tests, no mocks.** Each finding code has a test that triggers it and one that does not; each
   key part of spec §7 has a case where it alone decides (LLM.md §8).
-- **Readers: real files.** Build the workbook with `openpyxl` inside the test in the export's layout: title rows,
-  header on row 5, `└` indentation, a formula footer, one name stored as NFD. CSV tests write each supported shape:
-  BOM and no BOM, `,` and `;`, `YYYY-MM-DD` and `DD/MM/YYYY`.
+- **Readers: real files.** Build `devs.xlsx` with `openpyxl` inside the test (one name stored as NFD) and write the
+  rules `.md` with each supported shape (BOM, CRLF, fenced blocks).
 - **`ai_cli.py`: a real child process** (`tests/fake_ai.py`), never a mocked `subprocess` (LLM.md §8).
-- **The acceptance test on `input/`** runs with `--ai off` and asserts spec §12 exactly; it is skipped with a printed
-  reason when the sample is absent.
 - **The API client: a real local HTTP server** (`tests/http_server.py`), never a mocked urllib. **No test reaches the
   dev server:** `tests/conftest.py` points `SCRUMBOT_API_BASE` at a closed local port for every test; a test that
   forgets to start the fake server fails in milliseconds instead of calling the dev server with the real token.
@@ -172,12 +163,10 @@ The tool runs on Windows, Linux and macOS (A2).
 ## 11 · Checklist before reporting done
 
 1. `uv run ruff check .` and `uv run ruff format --check .` pass.
-2. `uv run pytest` passes; report the counts, and whether `real_input` tests ran or were skipped.
+2. `uv run pytest` passes; report the counts.
 3. Changed a rule, a finding or the prompt: spec §6–§9 updated, with a test that fails without the change.
-4. Ran `uv run scrumbot run --source file --ai off --today 2026-10-06` on `input/` and opened the report: it
-   matches assignment spec §12, or §12 was updated with the new fact and the reason. Changed the API source, a risk
-   or a flow: also ran `uv run scrumbot run --ai off --state <scratch dir> --out <scratch dir>` against the dev
-   server and read the report.
+4. Changed the API source, a rule, a risk or the flow: ran `uv run scrumbot run --ai off --today <today> --out
+   <scratch dir>` against the dev server and read the report (`--today` keeps the memory untouched).
 5. Changed `ai_cli.py` or `rules/sizing.py`: ran `ASSIGNTOOL_TEST_AI=gemini uv run pytest -m ai` (or `=agy`) once with a real AI tool,
    or the report says plainly that it did not run.
 6. No `shell=True`; no file opened without `encoding=`; no column read by index; no `datetime` compared with a
@@ -185,25 +174,21 @@ The tool runs on Windows, Linux and macOS (A2).
 7. `LLM.md`, the spec and `confirm.md` updated as `LLM.md` §10 requires, in the same change.
 8. Nothing contradicts a `D` decision in `confirm.md`. A changed `A` default is updated there with the reason.
 
-## 12 · The internal system's API, the memory and scheduled runs
+## 12 · The internal system's API and the memory
 
 - **One HTTP client, GET only** (`sources/api_client.py`): `Authorization: Bearer`, `User-Agent: scrumbot/<version>`,
   timeout 60 s, `429` waits 30 s and retries three times, every other failure an `ApiError` with a Vietnamese message.
   Measured 2026-10-13: urllib's default User-Agent gets a Cloudflare 403 (code 1010), and 4,816 history rows need 97
   requests against a limit of 120 a minute; a client without the header or the retry fails on the first run.
-- **The token never leaves its header.** `ApiConfig.token` is `repr=False`; error messages, logs, snapshots and
+- **The token never leaves its header.** `ApiConfig.token` is `repr=False`; error messages, logs and
   reports never carry it. A token in a log line ends up in a screenshot or a committed file.
 - **Read the configuration from the environment first, then `.env`, leniently** (spaces around `=`, quotes). The
   user's `.env` had `KEY = value`; a strict parser reported a missing token that was there.
-- **Store raw replies, decide from model values.** `raw_store.py` writes what a run read (gzip JSON) and
-  `api_reader.py` turns it into `model_board` values; rules never see JSON. An offline re-run (`--snapshot`) and the
-  replay then go through exactly the code a live run used.
+- **Decide from model values, never from JSON.** `raw_store.py` gets the raw replies (with the list cache) and
+  `api_reader.py` turns them into `model_board` values; rules never see JSON, so they are tested with plain values.
 - **The memory is one SQLite file with one owner** (`actions/state_store.py`); each method opens, writes and commits
-  on its own. A long-lived connection shared by flows would hold a lock while `agy` thinks for two minutes and make
-  the next scheduled run fail.
-- **Only live runs write the memory** (A66). `--today` and `--snapshot` read nothing from it but AI answers.
-- **Scheduled runs log, they do not print for anyone.** `scrumbot auto` writes one line per run in `state/log/`;
-  stdout and stderr go to `state/log/launchd.*.log`. A notification never fails a run: the report is already written.
+  on its own. A long-lived connection would hold a lock while `agy` thinks for two minutes.
+- **Only live runs use the memory** (A66). A run with `--today` reads and writes nothing in it but AI answers.
 - **Times are naive local times,** like the API's (`YYYY-MM-DD HH:MM:SS`, server time = the team's time zone).
   Mixing an aware `datetime` with the API's naive ones raises `TypeError` in the middle of a comparison.
 

@@ -1,11 +1,10 @@
 # Bot spec: `scrumbot`
 
 What the scrum-master bot adds on top of the assignment core of [`assignment-spec.md`](assignment-spec.md): reading
-the internal system's API, the risk register, the change log, memory between runs, scheduled runs, the replay on a
-copy of old data and the end-of-sprint report. [`LLM.md`](../LLM.md) says where each part lives in code;
+the internal system's API, the risk register, the change log and memory between runs. [`LLM.md`](../LLM.md) says where each part lives in code;
 [`confirm.md`](../confirm.md) holds the decisions cited here (`Dn` user-locked, `An` defaults, `On` open).
 
-**Status:** written 2026-10-13 for stage 1 (D57). User-facing text is Vietnamese (D12) and quoted exactly as the
+**Status:** written 2026-10-13 for stage 1 (D57); scope cut the same day (D59). User-facing text is Vietnamese (D12) and quoted exactly as the
 bot writes it. `<n>` is an order's STT, `<Mã>` a dev code, dates are `DD/MM/YYYY`, hours are whole numbers.
 
 | § | Contents |
@@ -16,43 +15,28 @@ bot writes it. `<n>` is an order's STT, `<Mã>` a dev code, dates are `DD/MM/YYY
 | 4 | Risk register |
 | 5 | Change log and memory between runs |
 | 6 | Report |
-| 7 | Scheduled runs |
-| 8 | Replay on a copy of old data |
-| 9 | End-of-sprint report |
 
 ---
 
-## 1 · Commands
+## 1 · Command
 
-One program, `scrumbot`, with sub-commands (A77). Without a sub-command it runs `run`.
-
-| Command | Does | Writes |
-|---|---|---|
-| `scrumbot run [--source api\|file] …` | One assignment run with the risk register. `api` (default) reads the system (§2); `file` reads the export files exactly as assignment spec §2–§5 (D51, kept for `eval/`). | `--out` (default `output/`) |
-| `scrumbot clone` | Copies every Maintain list, list Tech manager and the status history to disk, GET only (D55). | `state/clone/<YYYYMMDD-HHMMSS>/` |
-| `scrumbot replay --clone DIR` | Re-assigns and re-scores every sprint of a copy (§8). | `--out` (default `output/`) |
-| `scrumbot auto` | The scheduled run (§7). | `state/bao-cao/`, `state/log/` |
-| `scrumbot sprint-end [--sprint-id ID]` | The end-of-sprint report of the sprint that ended last, or of `ID` (§9). | `--out` (default `output/`) |
-
-Options of `run`:
+One program, `scrumbot`, with one sub-command, `run` (D59). Without a sub-command it runs `run`. A run reads the system
+(§2), assigns (assignment spec §7), builds the risk register (§4), compares with the memory (§5) and writes the report
+to `--out` (§6).
 
 | Option | Default | Meaning |
 |---|---|---|
-| `--source api\|file` | `api` | Where orders come from. |
-| `--snapshot DIR` | none | Read a stored snapshot or clone instead of calling the API (§2.4). |
 | `--sprint-id ID` | the running sprint (§2.3) | The sprint to assign. |
+| `--input DIR` | `input/` | Where `devs.xlsx` and the TM rules file are found (assignment spec §2). |
 | `--devs FILE` | `input/devs.xlsx` | Dev workbook (assignment spec §4). |
-| `--rules FILE` | the only `*.md` in `input/` | TM rules (assignment spec §14). |
-| `--today DATE` | the clock | Run day (A35). A run with `--today` or `--snapshot` neither reads nor writes the memory of §5.2 (A66). |
-| `--state DIR` | `state/` | Memory, cache, snapshots and logs. |
-| `--out DIR`, `--ai`, `--ai-model`, `--ai-timeout`, `-v` | as assignment spec §2 | |
-| `--input`, `--sprint`, `--history`, `--sheet` | as assignment spec §2 | `--source file` only. |
+| `--rules FILE` | the only `*.md` in `--input` | TM rules (assignment spec §14). |
+| `--today DATE` | the clock | Run day (A35). A run with `--today` neither reads nor writes the memory of §5.2 (A66). |
+| `--state DIR` | `state/` | Memory and list cache. |
+| `--out DIR` | `output/` | Where the report goes. |
+| `--ai gemini\|agy\|off`, `--ai-model`, `--ai-timeout` | `gemini`, none, 180 s | The AI tool (assignment spec §6.4). |
+| `-v` | off | Traceback and the AI exchange on errors. |
 
-`clone`, `replay`, `auto` and `sprint-end` accept `--state`, `--devs`, `--rules` and `-v`; `replay` and `auto` also
-the `--ai` options (`auto` defaults to `agy` with a 300 s timeout, A68; `replay` to `off`, A69).
-
-Exit codes are those of assignment spec §11. An API error (§2.2) is exit `2`. `auto` exits `0` when there is no
-running sprint (A59).
+Exit codes are those of assignment spec §11. An API error (§2.2) is exit `2`.
 
 ## 2 · Source: the internal system API
 
@@ -107,15 +91,6 @@ orders win; still several, or none, is an input error:
 of every item of the running sprint. Archived lists are cached in `state/cache/` for good; lists whose `ket_thuc` is
 before today are cached for the day; the running sprint, list Tech manager and the history are always read fresh.
 
-### 2.4 Snapshots and clones (A57, D55)
-
-Every API run stores what it read under `state/snapshots/<YYYYMMDD-HHMMSS>/`: `meta.json` (time, server host, kind),
-`sprints.json.gz`, `don/<list id>.json.gz` (pages merged) and `lich-su.json.gz` (batches merged). A clone has the same
-layout under `state/clone/` with every list and the history of every item of every Maintain sprint. `--snapshot DIR`
-reads such a folder (`.json` or `.json.gz`); lists missing from it are taken from `state/cache/`. A missing file is an
-input error: `Thư mục '<dir>' không có <file>.` Snapshots older than 30 days are deleted at the start of an API run;
-clones are never deleted by the bot.
-
 ### 2.5 From API items to orders
 
 An item is a **root** when `cha_id` is null; roots with `loai` = `task` are the orders (D5); bugs are never orders.
@@ -154,8 +129,7 @@ a new SDK or a store deadline). A wrong or missing extra key leaves the size unt
 `Ads`, `IAP`, `Luồng/UI`, `Policy`, `Crash`, `SDK`, `Tính năng`, `Khác`.
 
 A valid AI answer is remembered by order `id` + title (casefolded); the AI is called only for orders without one.
-`Độ lớn` then reads, e.g., `AI (agy, 6/6 đơn; 5 từ bộ nhớ)`. Defaults (`M`) are never remembered. File runs have no
-`id` and no memory.
+`Độ lớn` then reads, e.g., `AI (agy, 6/6 đơn; 5 từ bộ nhớ)`. Defaults (`M`) are never remembered.
 
 ## 3 · Run day, base day, remaining days
 
@@ -180,7 +154,7 @@ cap (D26) or the exit code (LLM.md §12).
 |---|---|
 | Open order | A root order whose status is busy (D8) or empty: work is left for its dev. |
 | Not started | Status `ready to progress`, `pending`, `all issue` or empty. |
-| Done | Status kind `done`/`closed`; for file input, status `done`, `ready to release`, `close`, `complete` or `đã ro`. |
+| Done | Status kind `done`/`closed`; when the kind is unknown, status `done`, `ready to release`, `close`, `complete` or `đã ro`. |
 | PIC | The pool devs on the order: the TM's for a pre-assigned order, the bot's for a proposal (kept or new). |
 | Deadline | `Hạn`, else the sprint's last day. Written `hạn <date>` or `cuối sprint (<date>)`. |
 | Days left `k` | Working days from the base day to the deadline, inclusive (0 when the deadline is past). |
@@ -292,11 +266,6 @@ the action.
 - Action: `Hỏi <PIC> nguyên nhân; cân nhắc review code trước khi gửi test.`; no PIC: `Tìm nguyên nhân trước khi gửi
   test lại.`
 
-### 4.3 Orders a risk covers
-
-Used by the replay (§8): an order risk covers its order; `CAPACITY-DEV` and `CARRY-OVER` cover the dev's open orders;
-`CAPACITY-SPRINT` and `SCOPE-ADDED` cover their defer list, or every open order of the set when the list is empty.
-
 ## 5 · Change log and memory between runs
 
 The memory is one SQLite file, `state/scrumbot.sqlite` (A51), used only by API runs on live data of today (A66).
@@ -320,7 +289,7 @@ codes now, and whether they match.
 
 Columns `Loại` · `Đơn` · `Trước` · `Sau`. `Đơn` is `STT <n> · <title>`. The first row is `So với dữ liệu lưu lúc
 <dd/mm/yyyy HH:MM>`, or `Chưa có lần chạy trước để so` when nothing of this sprint was stored before today, or
-`Không so khi chạy với --today hoặc --snapshot.` for a run that does not use the memory; when nothing changed, a
+`Không so khi chạy với --today.` for a run that does not use the memory; when nothing changed, a
 second row `Không có thay đổi`.
 
 | `Loại` | When | `Trước` → `Sau` |
@@ -340,19 +309,19 @@ Codes only, never names; a change between people outside the pool is not shown (
 `assignment_<sprint slug>_<YYYYMMDD-HHMMSS>.xlsx` (assignment spec §10), with six sheets in this order (A76):
 
 1. **`Tóm tắt`**: columns `Mục` · `Nội dung`; rows `Sprint` (`<label> (<start> – <end>)`), `Ngày chạy`
-   (`<dd/mm/yyyy HH:MM>`, plus ` (--today)` when given), `Nguồn` (`API <host>`, `Snapshot <dir>` or `File <file>`),
+   (`<dd/mm/yyyy HH:MM>`, plus ` (--today)` when given), `Nguồn` (`API <host>`),
    `Dữ liệu mới nhất` (API), `Độ lớn`, `Mô tả đơn` (the D50 note, when it applies), `Đơn` (`<n> đơn · giao sẵn <a> ·
    bot đề xuất <b> (mới <c>, giữ từ lần trước <d>)`), `Rủi ro` (`<x> cao · <y> trung bình · <z> thấp`), `Cảnh báo dữ
    liệu` (`<w> WARN · <i> INFO`), `Thay đổi` (`<k> dòng`, or the first-row text of §5.3), `Đơn trống chưa vào sprint`
    (API: `<m> đơn ở list Tech manager, <r> đơn tạo trong 30 ngày gần đây`, A65), then one `Rủi ro cao` row per `Cao`
    risk: `<code> · <where>: <problem>`.
-2. **`Phân công`**: as assignment spec §10. API input has the columns `STT` · `ID` · `Task` · `App Name` · `Trạng
+2. **`Phân công`**: as assignment spec §10. The input columns are `STT` · `ID` · `Task` · `App Name` · `Trạng
    thái` · `Người làm` · `Ưu tiên` · `Hạn` · `Ngày tạo` · `Bug mở` · `Bug tổng`. The bot's columns are `Độ lớn` · `Giờ
    ước tính` · `Lý do độ lớn` · `Loại đơn (AI)` · `Hạng mục (AI)` · `Rủi ro kỹ thuật (AI)` · `PIC` · `Mã PIC` ·
    `Nguồn` · `Lý do` · `Dự phòng 1` · `Dự phòng 2` · `Rủi ro` (the codes of the order's risks).
 3. **`Rủi ro`**: `Mức` · `Mã` · `Nhóm` · `Vị trí` · `Vấn đề` · `Ảnh hưởng` · `Đề xuất` · `Ai xử lý` · `Hạn xử lý`; an
    empty register writes one row `Không có rủi ro`.
-4. **`Thay đổi`**: §5.3. File runs write the single row `Nguồn file export không có id đơn; không so được.`
+4. **`Thay đổi`**: §5.3.
 5. **`Cảnh báo`**: as assignment spec §10.
 6. **`Tải dev`**: as assignment spec §10, plus `Sức chứa còn lại (h)` and `Giờ việc còn lại (h)` (empty when the sprint
    has no dates).
@@ -360,107 +329,3 @@ Codes only, never names; a change between people outside the pool is not shown (
 **Terminal** (assignment spec §11) also prints `Nguồn: …` (with `dữ liệu mới nhất <date time>` for the API), the D50
 note, `Rủi ro: <x> cao · <y> trung bình · <z> thấp`, one line `CAO <code> <where>: <problem>` per `Cao` risk, and
 `Thay đổi: <k> dòng`.
-
-## 7 · Scheduled runs (D54)
-
-`scripts/lich-chay.sh install` writes `~/Library/LaunchAgents/com.scrumbot.auto.plist` and loads it; `uninstall`
-unloads and deletes it; `status` prints whether it is loaded and the last log lines (A71). The job runs
-`.venv/bin/scrumbot auto` in the repo at 08:30 and every 30 minutes from 09:00 to 17:30, Monday to Friday. `launchd`
-skips a time when the Mac is off and runs once on wake when it slept through one.
-
-`scrumbot auto`:
-
-1. Picks the running sprint (§2.3). None: logs `không có sprint đang chạy` and exits 0 (A59).
-2. **Full run** when no full run is stored for today, else **quick run**. Both read the API and run as `run` with
-   `--ai agy --ai-timeout 300` (A68), the memory of §5 and output to `state/bao-cao/`.
-3. A full run always writes its report. A quick run writes one only when the report's fingerprint differs from the
-   last written report of the sprint (A78): the set of (order, PIC codes, source), the set of (code, where, level) of
-   the register and the `Thay đổi` rows. A quick run that writes nothing deletes its snapshot.
-4. A full run on the first day after a sprint ended also writes the end-of-sprint report of that sprint (§9), once.
-5. **Notification** (macOS, A78) when a written report proposes at least one order not proposed before, or has a `Cao`
-   risk (code, where) absent from the last written report: title `scrumbot`, text `<sprint>: <parts>. Báo cáo:
-   <file>`, parts among `giao <n> đơn mới`, `<k> rủi ro cao mới`. An end-of-sprint report: `Báo cáo cuối sprint
-   <sprint>: <file>`.
-6. **Log:** one line per run in `state/log/scrumbot-<YYYY-MM-DD>.log`: `<HH:MM> <đầy đủ|nhanh> <sprint>: <result>`,
-   result one of `ghi <file> (giao <n> đơn mới, <k> rủi ro cao mới)`, `không đổi`, `không có sprint đang chạy`,
-   `lỗi: <message>`; plus the D50 note. Logs older than 30 days are deleted.
-
-## 8 · Replay on a copy of old data (D55, D56)
-
-`scrumbot replay --clone DIR [--ai off|agy|gemini]` reads a clone (§2.4) and never calls the API.
-
-### 8.1 Assignment (D55)
-
-Sprints: every Maintain sprint of the clone, oldest first. The **pool of a sprint** is the active devs of `devs.xlsx`
-whose first sprint as PIC on a root order starts on or before it. For each sprint:
-
-1. Its root orders that name at least one pool dev are taken. Those also in an earlier Maintain sprint are
-   **carried**: kept with the TM's `Người làm`. The others are **compared**: cleared and assigned again.
-2. Compared orders are replayed by filing day (`ngay_tao`): those filed before the sprint starts on its first day,
-   each later filing day as one more run that sees the earlier choices.
-3. Each run is §7 with: the history window on that day (§2.5 history); the TM rules in force that day; sizes `M`, or
-   the AI with memory when `--ai` is given (A69); carry-over at the sprint's first day (A70): rows of the previous
-   sprint that name the dev and were busy then (status at that day in D8 when the row has history; else not done at
-   that day: `ngay_dong` after it, or no `ngay_dong` and a current status that is not done, or a root that is also in
-   the replayed sprint); leave from `devs.xlsx`.
-4. An order **matches** when the bot's PIC is one of the pool devs the TM named. No threshold (D22).
-
-### 8.2 Risks (D56)
-
-**Outcome** of a root order with a pool dev (A74): **bad** when any of
-- not done by the sprint's end: its done time is after the end, or it is in a later Maintain sprint, or its done time
-  is unknown and its status now is not done;
-- done after `Hạn` (only when both are known);
-- 5 bugs or more in its tree.
-
-The done time is `ngay_dong`, else the first history event into a status of kind `done`/`closed`.
-
-**Checkpoints:** 08:30 of the sprint's first working day, of its 5th working day, and of the working day from which 3
-working days remain; a checkpoint after the end or equal to an earlier one is dropped. At a checkpoint the bot sees the
-items created before it, each with its status then (history; without history, an item open now keeps its status and
-an item done now counts as `in progress`, A74), bugs by the same rule, and the TM's `Người làm` as they are now. The
-register is §4 with the run day = the checkpoint's day, carry-over from the previous sprint at that time, and no
-stored state (`ORDER-CHANGED` is not scored).
-
-Only sprints that ended before the clone was taken are scored: a running sprint has no outcome yet.
-
-**Scores per code** over the risks at `Cao` or `Trung bình`, with the orders they cover (§4.3), over every scored
-sprint and again over the sprints with status history (where the statuses at a checkpoint are not estimated):
-- `Báo đúng` = covered orders with a bad outcome / covered orders;
-- `Báo đủ` = bad orders covered before the end / bad orders;
-- `Báo trước` = for bad orders covered, the median working days from the first checkpoint that covered them to the end.
-
-### 8.3 Output
-
-`replay_<YYYYMMDD-HHMMSS>.xlsx`:
-
-| Sheet | Columns |
-|---|---|
-| `Giao người theo sprint` | `Sprint` · `Bắt đầu` · `Kết thúc` · `Pool` · `Đơn so sánh` · `Khớp` · `Tỉ lệ khớp` · `Đơn mang sang`; last row `Tổng` |
-| `Giao người theo đơn` | `Sprint` · `Ngày tạo` · `ID` · `App` · `Đơn` · `Ưu tiên` · `TM giao` · `Bot giao` · `Khớp` · `Dự phòng 1` · `Dự phòng 2` · `Lý do của bot` · `Luật TM` |
-| `Rủi ro theo loại` | `Mã` · `Đơn được báo` · `Báo đúng` · `Tỉ lệ báo đúng` · `Đơn kết cục xấu` · `Được báo trước` · `Tỉ lệ báo đủ` · `Báo trước (ngày, trung vị)`; last row `Mọi loại` |
-| `Rủi ro theo loại (có lịch sử)` | the same, over the sprints with status history only |
-| `Rủi ro theo sprint` | `Sprint` · `Đơn` · `Kết cục xấu` · `Được báo trước` · `Đơn được báo` · `Báo đúng` · `Có lịch sử trạng thái` |
-| `Kết cục đơn` | `Sprint` · `ID` · `App` · `Đơn` · `TM giao` · `Kết cục` (`Tốt`/`Xấu`) · `Lý do` · `Rủi ro đã báo` |
-| `Sổ rủi ro các mốc` | `Sprint` · `Mốc` · `Mức` · `Mã` · `Vị trí` · `Vấn đề` |
-
-`Lý do` lists `xong sau ngày kết thúc`, `có mặt ở sprint sau`, `chưa xong`, `xong sau hạn`, `<b> bug`. `Rủi ro đã báo`
-lists `<code> (<dd/mm>)` at its first checkpoint. Rates are rounded half up; an empty denominator leaves the cell empty.
-Terminal: `Replay: Bản sao <dir>, <s> sprint (<AI note>)`, one line per sprint
-`<label>: khớp <m>/<c> đơn (<p>%) · kết cục xấu <b>/<o>, báo trước <f>` (the second part only for a scored sprint),
-`Tổng: khớp <m>/<c> đơn (<p>%)`, `Rủi ro (Cao/Trung bình), mọi sprint đã kết thúc: báo đúng <a>/<b>, báo đủ <c>/<d>`,
-the same line for `sprint có lịch sử trạng thái`, and the report path.
-
-## 9 · End-of-sprint report (A72)
-
-`cuoi-sprint_<sprint slug>_<YYYYMMDD-HHMMSS>.xlsx` for one finished sprint, from live data: the risks of §8.2 for that
-sprint alone, plus what was assigned.
-
-| Sheet | Content |
-|---|---|
-| `Tóm tắt` | `Sprint`, `Đơn` (root orders with a pool dev), `Kết cục xấu`, `Được báo trước`, `Báo đúng`, the rates |
-| `Kết cục đơn`, `Rủi ro theo loại`, `Sổ rủi ro các mốc` | as §8.3, for this sprint |
-| `Đề xuất của bot` | `Đơn` · `Bot đề xuất` · `TM giao` · `Khớp`: the outcomes of §5.2 recorded for this sprint |
-
-`scrumbot sprint-end` writes it for the sprint that ended last before today (or `--sprint-id`); `auto` writes it once
-per sprint (§7 step 4).
