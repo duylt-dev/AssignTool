@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from assigntool.dev_reader import read_devs
-from assigntool.errors import InputError
-from assigntool.model import Level
+from scrumbot.errors import InputError
+from scrumbot.model import Level
+from scrumbot.sources.dev_reader import read_devs
 from tests.conftest import build_devs
 
 

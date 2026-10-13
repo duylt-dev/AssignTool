@@ -2,9 +2,9 @@ from datetime import date
 
 import pytest
 
-from assigntool.errors import InputError
-from assigntool.model import Dev, Level, RuleKind, TeamRule
-from assigntool.rules.team_rules import check_rules, in_force, rules_day, unavailable_findings
+from scrumbot.errors import InputError
+from scrumbot.model import Dev, Level, RuleKind, TeamRule
+from scrumbot.rules.team_rules import check_rules, in_force, rules_day, unavailable_findings
 
 LINH = Dev("Ngọc Văn Linh", "LinhNV", Level.MIDDLE_PLUS, True, ())
 MINH = Dev("Nguyễn Nhật Minh", "MinhNM", Level.MIDDLE, True, ())

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from assigntool.model import AiReply, HistoryOrder, Order, Priority, Size, SprintRow
-from assigntool.rules.sizing import MAX_EXAMPLES, PROMPT_BUDGET, build_prompt, default_sizes, parse_reply
+from scrumbot.model import AiReply, HistoryOrder, Order, Priority, Size, SprintRow
+from scrumbot.understanding.sizing import MAX_EXAMPLES, PROMPT_BUDGET, build_prompt, default_sizes, parse_reply
 
 
 def _order(
@@ -35,8 +35,10 @@ def test_build_prompt_has_exact_headers_removes_urls_and_never_includes_people()
     assert "Past orders of this team with the hours they took (for calibration):\n- Camera · Previous · 4h" in prompt
     assert "Orders to size:\n- STT 7 · Camera · high · Fix crash · See [link] please" in prompt
     assert prompt.endswith(
-        '[{"stt": <STT number>, "size": "S|M|L|XL", "reason": "<at most 20 words, in Vietnamese>"}]\n'
+        '[{"stt": <STT number>, "size": "S|M|L|XL", "reason": "<at most 20 words, in Vietnamese>",\n'
+        '  "type": "<type>", "items": ["<item>"], "tech_risks": ["<risk>"]}]\n'
     )
+    assert "its type (ads, iap, flow_ui, policy, crash, sdk, feature or other)" in prompt
     assert "Nguyen Van A" not in prompt
     assert "Tran Thi B" not in prompt
     assert "https://" not in prompt
@@ -136,3 +138,27 @@ def test_parse_reply_accepts_fenced_array_and_limits_reason() -> None:
     assert len(sizes[1].reason) == 120
     assert not findings
     assert note == "AI (agy, 1/1 đơn)"
+
+
+def test_parse_reply_reads_the_understanding_fields_and_never_lets_them_change_the_size() -> None:
+    orders = (_order(1), _order(2), _order(3))
+    reply = AiReply(
+        "agy",
+        '[{"stt": 1, "size": "L", "reason": "r", "type": "IAP", "items": ["Add IAP", " ", 3], '
+        '"tech_risks": ["SDK mới", "hạn store", "thừa"]},'
+        ' {"stt": 2, "size": "S", "type": "unknown", "items": "not a list", "tech_risks": null},'
+        ' {"stt": 3, "size": "XL"}]',
+        None,
+    )
+
+    sizes, findings, _ = parse_reply(reply, orders)
+
+    assert findings == ()
+    assert (sizes[1].size, sizes[1].kind, sizes[1].items, sizes[1].tech_risks) == (
+        Size.L,
+        "iap",
+        ("Add IAP",),
+        ("SDK mới", "hạn store"),
+    )
+    assert (sizes[2].size, sizes[2].kind, sizes[2].items, sizes[2].tech_risks) == (Size.S, "", (), ())
+    assert (sizes[3].size, sizes[3].kind) == (Size.XL, "")

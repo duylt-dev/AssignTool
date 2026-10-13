@@ -6,10 +6,10 @@ import os
 
 import pytest
 
-from assigntool.ai_cli import run_ai
-from assigntool.rules.sizing import build_prompt, parse_reply
-from assigntool.rules.validate import orders_and_findings
-from assigntool.sprint_reader import read_workbook
+from scrumbot.rules.validate import orders_and_findings
+from scrumbot.sources.sprint_reader import read_workbook
+from scrumbot.understanding.ai_cli import run_ai
+from scrumbot.understanding.sizing import build_prompt, parse_reply
 from tests.sample import SAMPLE, SKIP_REASON, history_orders
 
 TOOL = os.environ.get("ASSIGNTOOL_TEST_AI", "")

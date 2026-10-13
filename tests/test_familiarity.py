@@ -1,7 +1,7 @@
 from datetime import date
 
-from assigntool.model import Dev, HistoryOrder, Level
-from assigntool.rules.familiarity import FamiliarityIndex
+from scrumbot.model import Dev, HistoryOrder, Level
+from scrumbot.rules.familiarity import FamiliarityIndex
 
 
 def dev(name: str, code: str) -> Dev:

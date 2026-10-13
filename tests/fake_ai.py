@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Canned child process used to test assigntool.ai_cli without a real AI."""
+"""Canned child process used to test scrumbot.understanding.ai_cli without a real AI."""
 
 from __future__ import annotations
 

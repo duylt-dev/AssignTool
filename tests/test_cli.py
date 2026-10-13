@@ -1,4 +1,5 @@
-"""CLI: discovery, exit codes, the report's sheets and the AI wiring (spec §2, §10, §11)."""
+"""CLI on the export files (`run --source file`): discovery, exit codes, the report's sheets and the AI wiring
+(assignment spec §2, §10, §11; bot spec §1, §6)."""
 
 from __future__ import annotations
 
@@ -8,11 +9,13 @@ from pathlib import Path
 import pytest
 from openpyxl import load_workbook
 
-from assigntool import ai_cli
-from assigntool.cli import main
-from assigntool.model import AiReply
-from assigntool.xlsx_report import report_name
+from scrumbot.actions.xlsx_report import report_name
+from scrumbot.cli import main
+from scrumbot.model import AiReply
+from scrumbot.understanding import ai_cli
 from tests.conftest import build_devs, build_history_xlsx, build_sprint_workbook, write_history_csv
+
+FILE = ["run", "--source", "file"]
 
 ORDER = {
     "STT": 1,
@@ -57,27 +60,38 @@ def _report(out: Path) -> Path:
     return path
 
 
-def test_off_run_discovers_inputs_and_writes_the_three_sheets(tmp_path: Path, capsys) -> None:
+def test_off_run_discovers_inputs_and_writes_the_six_sheets(tmp_path: Path, capsys) -> None:
     source = _inputs(tmp_path / "input")
     out = tmp_path / "out"
 
-    assert main(["--input", str(source), "--out", str(out), "--ai", "off"]) == 0
+    assert main([*FILE, "--input", str(source), "--out", str(out), "--ai", "off", "--today", "2026-10-06"]) == 0
 
     workbook = load_workbook(_report(out))
-    assert workbook.sheetnames == ["Phân công", "Cảnh báo", "Tải dev"]
+    assert workbook.sheetnames == ["Tóm tắt", "Phân công", "Rủi ro", "Thay đổi", "Cảnh báo", "Tải dev"]
     header, row = list(workbook["Phân công"].iter_rows(values_only=True))
-    assert header[-9:] == (
+    assert header[-13:] == (
         "Độ lớn",
         "Giờ ước tính",
         "Lý do độ lớn",
+        "Loại đơn (AI)",
+        "Hạng mục (AI)",
+        "Rủi ro kỹ thuật (AI)",
         "PIC",
         "Mã PIC",
         "Nguồn",
         "Lý do",
         "Dự phòng 1",
         "Dự phòng 2",
+        "Rủi ro",
     )
-    assert row[-9:-2] == ("M (mặc định)", 16, None, "Dev A", "DevA", "Tool đề xuất", row[-3])
+    assert row[-13:-4] == ("M (mặc định)", 16, None, None, None, None, "Dev A", "DevA", "Tool đề xuất")
+    changes = list(workbook["Thay đổi"].iter_rows(values_only=True))
+    assert changes[1][0] == "Nguồn file export không có id đơn; không so được."
+    summary = dict(list(workbook["Tóm tắt"].iter_rows(values_only=True))[1:])
+    assert summary["Nguồn"] == "File export.xlsx" and summary["Rủi ro"] == "0 cao · 0 trung bình · 1 thấp"
+    risks = list(workbook["Rủi ro"].iter_rows(values_only=True))
+    assert risks[1][:5] == ("Thấp", "CARRY-OVER", "Năng lực", "DevA", "DevA còn 1 việc dở ở Sprint 1")
+    assert row[-1] is None  # CARRY-OVER is about the dev, not the order
     printed = capsys.readouterr().out
     assert "Sprint: Sprint 2" in printed and "Độ lớn: tắt AI (mọi đơn M)" in printed
     assert "Luật TM: không có" in printed
@@ -96,11 +110,11 @@ def test_ai_reply_sizes_the_order(tmp_path: Path, monkeypatch, capsys) -> None:
 
     monkeypatch.setattr(ai_cli, "run_ai", fake)
 
-    assert main(["--input", str(source), "--out", str(out), "--ai-model", "m1", "--ai-timeout", "9"]) == 0
+    assert main([*FILE, "--input", str(source), "--out", str(out), "--ai-model", "m1", "--ai-timeout", "9"]) == 0
 
     assert calls == [("gemini", "m1", 9, False)]
     row = list(load_workbook(_report(out))["Phân công"].iter_rows(values_only=True))[1]
-    assert row[-9:-6] == ("L", 32, "Thêm ads")
+    assert row[-13:-10] == ("L", 32, "Thêm ads")
     assert "Độ lớn: AI (gemini, 1/1 đơn)" in capsys.readouterr().out
 
 
@@ -109,7 +123,7 @@ def test_ai_failure_falls_back_to_m_and_still_writes_the_report(tmp_path: Path, 
     out = tmp_path / "out"
     monkeypatch.setattr(ai_cli, "run_ai", lambda tool, prompt, **_: AiReply(tool, None, "mã thoát 41"))
 
-    assert main(["--input", str(source), "--out", str(out)]) == 0
+    assert main([*FILE, "--input", str(source), "--out", str(out)]) == 0
 
     printed = capsys.readouterr().out
     assert "Độ lớn: mặc định M (mã thoát 41)" in printed
@@ -136,7 +150,6 @@ def test_ai_failure_falls_back_to_m_and_still_writes_the_report(tmp_path: Path, 
         (["a.xlsx:sprint", "devs.xlsx:devs", "t.xlsx:history", "h.csv"], [], "Có nhiều file lịch sử: h.csv, t.xlsx."),
         (["a.xlsx"], [], "Không mở được file"),
         ([], ["--sprint", "missing.xlsx"], "Không có file 'missing.xlsx' (--sprint)."),
-        (["a.xlsx:sprint", "devs.xlsx:devs"], ["--backtest"], "Không tìm thấy file lịch sử để backtest."),
         (
             ["a.xlsx:sprint", "devs.xlsx:devs", "a.md", "b.md"],
             [],
@@ -145,7 +158,6 @@ def test_ai_failure_falls_back_to_m_and_still_writes_the_report(tmp_path: Path, 
         (["a.xlsx:sprint", "devs.xlsx:devs", "a.md"], [], "không có bảng luật (bảng có cột Loại và Dev)."),
         (["a.xlsx:sprint", "devs.xlsx:devs"], ["--rules", "missing.md"], "Không có file 'missing.md' (--rules)."),
         (["a.xlsx:sprint", "devs.xlsx:devs", "a.md:rules"], [], "dòng 5: không có dev mã 'Nobody' trong file dev."),
-        (["devs.xlsx:devs", "t.xlsx:history", "a.md:rules"], ["--backtest"], "không có dev mã 'Nobody'"),
         (["a.xlsx:sprint", "devs.xlsx:devs"], ["--today", "31/02/2026"], "--today '31/02/2026': không đọc được ngày"),
     ],
 )
@@ -166,14 +178,14 @@ def test_input_errors_exit_2_with_a_message(tmp_path: Path, capsys, files, flags
         else:
             (source / name).write_bytes(b"")
 
-    assert main(["--input", str(source), "--out", str(tmp_path / "out"), "--ai", "off", *flags]) == 2
+    assert main([*FILE, "--input", str(source), "--out", str(tmp_path / "out"), "--ai", "off", *flags]) == 2
 
     assert message in capsys.readouterr().err
     assert not (tmp_path / "out").exists()
 
 
 def test_missing_input_directory_exits_2(tmp_path: Path, capsys) -> None:
-    assert main(["--input", str(tmp_path / "nope"), "--ai", "off"]) == 2
+    assert main([*FILE, "--input", str(tmp_path / "nope"), "--ai", "off"]) == 2
     assert "Không có thư mục input" in capsys.readouterr().err
 
 
@@ -188,13 +200,13 @@ def test_without_history_file_the_older_sheets_are_the_history_and_the_report_is
     (source / "history.csv").unlink()
     out = tmp_path / "out"
 
-    assert main(["--input", str(source), "--out", str(out), "--ai", "off"]) == 0
+    assert main([*FILE, "--input", str(source), "--out", str(out), "--ai", "off"]) == 0
 
     printed = capsys.readouterr().out
     assert "Lịch sử: sheet Sprint 1 trong workbook (không có file lịch sử)" in printed
     workbook = load_workbook(_report(out))
     assignment = list(workbook["Phân công"].iter_rows(values_only=True))[1]
-    assert assignment[-3].startswith("Làm version gần nhất của Demo (Sprint 1: 1.0.1 - Add ads)")
+    assert assignment[-4].startswith("Làm version gần nhất của Demo (Sprint 1: 1.0.1 - Add ads)")
     findings = list(workbook["Cảnh báo"].iter_rows(values_only=True))[1:]
     assert [row[:3] for row in findings] == [("INFO", "HISTORY-FROM-WORKBOOK", "Sprint 1")]
 
@@ -206,47 +218,11 @@ def test_tech_manager_xlsx_beside_the_export_is_found_as_history(tmp_path: Path,
     build_history_xlsx(source / "tech.xlsx", {"Tháng 9": [HISTORY], "Tháng 10": [target_order]})
     out = tmp_path / "out"
 
-    assert main(["--input", str(source), "--out", str(out), "--ai", "off"]) == 0
+    assert main([*FILE, "--input", str(source), "--out", str(out), "--ai", "off"]) == 0
 
     assert "Lịch sử: file tech.xlsx (1 đơn gốc)" in capsys.readouterr().out
     assignment = list(load_workbook(_report(out))["Phân công"].iter_rows(values_only=True))[1]
-    assert assignment[-3].startswith("Làm version gần nhất của Demo (Sprint 1 (9/22 - 10/3): 1.0.0)")
-
-
-def test_backtest_replays_the_history_and_writes_its_report(tmp_path: Path, capsys) -> None:
-    source = tmp_path / "input"
-    source.mkdir()
-    build_devs(
-        source / "devs.xlsx",
-        [
-            {"Tên": "Dev A", "Mã": "DevA", "Level": "middle", "Nhận việc": "Y"},
-            {"Tên": "Dev B", "Mã": "DevB", "Level": "junior", "Nhận việc": "Y"},
-        ],
-    )
-    s9, s10 = "Sprint 9 (9/21 - 10/2)", "Sprint 10 (10/6 - 10/17)"
-    rows = [
-        {**HISTORY, "Ngày lên đơn": "2026-09-20 09:00", "App Name": "Demo", "Người làm": "Dev B", "Sprint": s9},
-        {**HISTORY, "Ngày lên đơn": "2026-10-01 09:00", "App Name": "Demo", "Người làm": "Dev B", "Sprint": s10},
-        {**HISTORY, "Ngày lên đơn": "2026-10-02 09:00", "App Name": "New", "Người làm": "Dev B", "Sprint": s10},
-        {**HISTORY, "Ngày lên đơn": "2026-09-01 09:00", "Người làm": "Dev A", "Sprint": "Sprint 3 (9/3 - 9/30)"},
-    ]
-    build_history_xlsx(source / "tech.xlsx", {"Tháng 9": rows})
-    out = tmp_path / "out"
-
-    assert main(["--input", str(source), "--out", str(out), "--backtest"]) == 0
-
-    printed = capsys.readouterr().out
-    assert "Backtest: file tech.xlsx, 2 sprint Maintain (mọi đơn M, không tính việc dở)" in printed
-    assert "Sprint 9 (9/21 - 10/2): khớp 0/1 đơn (0%)" in printed
-    assert "Sprint 10 (10/6 - 10/17): khớp 1/2 đơn (50%)" in printed
-    assert "Tổng: khớp 1/3 đơn (33%)" in printed
-    (report,) = out.glob("backtest_*.xlsx")
-    workbook = load_workbook(report)
-    assert workbook.sheetnames == ["Theo sprint", "Theo đơn"]
-    summary = list(workbook["Theo sprint"].iter_rows(values_only=True))
-    assert summary[-1] == ("Tổng", None, None, 3, 1, "33%", 0, 0)
-    detail = list(workbook["Theo đơn"].iter_rows(values_only=True))
-    assert [row[5:8] for row in detail[1:]] == [("DevB", "DevA", "✗"), ("DevB", "DevB", "✓"), ("DevB", "DevA", "✗")]
+    assert assignment[-4].startswith("Làm version gần nhất của Demo (Sprint 1 (9/22 - 10/3): 1.0.0)")
 
 
 def test_the_md_file_in_the_input_folder_is_the_rules_file_and_its_pin_reaches_the_report(tmp_path: Path, capsys):
@@ -255,35 +231,13 @@ def test_the_md_file_in_the_input_folder_is_the_rules_file_and_its_pin_reaches_t
     (source / "luat.md").write_text(RULES.replace("\n", "\r\n"), encoding="utf-8-sig")
     out = tmp_path / "out"
 
-    assert main(["--input", str(source), "--out", str(out), "--ai", "off"]) == 0
+    assert main([*FILE, "--input", str(source), "--out", str(out), "--ai", "off"]) == 0
 
     printed = capsys.readouterr().out
     assert "Luật TM: file luat.md (1 luật, 1 có hiệu lực ngày " in printed
     assert "STT 1 · Demo 1.0.1 - Add ads [M] → DevB (dự phòng: DevA)" in printed
     assignment = list(load_workbook(_report(out))["Phân công"].iter_rows(values_only=True))[1]
-    assert assignment[-3].startswith("Luật TM dòng 5: chỉ định DevB cho Demo (thử) · Chưa làm Demo")
-
-
-def test_backtest_applies_the_rules_and_reports_which_orders_they_shaped(tmp_path: Path, capsys) -> None:
-    source = tmp_path / "input"
-    source.mkdir()
-    build_devs(source / "devs.xlsx", TWO_DEVS)
-    row = {**HISTORY, "Ngày lên đơn": "2026-10-02 09:00", "Người làm": "Dev B", "Sprint": "Sprint 10 (10/6 - 10/17)"}
-    build_history_xlsx(source / "tech.xlsx", {"Tháng 10": [row]})
-    rules = source / "rules-for-test.md"
-    rules.write_text(RULES, encoding="utf-8")
-    out = tmp_path / "out"
-
-    assert main(["--input", str(source), "--out", str(out), "--backtest", "--rules", str(rules)]) == 0
-
-    printed = capsys.readouterr().out
-    assert "Luật TM: file rules-for-test.md (1 luật, áp theo ngày giao lại)" in printed
-    assert "Sprint 10 (10/6 - 10/17): khớp 1/1 đơn (100%)" in printed
-    workbook = load_workbook(next(out.glob("backtest_*.xlsx")))
-    summary = list(workbook["Theo sprint"].iter_rows(values_only=True))
-    assert summary[0][-1] == "Đơn theo luật TM" and summary[1][-1] == 1 and summary[-1][-1] == 1
-    detail = list(workbook["Theo đơn"].iter_rows(values_only=True))
-    assert (detail[0][-1], detail[1][5:8], detail[1][-1]) == ("Luật TM", ("DevB", "DevB", "✓"), "dòng 5")
+    assert assignment[-4].startswith("Luật TM dòng 5: chỉ định DevB cho Demo (thử) · Chưa làm Demo")
 
 
 @pytest.mark.parametrize(
@@ -293,7 +247,7 @@ def test_today_replaces_the_clock_for_the_history_window(tmp_path: Path, capsys,
     """The history order's sprint starts 22/09: on 15/09 it has not started, so it is not history yet (spec §5.1)."""
     source = _inputs(tmp_path / "input")
 
-    assert main(["--input", str(source), "--out", str(tmp_path / "out"), "--ai", "off", "--today", today]) == 0
+    assert main([*FILE, "--input", str(source), "--out", str(tmp_path / "out"), "--ai", "off", "--today", today]) == 0
 
     printed = capsys.readouterr().out
     assert f"Ngày chạy: {shown} (--today)" in printed
@@ -313,7 +267,7 @@ def test_today_replaces_the_clock_for_the_rules_day(tmp_path: Path, capsys, toda
     )
     (source / "luat.md").write_text(dated, encoding="utf-8")
 
-    assert main(["--input", str(source), "--out", str(tmp_path / "out"), "--ai", "off", "--today", today]) == 0
+    assert main([*FILE, "--input", str(source), "--out", str(tmp_path / "out"), "--ai", "off", "--today", today]) == 0
 
     printed = capsys.readouterr().out
     assert f"có hiệu lực ngày {rules_day})" in printed
@@ -328,7 +282,7 @@ def test_without_hours_in_the_history_the_older_sheets_calibrate_the_ai(tmp_path
     prompts = []
     monkeypatch.setattr(ai_cli, "run_ai", lambda tool, prompt, **_: prompts.append(prompt) or AiReply(tool, "[]", None))
 
-    assert main(["--input", str(source), "--out", str(tmp_path / "out")]) == 0
+    assert main([*FILE, "--input", str(source), "--out", str(tmp_path / "out")]) == 0
 
     (prompt,) = prompts
     assert "(for calibration):\n- Demo · 1.0.0 - First release · 12h\n" in prompt

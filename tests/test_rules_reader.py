@@ -3,9 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from assigntool.errors import InputError
-from assigntool.model import RuleKind, TeamRule
-from assigntool.rules_reader import read_rules
+from scrumbot.errors import InputError
+from scrumbot.model import RuleKind, TeamRule
+from scrumbot.sources.rules_reader import read_rules
 
 EXAMPLE = """\
 # Luật giao việc

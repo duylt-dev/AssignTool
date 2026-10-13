@@ -4,8 +4,8 @@ from datetime import date, datetime
 
 import pytest
 
-from assigntool.model import Level
-from assigntool.normalize import clean, header_key, parse_date, parse_level, split_people, text_key
+from scrumbot.model import Level
+from scrumbot.normalize import clean, header_key, parse_date, parse_level, split_people, text_key
 
 
 def test_text_helpers_normalize_nfc_and_headers() -> None:
@@ -25,8 +25,8 @@ def test_parse_level_and_dates() -> None:
 
 
 def test_parse_sprint_labels_reads_every_label_and_dates_it_from_the_filing_day() -> None:
-    from assigntool.model import SprintLabel
-    from assigntool.normalize import parse_sprint_labels
+    from scrumbot.model import SprintLabel
+    from scrumbot.normalize import parse_sprint_labels
 
     labels = parse_sprint_labels("Sprint 18 (4/17 - 4/29), Sprint 19 (5/6-5/20)", date(2026, 4, 16))
     assert labels == (

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from assigntool.model import HistoryOrder, SprintSheet
-from assigntool.normalize import header_key
+from scrumbot.model import HistoryOrder, SprintSheet
+from scrumbot.normalize import header_key
 
 SAMPLE = Path(__file__).resolve().parents[1] / "input" / "Maintain_update_Sprint_10_va_9.xlsx"
 SKIP_REASON = f"thiếu file mẫu {SAMPLE}"

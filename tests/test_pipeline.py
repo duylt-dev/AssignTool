@@ -3,8 +3,8 @@ from datetime import date
 
 import pytest
 
-from assigntool.errors import InputError
-from assigntool.model import (
+from scrumbot.errors import InputError
+from scrumbot.model import (
     Dev,
     HistoryOrder,
     Level,
@@ -17,7 +17,7 @@ from assigntool.model import (
     SprintSheet,
     TeamRule,
 )
-from assigntool.rules.pipeline import build_result
+from scrumbot.rules.pipeline import build_result
 
 LINH = Dev("Ngọc Văn Linh", "LinhNV", Level.MIDDLE_PLUS, True, ())
 MINH = Dev("Nguyễn Nhật Minh", "MinhNM", Level.MIDDLE, True, ())
@@ -248,3 +248,36 @@ def test_pipeline_reports_rules_that_cannot_act_and_orders_they_left_without_can
         ),
     ]
     assert findings(TeamRule(RuleKind.PIN, "LinhNV", "AR Dog", None, None, None, "", 3), *every[1:]) == []
+
+
+def test_a_dev_off_every_remaining_day_takes_no_new_order_from_the_base_day_on() -> None:
+    """R8 (A75): AnTD is off 14–17/10; run on 14/10 he is out with DEV-ON-LEAVE-REST, run on 06/10 he is in."""
+    off_rest = replace(AN, leave_days=tuple(date(2026, 10, day) for day in (14, 15, 16, 17)))
+    target_sheet, orders = target(clear_assignees=True)
+
+    def run_on(day: date):
+        return build_result(
+            target=target_sheet,
+            prev=previous(),
+            prev_name="Sprint 9",
+            orders=orders,
+            findings=(),
+            devs=(LINH, MINH, off_rest, TIEN),
+            history=history(),
+            sizes={order.row.stt: SizeEstimate(Size.M, "", True) for order in orders},
+            sizing_note="AI off",
+            run_day=day,
+        )
+
+    late, early = run_on(date(2026, 10, 14)), run_on(date(2026, 10, 6))
+
+    assert [(f.code, f.where, f.message) for f in late.findings if f.code == "DEV-ON-LEAVE-REST"] == [
+        (
+            "DEV-ON-LEAVE-REST",
+            "AnTD",
+            "AnTD nghỉ hết các ngày còn lại của sprint (từ 14/10/2026); không được giao đơn mới.",
+        )
+    ]
+    assert all("AnTD" not in item.pic_codes for item in late.assignments)
+    assert not [f for f in early.findings if f.code == "DEV-ON-LEAVE-REST"]
+    assert any("AnTD" in item.pic_codes for item in early.assignments)

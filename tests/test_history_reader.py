@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from assigntool.errors import InputError
-from assigntool.history_reader import read_history
-from assigntool.model import SprintLabel
+from scrumbot.errors import InputError
+from scrumbot.model import SprintLabel
+from scrumbot.sources.history_reader import read_history
 from tests.conftest import TECH_HEADERS, build_history_xlsx, write_history_csv
 
 

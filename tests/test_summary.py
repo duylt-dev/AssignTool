@@ -1,8 +1,8 @@
 from datetime import date
 
-from assigntool.model import Assignment, Dev, Level, Order, Priority, Size, SizeEstimate, Source, SprintRow
-from assigntool.rules.familiarity import FamiliarityIndex
-from assigntool.rules.summary import summarize
+from scrumbot.model import Assignment, Dev, Level, Order, Priority, Size, SizeEstimate, Source, SprintRow
+from scrumbot.rules.familiarity import FamiliarityIndex
+from scrumbot.rules.summary import summarize
 
 
 def test_summary_keeps_devs_xlsx_order_and_includes_full_sprint_leave() -> None:

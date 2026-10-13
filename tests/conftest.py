@@ -4,6 +4,7 @@ import csv
 from datetime import date, datetime
 from pathlib import Path
 
+import pytest
 from openpyxl import Workbook
 
 SPRINT_HEADERS = [
@@ -26,6 +27,16 @@ SPRINT_HEADERS = [
 ]
 
 DEV_HEADERS = ["Tên", "Mã", "Level", "Nhận việc", "Ngày nghỉ"]
+
+
+@pytest.fixture(autouse=True)
+def _never_the_real_server(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The environment wins over `.env` (A54): a test that reaches for the API by mistake fails fast on a closed local
+    port instead of calling the dev server with the real token."""
+    monkeypatch.setenv("SCRUMBOT_API_BASE", "http://127.0.0.1:9")
+    monkeypatch.setenv("SCRUMBOT_API_TOKEN", "test-token")
+
+
 # The history export (list "Tech manager", spec §5): 18 columns, header on row 1, one sheet per month.
 TECH_HEADERS = [
     "Ngày lên đơn",

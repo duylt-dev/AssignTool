@@ -1,7 +1,7 @@
 from datetime import date
 
-from assigntool.model import HistoryOrder, SprintLabel
-from assigntool.rules.history_window import history_for, in_sprint
+from scrumbot.model import HistoryOrder, SprintLabel
+from scrumbot.rules.history_window import history_for, in_sprint
 
 S9 = SprintLabel(9, date(2026, 9, 21), date(2026, 10, 2))
 S10 = SprintLabel(10, date(2026, 10, 6), date(2026, 10, 17))

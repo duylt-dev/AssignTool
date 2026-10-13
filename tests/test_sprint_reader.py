@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 from openpyxl import load_workbook
 
-from assigntool.errors import InputError
-from assigntool.sprint_reader import read_workbook
+from scrumbot.errors import InputError
+from scrumbot.sources.sprint_reader import read_workbook
 from tests.conftest import SPRINT_HEADERS, build_sprint_workbook
 
 
@@ -104,7 +104,7 @@ def test_bad_target_date_names_excel_row_and_column(tmp_path: Path) -> None:
 def test_read_sheet_history_reads_only_older_sheets_and_their_hours(tmp_path) -> None:
     from datetime import datetime
 
-    from assigntool.sprint_reader import read_sheet_history
+    from scrumbot.sources.sprint_reader import read_sheet_history
     from tests.conftest import build_sprint_workbook
 
     task = {"Loại": "Task", "App Name.": "Demo", "Người làm": "Dev A", "Ngày tạo": datetime(2026, 9, 1)}

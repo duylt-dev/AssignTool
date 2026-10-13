@@ -1,7 +1,7 @@
 from datetime import date
 
-from assigntool.model import Priority, SprintRow, SprintSheet
-from assigntool.rules.validate import orders_and_findings
+from scrumbot.model import Priority, SprintRow, SprintSheet
+from scrumbot.rules.validate import orders_and_findings
 
 
 def row(stt: int, **changes: object) -> SprintRow:
@@ -52,10 +52,26 @@ def test_orders_and_findings_has_no_finding_for_clean_rows() -> None:
 
 
 def test_history_findings_say_where_familiarity_came_from() -> None:
-    from assigntool.rules.validate import history_findings
+    from scrumbot.rules.validate import history_findings
 
     assert history_findings(True, ()) == ()
     (info,) = history_findings(False, ("Sprint 8", "Sprint 9"))
     assert (info.severity.value, info.code, info.where) == ("INFO", "HISTORY-FROM-WORKBOOK", "Sprint 8, Sprint 9")
     (warn,) = history_findings(False, ())
     assert (warn.severity.value, warn.code) == ("WARN", "HISTORY-MISSING")
+
+
+def test_due_missing_fires_on_urgent_and_high_orders_without_a_due_date_only() -> None:
+    _, findings = orders_and_findings(
+        sheet(
+            row(1, priority_raw="urgent"),
+            row(2, priority_raw="high", due=date(2026, 10, 15)),
+            row(3, priority_raw="high"),
+            row(4, priority_raw="normal"),
+        )
+    )
+
+    assert [(f.severity.value, f.code, f.where, f.message) for f in findings] == [
+        ("WARN", "DUE-MISSING", "Đơn STT 1", "Đơn STT 1 là đơn urgent nhưng chưa có Hạn."),
+        ("WARN", "DUE-MISSING", "Đơn STT 3", "Đơn STT 3 là đơn high nhưng chưa có Hạn."),
+    ]
