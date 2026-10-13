@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, datetime, time
 
 from scrumbot.errors import InputError
@@ -32,6 +33,31 @@ from scrumbot.rules.team_rules import relaxed_findings, rules_day, unavailable_f
 MORNING = time(8, 30)  # a run day with no clock time is read as the start of the working day
 
 
+@dataclass(frozen=True)
+class Team:
+    """Who can take work on the base day (bot spec §3, A75)."""
+
+    days: tuple[date, ...]  # working days of the sprint
+    base: date
+    rest: tuple[date, ...]  # remaining working days
+    active: tuple[Dev, ...]  # "Nhận việc" = Y
+    removed: tuple[Dev, ...]  # off every working day of the sprint (DEV-ON-LEAVE)
+    off_rest: tuple[Dev, ...]  # off every remaining day (DEV-ON-LEAVE-REST)
+    pool: tuple[Dev, ...]
+
+
+def team_for(devs: tuple[Dev, ...], target: SprintSheet, run_day: date | None) -> Team:
+    """Without `run_day` the run is read as the sprint's first day, the behaviour before the remaining-days leave."""
+    days = working_days(target.start, target.end)
+    base = rules_day(run_day, target.start) if run_day is not None else target.start or date.min
+    rest = working_days(base, target.end) if target.end is not None else ()
+    active = tuple(dev for dev in devs if dev.active)
+    removed = tuple(dev for dev in active if on_leave_all_sprint(dev, days))
+    off_rest = tuple(dev for dev in active if dev not in removed and on_leave_all_sprint(dev, rest))
+    pool = tuple(dev for dev in active if dev not in removed and dev not in off_rest)
+    return Team(days, base, rest, active, removed, off_rest, pool)
+
+
 def build_result(
     *,
     target: SprintSheet,
@@ -52,14 +78,10 @@ def build_result(
 ) -> Result:
     """Leave exclusion, §7 with kept proposals, the risk register and the change rows. `rules` are those in force.
 
-    Without `run_day` the run is read as the sprint's first day, the behaviour before the remaining-days leave."""
-    days = working_days(target.start, target.end)
-    base = rules_day(run_day, target.start) if run_day is not None else target.start or date.min
-    rest = working_days(base, target.end) if target.end is not None else ()
-    active = tuple(dev for dev in devs if dev.active)
-    removed = tuple(dev for dev in active if on_leave_all_sprint(dev, days))
-    off_rest = tuple(dev for dev in active if dev not in removed and on_leave_all_sprint(dev, rest))
-    pool = tuple(dev for dev in active if dev not in removed and dev not in off_rest)
+    Without `run_day` the run is read as the sprint's first day (`team_for`)."""
+    team = team_for(devs, target, run_day)
+    days, base, rest, active = team.days, team.base, team.rest, team.active
+    removed, off_rest, pool = team.removed, team.off_rest, team.pool
     if not pool:
         raise InputError("Không còn dev nào để giao đơn.")
 

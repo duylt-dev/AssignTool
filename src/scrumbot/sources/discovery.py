@@ -16,8 +16,10 @@ def devs_path(input_dir: Path, value: str | None) -> Path:
     )
 
 
-def rules_path(input_dir: Path, value: str | None) -> Path | None:
-    return explicit(value, "--rules") or at_most_one(files(input_dir, ".md"), "file luật .md", "--rules")
+def rules_path(input_dir: Path, value: str | None, besides: Path | None = None) -> Path | None:
+    """The `--rules` file, else the only `.md` of the input folder other than `besides` (the order file of `assign`)."""
+    found = [path for path in files(input_dir, ".md") if besides is None or not _same(path, besides)]
+    return explicit(value, "--rules") or at_most_one(found, "file luật .md", "--rules")
 
 
 def files(directory: Path, suffix: str) -> list[Path]:
@@ -41,6 +43,10 @@ def only_one(found: list[Path], what: str, flag: str) -> Path:
 
 def at_most_one(found: list[Path], what: str, flag: str) -> Path | None:
     return only_one(found, what, flag) if found else None
+
+
+def _same(path: Path, other: Path) -> bool:
+    return path.resolve() == other.resolve()
 
 
 def explicit(value: str | None, flag: str) -> Path | None:

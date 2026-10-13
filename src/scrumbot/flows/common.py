@@ -38,10 +38,13 @@ class Options:
     env_file: Path = Path(".env")
 
 
-def load_team(options: Options) -> tuple[tuple[Dev, ...], tuple[TeamRule, ...], Path | None]:
-    """devs.xlsx and the TM rules file checked against it (assignment spec §4, §14)."""
+def load_team(
+    options: Options, besides: Path | None = None
+) -> tuple[tuple[Dev, ...], tuple[TeamRule, ...], Path | None]:
+    """devs.xlsx and the TM rules file checked against it (assignment spec §4, §14). `besides`, the order file of
+    `assign`, is never taken for the rules file (bot spec §7.1)."""
     devs = read_devs(devs_path(options.input_dir, options.devs))
-    path = rules_path(options.input_dir, options.rules)
+    path = rules_path(options.input_dir, options.rules, besides)
     rules: tuple[TeamRule, ...] = ()
     if path is not None:
         rules = read_rules(path)
@@ -60,13 +63,15 @@ def sizes_for(
     store: StateStore | None,
     say: Say,
     now: datetime,
+    fresh: frozenset[int] = frozenset(),
 ) -> tuple[dict[int, SizeEstimate], tuple[Finding, ...], str]:
-    """AI sizes, from the memory when an answer for the same order id and title exists (A67)."""
+    """AI sizes, from the memory when an answer for the same order id and title exists (A67). Orders whose STT is in
+    `fresh` are sized by this call and never remembered: their description comes from an order file (bot spec §7.2)."""
     if options.ai == "off":
         return default_sizes(orders), (), "tắt AI (mọi đơn M)"
     if not orders:
         return {}, (), "không có đơn"
-    keys = [(order.row.id, order.row.title) for order in orders if order.row.id]
+    keys = [(order.row.id, order.row.title) for order in orders if order.row.id and order.row.stt not in fresh]
     remembered = store.ai_answers(keys) if store is not None else {}
     sizes = {
         order.row.stt: remembered[key] for order in orders if (key := (order.row.id, order.row.title)) in remembered
@@ -77,10 +82,14 @@ def sizes_for(
     say(f"Đang ước lượng độ lớn bằng {options.ai}… ({len(todo)} đơn)")
     prompt = build_prompt(todo, examples)
     reply = ai_cli.run_ai(options.ai, prompt, model=options.ai_model, timeout=options.ai_timeout)
-    fresh, findings, note = parse_reply(reply, todo)
+    sized, findings, note = parse_reply(reply, todo)
     if store is not None and reply.failure is None:
-        store.save_ai_answers({(o.row.id, o.row.title): fresh[o.row.stt] for o in todo if o.row.id}, options.ai, now)
-    sizes.update(fresh)
+        store.save_ai_answers(
+            {(o.row.id, o.row.title): sized[o.row.stt] for o in todo if o.row.id and o.row.stt not in fresh},
+            options.ai,
+            now,
+        )
+    sizes.update(sized)
     if remembered:
         valid = sum(not estimate.is_default for estimate in sizes.values())
         note = (

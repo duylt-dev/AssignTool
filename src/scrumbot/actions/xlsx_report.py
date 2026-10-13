@@ -10,8 +10,9 @@ from openpyxl import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
 from scrumbot.actions.workbook import date_format, finish, save, slug, table
-from scrumbot.model import Level, Result
+from scrumbot.model import Result
 from scrumbot.model_risk import LEVEL_TEXT
+from scrumbot.normalize import LEVEL_NAMES
 from scrumbot.understanding.sizing import ORDER_TYPES
 
 EXTRA_HEADERS = (
@@ -47,13 +48,6 @@ DEV_HEADERS = (
     "Sức chứa còn lại (h)",
     "Giờ việc còn lại (h)",
 )
-LEVEL_NAMES = {
-    Level.JUNIOR: "junior",
-    Level.JUNIOR_PLUS: "junior+",
-    Level.MIDDLE: "middle",
-    Level.MIDDLE_PLUS: "middle+",
-    Level.SENIOR: "senior",
-}
 
 
 def report_name(sheet_name: str, now: datetime) -> str:

@@ -128,6 +128,18 @@ class Order:
 
 
 @dataclass(frozen=True, slots=True)
+class OrderDraft:
+    """An order file written by BA/MO (bot spec §7.1). Text is NFC-normalised; empty fields are ""/None."""
+
+    title: str  # the `#` line, else the file name without suffix
+    order_id: str  # `ID`: the order on the system
+    app: str
+    priority_raw: str
+    due: date | None
+    description: str  # every other line, as written
+
+
+@dataclass(frozen=True, slots=True)
 class SprintLabel:
     """One sprint an order belongs to, e.g. "Sprint 10 (10/6 - 10/17)" (assignment spec §5, A24).
 

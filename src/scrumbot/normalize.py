@@ -19,6 +19,7 @@ _LEVELS = {
     "middle+": Level.MIDDLE_PLUS,
     "senior": Level.SENIOR,
 }
+LEVEL_NAMES = {level: name for name, level in _LEVELS.items()}  # Level → the text of devs.xlsx
 _PRIORITIES = {
     "": Priority.NORMAL,
     "urgent": Priority.URGENT,
