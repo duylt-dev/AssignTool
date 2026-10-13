@@ -6,7 +6,13 @@ thống nội bộ (server **dev**), rồi làm **hai việc**:
 1. **Đề xuất PIC** (dev chịu trách nhiệm chính) cho mỗi đơn gốc còn trống.
 2. **Lập sổ rủi ro** của sprint: quá tải, trễ hạn, kẹt trạng thái, QA trả về nhiều, PIC vắng, đơn đổi so với hôm trước.
 
-Kết quả là **một file Excel**. TM đọc file này rồi tự nhập PIC vào hệ thống, vì bot chưa ghi được gì vào hệ thống.
+Có hai lệnh:
+
+- **`scrumbot run`**: giao cả sprint, kết quả là **một file Excel**.
+- **`scrumbot assign <file đơn>`**: giao **một đơn** do BA/MO viết trong file `.md`, kết quả là **`output/output.md`**
+  (PIC, lý do, 2 người dự phòng, so sánh dev, rủi ro và phương án dự phòng).
+
+TM đọc kết quả rồi tự nhập PIC vào hệ thống, vì bot chưa ghi được gì vào hệ thống.
 
 > **Đơn** = task gốc trên board Maintain, ứng với một version của một app. **Pool** = 4 dev Android có
 > `Nhận việc` = `Y` trong `input/devs.xlsx`. QA, RnD và TM không bao giờ được đề xuất.
@@ -15,7 +21,7 @@ Kết quả là **một file Excel**. TM đọc file này rồi tự nhập PIC 
 
 | | Nội dung |
 |---|---|
-| **Làm** | Giao PIC cho đơn trống · sổ rủi ro 10 mã · nhớ đề xuất và trạng thái đơn giữa các lần chạy để thấy cái gì đã đổi · một báo cáo Excel |
+| **Làm** | Giao PIC cho đơn trống · sổ rủi ro 10 mã · nhớ đề xuất và trạng thái đơn giữa các lần chạy để thấy cái gì đã đổi · báo cáo Excel cho cả sprint (`run`) · `output/output.md` cho một đơn BA/MO viết trong file `.md` (`assign`, D60) |
 | **Không làm** | Ghi vào hệ thống · giao bug hoặc subtask · đổi đơn đã có người làm · báo gì về người ngoài pool · đọc server production |
 | **Đã bỏ** (13/10/2026, `confirm.md` D59) | Chạy theo lịch 30 phút, báo cáo cuối sprint, clone + replay sprint cũ, chạy bằng file export Excel, bộ đánh giá `eval/`. Code vẫn còn trong lịch sử git (commit `7b2fa0d`). |
 
@@ -93,6 +99,20 @@ uv run scrumbot run --today 2026-10-15   # như thể hôm nay là 15/10; không
 uv run scrumbot run --help               # mọi tuỳ chọn (--sprint-id, --input, --devs, --rules, --out, --state, -v)
 ```
 
+**Giao một đơn từ file của BA/MO** (3 bước):
+
+1. Chuẩn bị: `.env` có token, `input/devs.xlsx` đúng, file đơn đặt trong `input/don/` (mẫu ở mục 5).
+2. Chạy:
+   ```bash
+   uv run scrumbot assign input/don/req_from_ba_test.md --ai agy --ai-timeout 400
+   ```
+   Lần đầu trong ngày `agy` phải ước lượng mọi đơn của sprint (khoảng 5–6 phút với 7 đơn); các lần sau chỉ còn đơn
+   trong file (khoảng 2 phút). `--ai off` thì không gọi AI, mọi đơn tính là M.
+3. Đọc `output/output.md`. Lần chạy sau ghi đè file này.
+
+`assign` dùng cùng luật giao PIC và sổ rủi ro với `run`, trên cả sprint đang chạy, nên tải và rủi ro là của sprint
+thật cộng thêm đơn này. Nó không lưu đề xuất vào bộ nhớ: muốn bot giữ đề xuất thì chạy `run`.
+
 Lỗi API hoặc lỗi input dừng lần chạy với mã thoát `2` và một câu tiếng Việt nói rõ lỗi.
 
 ## 5. Input
@@ -119,7 +139,35 @@ AI**. Luật sai hoặc mâu thuẫn thì bot dừng và chỉ đúng dòng.
 
 Mỗi luật có thể kèm `Từ ngày` / `Đến ngày`. Cú pháp đầy đủ: [`docs/assignment-spec.md`](docs/assignment-spec.md) §14.
 
-## 6. Output: `output/assignment_<sprint>_<YYYYMMDD-HHMMSS>.xlsx`
+**File đơn** (cho `assign`; đặt trong `input/don/`, đọc **không dùng AI**):
+
+```markdown
+# Game Emulator - Chỉnh sửa và bổ sung luồng auto scan game
+
+| Trường | Giá trị |
+|---|---|
+| ID | |
+| App | Game Emulator |
+| Ưu tiên | high |
+| Hạn | 16/10/2026 |
+
+Mô tả tự do: nội dung đơn, link SRS, link Figma, …
+```
+
+Mọi trường đều không bắt buộc. Có `ID` thì bot lấy đơn đó trên hệ thống và chỉ thêm mô tả; không có `ID` mà tên trùng
+một đơn trong sprint thì nối vào đơn đó; không trùng thì coi là **đơn mới** chưa lên hệ thống. Trước khi gửi cho AI,
+bot thay link bằng loại link (`[link Figma]`, `[link Google Docs]`, …) và thay tên người bằng `[người]`.
+
+## 6. Output
+
+### `scrumbot assign`: `output/output.md`
+
+Kết luận (PIC đề xuất, lý do, dự phòng, độ lớn) · thông tin đơn và mô tả AI đã đọc · bảng so sánh 4 dev (quen app, số
+đơn, giờ việc còn lại / sức chứa, việc dở, ngày nghỉ, vai trò) · rủi ro của đơn, của PIC và của sprint, mỗi rủi ro có
+**Phòng ngừa** và **Nếu xảy ra** · rủi ro kỹ thuật AI nhận xét · cảnh báo dữ liệu. Chi tiết:
+[`docs/bot-spec.md`](docs/bot-spec.md) §7.
+
+### `scrumbot run`: `output/assignment_<sprint>_<YYYYMMDD-HHMMSS>.xlsx`
 
 | Sheet | Nội dung |
 |---|---|

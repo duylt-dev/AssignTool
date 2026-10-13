@@ -54,6 +54,7 @@ exactly as the tool must print it.
 ```
 scrumbot run [--input DIR] [--devs FILE] [--rules FILE] [--sprint-id ID] [--today DATE] [--state DIR] [--out DIR]
              [--ai gemini|agy|off] [--ai-model NAME] [--ai-timeout SECONDS] [-v]
+scrumbot assign <order file> [the same options]
 ```
 
 Every option is in bot spec §1. `--today DATE` (`YYYY-MM-DD` or `DD/MM/YYYY`, A35) is the run day of the history
@@ -61,7 +62,7 @@ window (§5.1) and of the rules day (§14.3); the report's file name still uses 
 `--ai off` sizes every order `M` (§6.4).
 
 **Input files** (A2, D29): in `--input`, `devs.xlsx` is the dev workbook (§4) and the only `*.md` is the TM rules file
-(§14); no `.md` means no rules. Discovery never guesses: no `devs.xlsx`, or several `.md` files, is an input error that
+(§14); no `.md` means no rules. The order file given to `assign` (bot spec §7) is never taken for the rules file. Discovery never guesses: no `devs.xlsx`, or several `.md` files, is an input error that
 names the candidates and the flag to use (`--devs`, `--rules`). Files whose names start with `~$` (Excel lock files)
 and `.` are ignored.
 
@@ -192,7 +193,8 @@ The child runs in a **fresh empty temporary directory** with the user's environm
 2. Up to 30 **examples**: history orders with hours > 0 (A19), the target sprint's apps first, then most recent
    first. Each line: app · title · hours. No names.
 3. The **orders**: each line `STT` · app · priority · title · description. The API returns no description today
-   (D50); when there is one, every URL is replaced by `[link]` and the text is cut to 600 characters.
+   (D50); only the order file of `assign` gives one, with links and names already replaced (bot spec §7.2). Every
+   URL left is replaced by `[link]` and the text is cut to 600 characters.
 4. If the prompt is longer than 30,000 characters, descriptions are cut to 200 characters, then dropped. This keeps
    the `agy` argument under Windows' 32,767-character command-line limit.
 

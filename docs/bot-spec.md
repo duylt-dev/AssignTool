@@ -4,7 +4,7 @@ What the scrum-master bot adds on top of the assignment core of [`assignment-spe
 the internal system's API, the risk register, the change log and memory between runs. [`LLM.md`](../LLM.md) says where each part lives in code;
 [`confirm.md`](../confirm.md) holds the decisions cited here (`Dn` user-locked, `An` defaults, `On` open).
 
-**Status:** written 2026-10-13 for stage 1 (D57); scope cut the same day (D59). User-facing text is Vietnamese (D12) and quoted exactly as the
+**Status:** written 2026-10-13 for stage 1 (D57); scope cut the same day (D59); `assign` added the same day (D60). User-facing text is Vietnamese (D12) and quoted exactly as the
 bot writes it. `<n>` is an order's STT, `<Mã>` a dev code, dates are `DD/MM/YYYY`, hours are whole numbers.
 
 | § | Contents |
@@ -15,14 +15,18 @@ bot writes it. `<n>` is an order's STT, `<Mã>` a dev code, dates are `DD/MM/YYY
 | 4 | Risk register |
 | 5 | Change log and memory between runs |
 | 6 | Report |
+| 7 | `assign`: one order file, one Markdown report |
 
 ---
 
-## 1 · Command
+## 1 · Commands
 
-One program, `scrumbot`, with one sub-command, `run` (D59). Without a sub-command it runs `run`. A run reads the system
-(§2), assigns (assignment spec §7), builds the risk register (§4), compares with the memory (§5) and writes the report
-to `--out` (§6).
+One program, `scrumbot`, with two sub-commands (D59, D60). Without a sub-command it runs `run`.
+
+- **`run`** reads the system (§2), assigns (assignment spec §7), builds the risk register (§4), compares with the
+  memory (§5) and writes the report to `--out` (§6).
+- **`assign <file>`** does the same for the running sprint with one order file of BA/MO placed in it, and writes one
+  Markdown report instead (§7). Same options as `run`.
 
 | Option | Default | Meaning |
 |---|---|---|
@@ -103,7 +107,7 @@ Every non-root task is a subtask of its nearest root; bugs belong to the tree of
 | status, status kind | the name and `kieu` of `trang_thai_id` |
 | `Người làm` | the names of `nguoi_lam_ids`; matched with `devs.xlsx` by name (A10) |
 | created, updated, closed | `ngay_tao`, `ngay_cap_nhat`, `ngay_dong` |
-| description | none: the API has none (D50) |
+| description | none: the API has none (D50); the order file of `assign` gives one (§7.2) |
 
 Status kinds for names found only in the history (renamed statuses) come from every status table read in the run
 (A74); an unknown name has no kind.
@@ -129,6 +133,7 @@ a new SDK or a store deadline). A wrong or missing extra key leaves the size unt
 `Ads`, `IAP`, `Luồng/UI`, `Policy`, `Crash`, `SDK`, `Tính năng`, `Khác`.
 
 A valid AI answer is remembered by order `id` + title (casefolded); the AI is called only for orders without one.
+The order of an `assign` file is the exception: always sized, never remembered (§7.2).
 `Độ lớn` then reads, e.g., `AI (agy, 6/6 đơn; 5 từ bộ nhớ)`. Defaults (`M`) are never remembered.
 
 ## 3 · Run day, base day, remaining days
@@ -329,3 +334,106 @@ Codes only, never names; a change between people outside the pool is not shown (
 **Terminal** (assignment spec §11) also prints `Nguồn: …` (with `dữ liệu mới nhất <date time>` for the API), the D50
 note, `Rủi ro: <x> cao · <y> trung bình · <z> thấp`, one line `CAO <code> <where>: <problem>` per `Cao` risk, and
 `Thay đổi: <k> dòng`.
+
+## 7 · `assign`: one order file, one Markdown report (D60)
+
+`scrumbot assign <file> [same options as run]`, e.g. `uv run scrumbot assign input/don/req.md --ai agy`. It answers
+one question for one order of BA/MO: who takes it, why, who backs up, and what may go wrong. Everything is decided as
+in `run`, on the whole running sprint, so the load and the risks are those of the real sprint plus this order.
+
+### 7.1 The order file (A82)
+
+A `.md` file, usually in `input/don/` (an order file at the top of `--input` is never taken for the TM rules file).
+Read by `sources/order_reader.py`, without AI.
+
+```markdown
+# Game Emulator - Chỉnh sửa và bổ sung luồng auto scan game
+
+| Trường | Giá trị |
+|---|---|
+| ID | |
+| App | Game Emulator |
+| Ưu tiên | high |
+| Hạn | 16/10/2026 |
+
+Free text: the description, links, anything.
+```
+
+- **Title:** the first `# ` line; without one, the file name without `.md`.
+- **Fields:** the first table whose header starts with `Trường`; keys `ID` (or `ID trên hệ thống`), `App` (or `App
+  Name`), `Ưu tiên`, `Hạn` (`YYYY-MM-DD` or `DD/MM/YYYY`), case-insensitive; an empty cell is an empty field. Every
+  field is optional.
+- **Description:** every other line, as written.
+
+| Input error (exit 2) | Message |
+|---|---|
+| The file is missing | `Không có file đơn '<file>'.` |
+| Unreadable | `Không đọc được file đơn '<file>': <reason>` |
+| Unknown key | `File đơn '<file>' dòng <n>: trường '<key>' không hợp lệ; dùng ID, App, Ưu tiên hoặc Hạn.` |
+| `Hạn` not a date | `File đơn '<file>': Hạn '<value>' không đọc được; dùng YYYY-MM-DD hoặc DD/MM/YYYY.` |
+
+### 7.2 The order in the sprint (A82, A83)
+
+1. `ID` given: the root order with that `id` in the running sprint; none is the input error
+   `Không có đơn gốc ID '<id>' trong <sprint>.`
+2. No `ID`: the root order of the running sprint whose title equals the file's title (`text_key`); two or more is the
+   input error `Có <k> đơn tên '<title>' trong <sprint>; ghi ID của đơn vào file đơn.`
+3. Neither: a **new order**, not yet on the system: an empty root (no `Người làm`, no status) with the file's title,
+   App, priority and `Hạn`, filed on the run day, numbered after the roots (subtasks and bugs move one STT down). Filed
+   after the sprint's first day, it counts toward `SCOPE-ADDED` (§4.2) like any order added mid-sprint.
+
+An order found on the system keeps its title, App, priority and `Hạn` from the API; the file only adds the
+description. A pre-assigned order stays as it is (D10): the report says who holds it.
+
+**What the AI reads** (A83): the description with every link replaced by `[link <kind>]` (`Figma`, `Google Docs`,
+`Google Sheets`, `Google Slides`, `Google Drive`, else `[link]`; a Markdown link keeps its label unless the label is a
+link), every known name replaced by `[người]` (the names and codes of `devs.xlsx` and every `Người làm` read from the
+API), every word shaped like a person's code (a capitalised word ending in one to three capitals: `TestBA`, `TiếnBV`;
+`GameUI` too) replaced by `[người]`, whitespace collapsed. The order of the file is **always sized by this call** and
+its answer is never remembered (§2.6): the same `id` and title may carry another description next time.
+
+**Memory** (A84): `assign` reads the memory like `run` (kept proposals, stored state, AI answers) but writes only the
+AI answers of the other orders; it stores no proposal, no outcome and no state. `run` stays the owner of §5.
+
+### 7.3 The report: `<--out>/output.md` (A85)
+
+Written to `output.md.tmp` and renamed; each run replaces the previous file. Sections, in this order:
+
+1. `# Giao đơn: <title>`, then `<sprint> (<start> – <end>) · chạy <dd/mm/yyyy HH:MM> · dữ liệu API mới nhất <…>`.
+2. **`## Kết luận`**: `PIC đề xuất: <Mã>`, `Lý do: <assignment spec §8>`, `Dự phòng: <Mã>, <Mã>` (or, for a
+   pre-assigned order, `Đã có người làm trên hệ thống: <codes or người ngoài team>. Bot giữ nguyên, không đề xuất PIC
+   khác.`), `Độ lớn (AI): <size> (<h>h)[ (mặc định)]: <AI reason>`, `Rủi ro liên quan: <x> cao · <y> trung bình · <z>
+   thấp`, and for a proposal `Bot chưa ghi được vào hệ thống: TM nhập PIC vào hệ thống.`
+3. **`## Thông tin đơn`**: `Đơn` (`Đơn mới, chưa có trên hệ thống (tính là STT <n> của <sprint>)` or `Đơn trên hệ
+   thống, ID <id>, STT <n> (nối theo ID|theo tên đơn)`), `File đơn`, `App`, `Ưu tiên`, `Hạn` (`trống` when empty),
+   `Loại đơn (AI)`, `Hạng mục (AI)`, `Mô tả AI đọc` (§7.2).
+4. **`## So sánh dev`**: one row per active dev: `Dev` · `Level` · `Quen <app>` (`Làm version gần nhất`, `Từng làm
+   (<k> version)`, `Chưa làm`; `—` without App) · `Đơn trong sprint` · `Giờ việc còn lại / sức chứa` (§4.1) · `Việc
+   dở <previous sprint>` · `Ngày nghỉ còn lại` · `Vai trò` (`PIC`, `Người làm`, `Dự phòng 1`, `Dự phòng 2`, `Nghỉ cả
+   sprint`, `Nghỉ hết các ngày còn lại`). Counts and hours include this order for its PIC.
+5. **`## Rủi ro và phương án dự phòng`**: the risks of this order, of its PIC (where = a PIC code) and of the sprint
+   (where = the sprint label): `Mức` · `Mã` · `Vấn đề` · `Ảnh hưởng` · `Phòng ngừa` (the `Đề xuất` of §4.2) · `Nếu
+   xảy ra` · `Ai xử lý` · `Hạn xử lý`; none: `Không có rủi ro liên quan tới đơn này, PIC hoặc sprint.` Then ``Sổ rủi ro
+   cả sprint: <x> cao · <y> trung bình · <z> thấp (chi tiết: `scrumbot run`).``
+6. **`## Rủi ro kỹ thuật (AI nhận xét, chỉ để tham khảo)`**: the AI's `tech_risks` (A79), or `Không có.`
+7. **`## Cảnh báo dữ liệu`**: every finding except those about another order, as ``- <WARN|INFO> `<code>`:
+   <message>``, or `Không có cảnh báo.`
+
+**`Nếu xảy ra`** (A85), one fixed sentence per code:
+
+| Code | Sentence |
+|---|---|
+| `CAPACITY-DEV` | `Chuyển đơn chưa bắt đầu sang dev còn trống giờ; không còn ai trống thì lùi hạn đơn ưu tiên thấp.` |
+| `CAPACITY-SPRINT` | `Chốt với BA/MO các đơn đẩy sang sprint sau; giữ lại đơn urgent/high.` |
+| `SCOPE-ADDED` | `Báo BA/MO dời hạn đơn mới hoặc tách bớt hạng mục sang sprint sau.` |
+| `CARRY-OVER` | `Làm xong việc dở trước; đơn mới chưa bắt đầu thì chuyển cho người dự phòng.` |
+| `PIC-UNFAMILIAR` | `Chuyển cho người dự phòng đã làm app, hoặc ghép người đó review code.` |
+| `PIC-ABSENT` | `Chuyển đơn cho người dự phòng ngay; không còn ai thì đẩy sang sprint sau.` |
+| `DUE-AT-RISK` | `Báo BA/MO lùi hạn hoặc cắt bớt hạng mục; cần thì thêm người hỗ trợ.` |
+| `STATUS-STUCK` | `Gặp người làm để gỡ vướng; vướng ở khâu test hoặc phát hành thì báo người phụ trách khâu đó.` |
+| `QA-RETURNS` | `Dừng gửi test; review code và tự test lại trước khi gửi QA lần nữa.` |
+| `ORDER-CHANGED` | `Ước lượng lại độ lớn và xác nhận lại hạn với BA/MO.` |
+
+**Terminal:** the lines of `run` up to `Lịch sử`, then `Đơn: <title> (đơn mới|đơn trên hệ thống <id>, STT <n> của
+<sprint>)`, `Độ lớn: <size>[ (mặc định)] · <sizing note>`, `PIC đề xuất: <Mã> (dự phòng: …)` or `Đã có người làm: …
+(giữ nguyên)`, `Rủi ro liên quan: …`, each WARN finding of the report, and `Báo cáo: <path>`.
