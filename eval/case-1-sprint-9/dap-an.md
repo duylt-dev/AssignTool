@@ -2,7 +2,7 @@
 
 Sinh bởi `eval/build_cases.py`; sửa ở đó, không sửa tay.
 
-Chạy: `uv run assigntool --input eval/case-1-sprint-9/input --today 2026-09-21 --history input/Tech_manager_T2-T10_2026.xlsx`
+Chạy: `uv run scrumbot run --source file --input eval/case-1-sprint-9/input --today 2026-09-21 --history input/Tech_manager_T2-T10_2026.xlsx`
 
 Đáp án: dev TM đã giao (khớp khi PIC là một trong số đó) và giờ thật (A37, A40).
 

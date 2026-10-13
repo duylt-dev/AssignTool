@@ -143,15 +143,24 @@ def real_case(slug: str, sheet_name: str, title: str) -> dict:
     workbook.save(case / "input" / f"Maintain_{sheet_name.replace(' ', '_')}_dung_lai.xlsx")
     write_devs(case / "input" / "devs.xlsx", {}, [])
     due_before = [o["stt"] for o, r in zip(orders, rows, strict=True) if _due_before(r)]
+    due_missing = [o["stt"] for o, r in zip(orders, rows, strict=True) if _due_missing(r)]
     return {
         "slug": slug,
         "title": title,
         "kind": "real",
         "args": ["--today", start, "--history", HISTORY],
         "orders": orders,
-        "findings": [{"code": "DUE-BEFORE-CREATED", "stt": s} for s in due_before],
+        "findings": [
+            *({"code": "DUE-BEFORE-CREATED", "stt": s} for s in due_before),
+            *({"code": "DUE-MISSING", "stt": s} for s in due_missing),
+        ],
         "watch": [],
     }  # fmt: skip
+
+
+def _due_missing(row: dict) -> bool:
+    """D53, bot spec §3: an urgent or high order without `Hạn`."""
+    return str(row["Ưu tiên"] or "").strip().casefold() in ("urgent", "high") and not row["Hạn"]
 
 
 def _due_before(row: dict) -> bool:
@@ -204,7 +213,7 @@ def synthetic_case(scenario: dict) -> dict:
 def write_answers(answer: dict) -> None:
     case = EVAL / answer["slug"]
     (case / "dap-an.json").write_text(json.dumps(answer, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    command = " ".join(["uv run assigntool --input", f"eval/{answer['slug']}/input", *answer["args"]])
+    command = " ".join(["uv run scrumbot run --source file --input", f"eval/{answer['slug']}/input", *answer["args"]])
     lines = [
         f"# {answer['slug']}: {answer['title']}",
         "",

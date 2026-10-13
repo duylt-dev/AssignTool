@@ -50,7 +50,8 @@ def main() -> int:
 
 def _run(case: Path, answer: dict, name: str, mode: str, out: Path, ai_timeout: int) -> dict:
     out.mkdir(parents=True, exist_ok=True)
-    command = [sys.executable, "-m", "assigntool", "--input", str(case / "input"), "--out", str(out), "--ai", mode]
+    command = [sys.executable, "-m", "scrumbot", "run", "--source", "file", "--input", str(case / "input")]
+    command += ["--out", str(out), "--ai", mode]
     command += ["--ai-timeout", str(ai_timeout)]
     started = time.monotonic()
     done = subprocess.run(

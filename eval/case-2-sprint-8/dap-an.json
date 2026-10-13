@@ -139,6 +139,11 @@
       "size_true": "M"
     }
   ],
-  "findings": [],
+  "findings": [
+    {
+      "code": "DUE-MISSING",
+      "stt": 61
+    }
+  ],
   "watch": []
 }

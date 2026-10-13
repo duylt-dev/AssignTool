@@ -2,7 +2,7 @@
 
 Sinh bởi `eval/build_cases.py`; sửa ở đó, không sửa tay.
 
-Chạy: `uv run assigntool --input eval/case-3-giua-sprint/input --today 2026-10-22 --history input/Tech_manager_T2-T10_2026.xlsx`
+Chạy: `uv run scrumbot run --source file --input eval/case-3-giua-sprint/input --today 2026-10-22 --history input/Tech_manager_T2-T10_2026.xlsx`
 
 Đáp án theo spec, tính tay cho lần `--ai off` (A37). Cột `TM điền` để trống cho TM (O10).
 
@@ -19,7 +19,7 @@ Chạy: `uv run assigntool --input eval/case-3-giua-sprint/input --today 2026-10
 | 10 | Auto click | 1.1.2 - Edit UI/Add tracking |  |  | AnTD | LinhNV, TiếnBV | M | |
 | 11 | live video 2 | 1.0.9 - Fix ads/Edit luồng |  |  | TiếnBV | LinhNV, AnTD | L | |
 
-Cảnh báo theo spec: `DEV-ON-LEAVE`, `PRE-ASSIGNED-ON-LEAVE` (STT 4)
+Cảnh báo theo spec: `DEV-ON-LEAVE`, `PRE-ASSIGNED-ON-LEAVE` (STT 4), `DUE-MISSING` (STT 7), `DUE-MISSING` (STT 9)
 
 Cần quan sát (không chấm):
 

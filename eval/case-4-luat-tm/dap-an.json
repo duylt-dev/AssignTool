@@ -188,6 +188,14 @@
     {
       "code": "RULE-NO-CANDIDATE",
       "stt": 10
+    },
+    {
+      "code": "DUE-MISSING",
+      "stt": 3
+    },
+    {
+      "code": "DUE-MISSING",
+      "stt": 4
     }
   ],
   "watch": [

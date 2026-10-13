@@ -213,6 +213,22 @@
     {
       "code": "PREV-SPRINT-MISSING",
       "stt": null
+    },
+    {
+      "code": "DUE-MISSING",
+      "stt": 5
+    },
+    {
+      "code": "DUE-MISSING",
+      "stt": 6
+    },
+    {
+      "code": "DUE-MISSING",
+      "stt": 7
+    },
+    {
+      "code": "DUE-MISSING",
+      "stt": 8
     }
   ],
   "watch": [

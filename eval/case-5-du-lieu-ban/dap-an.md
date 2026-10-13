@@ -2,7 +2,7 @@
 
 Sinh bởi `eval/build_cases.py`; sửa ở đó, không sửa tay.
 
-Chạy: `uv run assigntool --input eval/case-5-du-lieu-ban/input --today 2026-10-16 --history input/Tech_manager_T2-T10_2026.xlsx`
+Chạy: `uv run scrumbot run --source file --input eval/case-5-du-lieu-ban/input --today 2026-10-16 --history input/Tech_manager_T2-T10_2026.xlsx`
 
 Đáp án theo spec, tính tay cho lần `--ai off` (A37). Cột `TM điền` để trống cho TM (O10).
 
@@ -22,7 +22,7 @@ Chạy: `uv run assigntool --input eval/case-5-du-lieu-ban/input --today 2026-10
 | 13 | VPN | 1.1.8 - Fix IAP |  |  | TiếnBV | LinhNV, MinhNM | M | |
 | 14 | VPN | Crash khi xoay màn hình |  |  |  |  |  | |
 
-Cảnh báo theo spec: `APP-MISSING` (STT 8), `PRIORITY-UNKNOWN` (STT 10), `DUE-BEFORE-CREATED` (STT 12), `TYPE-UNKNOWN` (STT 14), `PREV-SPRINT-MISSING`
+Cảnh báo theo spec: `APP-MISSING` (STT 8), `PRIORITY-UNKNOWN` (STT 10), `DUE-BEFORE-CREATED` (STT 12), `TYPE-UNKNOWN` (STT 14), `PREV-SPRINT-MISSING`, `DUE-MISSING` (STT 5), `DUE-MISSING` (STT 6), `DUE-MISSING` (STT 7), `DUE-MISSING` (STT 8)
 
 Cần quan sát (không chấm):
 

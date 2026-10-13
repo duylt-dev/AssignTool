@@ -2,7 +2,7 @@
 
 Sinh bởi `eval/build_cases.py`; sửa ở đó, không sửa tay.
 
-Chạy: `uv run assigntool --input eval/case-2-sprint-8/input --today 2026-09-04 --history input/Tech_manager_T2-T10_2026.xlsx`
+Chạy: `uv run scrumbot run --source file --input eval/case-2-sprint-8/input --today 2026-09-04 --history input/Tech_manager_T2-T10_2026.xlsx`
 
 Đáp án: dev TM đã giao (khớp khi PIC là một trong số đó) và giờ thật (A37, A40).
 
@@ -20,4 +20,4 @@ Chạy: `uv run assigntool --input eval/case-2-sprint-8/input --today 2026-09-04
 | 65 | WifiHotspot | 1.2.4- Fix policy |  | giao sẵn (ngoài danh sách) |  |  |
 | 66 | Game mode | 1.1.1 - Fix policy native too small |  | LinhNV | 10 | M |
 
-Cảnh báo theo spec: không có
+Cảnh báo theo spec: `DUE-MISSING` (STT 61)

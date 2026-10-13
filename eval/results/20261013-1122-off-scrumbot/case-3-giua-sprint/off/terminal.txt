@@ -1,0 +1,20 @@
+Ngày chạy: 22/10/2026 (--today)
+Luật TM: không có
+Lịch sử: file Tech_manager_T2-T10_2026.xlsx (178 đơn gốc)
+Sprint: Sprint 11
+Độ lớn: tắt AI (mọi đơn M)
+Đơn: 10 · giao sẵn: 5 · tool đề xuất: 5 · cảnh báo: 3 WARN, 1 INFO
+STT 7 · QR Scanner 1.0.0 - Init project/Add ads/Add IAP [M] → LinhNV (dự phòng: AnTD, TiếnBV)
+STT 8 · Game Emulator 1.0.8 - Fix crash khi load ROM [M] → AnTD (dự phòng: LinhNV, TiếnBV)
+STT 9 · PS Remote 1.1.3 - Fix crash/Fix ANR [M] → TiếnBV (dự phòng: LinhNV, AnTD)
+STT 10 · Auto click 1.1.2 - Edit UI/Add tracking [M] → AnTD (dự phòng: LinhNV, TiếnBV)
+STT 11 · live video 2 1.0.9 - Fix ads/Edit luồng [M] → TiếnBV (dự phòng: LinhNV, AnTD)
+WARN DUE-MISSING: Đơn STT 7 là đơn urgent nhưng chưa có Hạn.
+WARN DUE-MISSING: Đơn STT 9 là đơn high nhưng chưa có Hạn.
+WARN PRE-ASSIGNED-ON-LEAVE: Đơn STT 4 giao sẵn cho MinhNM nhưng MinhNM nghỉ cả sprint; đơn chưa có ai làm, cân nhắc giao lại.
+Rủi ro: 4 cao · 5 trung bình · 1 thấp
+CAO CAPACITY-DEV AnTD: AnTD còn 48h việc (3 đơn), sức chứa còn 24h (4 ngày × 6h)
+CAO DUE-AT-RISK Đơn STT 8: Đơn STT 8 còn 2 ngày làm việc tới hạn 24/10/2026 nhưng vẫn "ready to progress"
+CAO PIC-ABSENT Đơn STT 4: Đơn STT 4 giao cho MinhNM nhưng MinhNM nghỉ các ngày còn lại của sprint (từ 22/10/2026)
+CAO SCOPE-ADDED Sprint 11: 5 đơn lên sau ngày đầu sprint (STT 7, 8, 9, 10, 11: 80h) làm tải vượt sức chứa (160h > 108h)
+Báo cáo: /Users/macbook/Desktop/AssignTools/eval/results/20261013-1122-off-scrumbot/case-3-giua-sprint/off/assignment_sprint-11_20261013-112259.xlsx

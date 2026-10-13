@@ -224,7 +224,8 @@ CASE_3 = {
         10: ("AnTD", ("LinhNV", "TiếnBV")),  # cap 2+1 lets everyone in; AnTD on the latest Auto click
         11: ("TiếnBV", ("LinhNV", "AnTD")),  # TiếnBV on the latest live video 2
     },
-    "findings": [("DEV-ON-LEAVE", None), ("PRE-ASSIGNED-ON-LEAVE", 4)],  # A43, added after the baseline run
+    # A43 added after the baseline run; DUE-MISSING (urgent/high without Hạn) added 2026-10-13 by D53
+    "findings": [("DEV-ON-LEAVE", None), ("PRE-ASSIGNED-ON-LEAVE", 4), ("DUE-MISSING", 7), ("DUE-MISSING", 9)],
     "watch": [
         "STT 4 giao sẵn cho MinhNM, người nghỉ cả sprint: đơn được giữ (D10). Lượt baseline không có cảnh báo nào; "
         "từ A43 có `PRE-ASSIGNED-ON-LEAVE`.",
@@ -405,7 +406,12 @@ CASE_4 = {
         11: ("TiếnBV", ("LinhNV",)),  # LinhNV capped (4 > 2+1); TiếnBV built an older VPN
         12: ("TiếnBV", ("LinhNV",)),  # TiếnBV on the latest live video 2
     },
-    "findings": [("RULE-DEV-UNAVAILABLE", None), ("RULE-NO-CANDIDATE", 10)],
+    "findings": [  # DUE-MISSING added 2026-10-13 by D53
+        ("RULE-DEV-UNAVAILABLE", None),
+        ("RULE-NO-CANDIDATE", 10),
+        ("DUE-MISSING", 3),
+        ("DUE-MISSING", 4),
+    ],
     "watch": [
         "STT 1 giao sẵn AR Dog cho TiếnBV dù luật chỉ định LinhNV: giữ nguyên (D10).",
         "STT 10: luật loại hết dev, A31 giao như không có luật Không giao/Tối đa đơn, nên MinhNM nhận đơn dù TM ghi "
@@ -574,6 +580,10 @@ CASE_5 = {
         ("DUE-BEFORE-CREATED", 12),
         ("TYPE-UNKNOWN", 14),
         ("PREV-SPRINT-MISSING", None),
+        ("DUE-MISSING", 5),  # D53 (2026-10-13): urgent or high without Hạn
+        ("DUE-MISSING", 6),
+        ("DUE-MISSING", 7),
+        ("DUE-MISSING", 8),
     ],
     "watch": [
         "STT 4 giao sẵn cho 'Bùi Văn Tiếng' (gõ sai tên TiếnBV): tool coi là người lạ, TiếnBV bị tính thiếu 1 đơn và "

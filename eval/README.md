@@ -1,6 +1,6 @@
 # Bộ đánh giá `eval/`
 
-Năm bộ input để chạy `assigntool`, chấm output so với đáp án, rồi cải thiện tool theo kết quả. Các quyết định nằm
+Năm bộ input để chạy `scrumbot run --source file` (đọc file export, `confirm.md` D51), chấm output so với đáp án, rồi cải thiện tool theo kết quả. Các quyết định nằm
 trong `confirm.md` A35–A42 và O10. Đây không phải test: lệch với TM là một con số trong bảng điểm, không làm `pytest`
 đỏ.
 

@@ -2,7 +2,7 @@
 
 Sinh bởi `eval/build_cases.py`; sửa ở đó, không sửa tay.
 
-Chạy: `uv run assigntool --input eval/case-4-luat-tm/input --today 2026-10-16 --history input/Tech_manager_T2-T10_2026.xlsx`
+Chạy: `uv run scrumbot run --source file --input eval/case-4-luat-tm/input --today 2026-10-16 --history input/Tech_manager_T2-T10_2026.xlsx`
 
 Đáp án theo spec, tính tay cho lần `--ai off` (A37). Cột `TM điền` để trống cho TM (O10).
 
@@ -21,7 +21,7 @@ Chạy: `uv run assigntool --input eval/case-4-luat-tm/input --today 2026-10-16 
 | 11 | VPN | 1.1.8 - Fix IAP/Fix luồng |  |  | TiếnBV | LinhNV | L | |
 | 12 | live video 2 | 1.0.9 - Edit UI | low |  | TiếnBV | LinhNV | S | |
 
-Cảnh báo theo spec: `RULE-DEV-UNAVAILABLE`, `RULE-NO-CANDIDATE` (STT 10)
+Cảnh báo theo spec: `RULE-DEV-UNAVAILABLE`, `RULE-NO-CANDIDATE` (STT 10), `DUE-MISSING` (STT 3), `DUE-MISSING` (STT 4)
 
 Cần quan sát (không chấm):
 

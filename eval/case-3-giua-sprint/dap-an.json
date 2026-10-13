@@ -153,6 +153,14 @@
     {
       "code": "PRE-ASSIGNED-ON-LEAVE",
       "stt": 4
+    },
+    {
+      "code": "DUE-MISSING",
+      "stt": 7
+    },
+    {
+      "code": "DUE-MISSING",
+      "stt": 9
     }
   ],
   "watch": [
