@@ -1,6 +1,12 @@
 # AI config: settings.json and .env hold GEMINI_API_KEY in plain text
 .claude/
 
+# Secrets: the internal system token (confirm.md D41, A54)
+.env
+
+# The bot's memory, cache, snapshots, clones, scheduled reports and logs: names of people (A51, A57)
+state/
+
 # Docs for AI agents, kept local (D18)
 LLM.md
 AGENTS.md
