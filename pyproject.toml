@@ -1,7 +1,7 @@
 [project]
 name = "scrumbot"
 version = "0.1.0"
-description = "Giao dev phụ trách (PIC) cho các đơn còn trống của sprint"
+description = "Bot scrum master: giao PIC cho đơn trống và lập sổ rủi ro sprint"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = ["openpyxl>=3.1"]
@@ -22,7 +22,6 @@ packages = ["src/scrumbot"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
-    "real_input: acceptance test on input/ (spec §12); skipped when the sample is absent",
     "ai: calls a real AI CLI; runs only when ASSIGNTOOL_TEST_AI names a tool (gemini or agy)",
 ]
 
@@ -30,7 +29,7 @@ markers = [
 line-length = 120
 target-version = "py311"
 src = ["src", "tests"]
-# Markdown is prose: ruff would rewrap the Python examples in docs/ and plans/ (seen with ruff 0.16).
+# Markdown is prose: ruff would rewrap the Python examples in docs/ (seen with ruff 0.16).
 extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
