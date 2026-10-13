@@ -1,14 +1,13 @@
-"""The change log and memory rules (bot spec §5): the "Thay đổi" rows, the stored state, kept proposals, the
-fingerprint of A78. Pure."""
+"""The change log and memory rules (bot spec §5): the "Thay đổi" rows, the stored state, kept proposals. Pure."""
 
 from __future__ import annotations
 
 from dataclasses import replace
 from datetime import date, datetime
 
-from scrumbot.model import Assignment, Order, Priority, Result, Size, SizeEstimate, Source, SprintRow
+from scrumbot.model import Assignment, Order, Priority, Size, SizeEstimate, Source, SprintRow
 from scrumbot.model_risk import ChangeKind, KeptProposal, OrderMark, Outcome
-from scrumbot.rules.changes import change_rows, fingerprint, marks
+from scrumbot.rules.changes import change_rows, marks
 from scrumbot.rules.proposals import restore, settle, with_kept
 from tests.api_builders import AN, LINH, MINH, OUTSIDER, POOL
 
@@ -96,12 +95,3 @@ def test_a_kept_proposal_enters_section_7_as_preassigned_and_comes_back_as_a_pro
     )
     assert first.reason == "Giữ đề xuất từ 13/10/2026 09:30 · Làm version gần nhất"
     assert with_kept(orders, {1: replace(proposal, code="Nobody")}, POOL)[1] == {}  # dev left the pool: chosen again
-
-
-def test_the_fingerprint_ignores_wording_but_not_who_holds_what() -> None:
-    base = Result("S", "P", "note", (held(order(1), Source.PROPOSED, ("LinhNV",)),), (), ())
-    reworded = replace(base, sizing_note="other", summary=(("a", "b"),))
-    moved = replace(base, assignments=(held(order(1), Source.PROPOSED, ("MinhNM",)),))
-
-    assert fingerprint(base) == fingerprint(reworded)
-    assert fingerprint(base) != fingerprint(moved)

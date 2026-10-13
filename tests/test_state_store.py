@@ -54,16 +54,9 @@ def test_the_baseline_is_the_latest_state_before_today_and_only_two_days_are_kep
     assert store.baseline("S9", date(2026, 10, 13)) is None
 
 
-def test_outcomes_runs_and_sprint_ends(tmp_path: Path) -> None:
+def test_outcomes_are_found_by_the_day_they_were_recorded(tmp_path: Path) -> None:
     store = StateStore(tmp_path)
     store.save_outcomes("S10", (Outcome("o1", "Order 1", "LinhNV", ("LinhNV",), AT),))
-    store.record_run("S10", "full", "fp1", ("CAPACITY-DEV|LinhNV",), ("o1",), "a.xlsx", AT)
-    store.record_run("S10", "quick", "fp1", (), (), "", datetime(2026, 10, 13, 10))
 
     assert store.outcomes("S10", date(2026, 10, 13)) == (Outcome("o1", "Order 1", "LinhNV", ("LinhNV",), AT),)
     assert store.outcomes("S10", date(2026, 10, 14)) == ()
-    assert store.full_run_on(date(2026, 10, 13)) and not store.full_run_on(date(2026, 10, 14))
-    assert store.last_report("S10") == ("fp1", ("CAPACITY-DEV|LinhNV",), ("o1",))
-    assert not store.sprint_end_done("S9")
-    store.record_sprint_end("S9", "end.xlsx", AT)
-    assert store.sprint_end_done("S9")

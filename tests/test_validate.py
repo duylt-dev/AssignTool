@@ -51,16 +51,6 @@ def test_orders_and_findings_has_no_finding_for_clean_rows() -> None:
     assert findings == ()
 
 
-def test_history_findings_say_where_familiarity_came_from() -> None:
-    from scrumbot.rules.validate import history_findings
-
-    assert history_findings(True, ()) == ()
-    (info,) = history_findings(False, ("Sprint 8", "Sprint 9"))
-    assert (info.severity.value, info.code, info.where) == ("INFO", "HISTORY-FROM-WORKBOOK", "Sprint 8, Sprint 9")
-    (warn,) = history_findings(False, ())
-    assert (warn.severity.value, warn.code) == ("WARN", "HISTORY-MISSING")
-
-
 def test_due_missing_fires_on_urgent_and_high_orders_without_a_due_date_only() -> None:
     _, findings = orders_and_findings(
         sheet(

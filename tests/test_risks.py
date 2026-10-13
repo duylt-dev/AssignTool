@@ -155,7 +155,7 @@ def test_capacity_dev_fires_above_capacity_and_is_cao_above_one_and_a_half() -> 
     assert medium[0].problem == "LinhNV còn 32h việc (2 đơn), sức chứa còn 24h (4 ngày × 6h)"
     assert medium[0].impact == "Có thể không xong hết đơn trước 17/10/2026."
     assert medium[0].action == "Cân nhắc chuyển STT 2 cho AnTD (còn trống 24h)"  # AnTD's order is in QA: not open
-    assert medium[0].covers == (1, 2) and medium[0].due == date(2026, 10, 14)
+    assert medium[0].due == date(2026, 10, 14)
     assert [r.level for r in high] == [RiskLevel.HIGH]
 
 

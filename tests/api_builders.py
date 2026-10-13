@@ -1,12 +1,9 @@
-"""Synthetic `/api/doc/` payloads in the API's real shapes (docs/api-doc-he-thong.md §4–§6), and a snapshot folder
-built from them. Nothing here comes from `input/` or the system: the four pool devs' names are configuration (spec
-§4), everybody else has a made-up name."""
+"""Synthetic `/api/doc/` payloads in the API's real shapes (docs/api-doc-he-thong.md §4–§6). Nothing here comes from
+`input/` or the system: the four pool devs' names are configuration (spec §4), everybody else has a made-up name."""
 
 from __future__ import annotations
 
-import json
 from datetime import date, datetime
-from pathlib import Path
 
 from scrumbot.model import Dev, Level
 from scrumbot.model_board import TECH_MANAGER_LIST
@@ -156,24 +153,3 @@ def history(*changes: tuple[str, str | None, str, datetime]) -> dict[str, object
         "comment": [],
         "nguoi": [],
     }
-
-
-def write_snapshot(
-    folder: Path,
-    sprint_list: dict[str, object],
-    lists: dict[str, dict[str, object]],
-    changes: dict[str, object] | None = None,
-    *,
-    kind: str = "snapshot",
-    fetched_at: datetime = datetime(2026, 10, 13, 9, 0),
-) -> Path:
-    """A folder in the layout of bot spec §2.4, plain `.json` (the reader accepts `.json` and `.json.gz`)."""
-    (folder / "don").mkdir(parents=True, exist_ok=True)
-    meta = {"kind": kind, "host": "test", "fetched_at": fetched_at.strftime("%Y-%m-%d %H:%M:%S")}
-    (folder / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
-    (folder / "sprints.json").write_text(json.dumps(sprint_list, ensure_ascii=False), encoding="utf-8")
-    for list_id, reply in lists.items():
-        (folder / "don" / f"{list_id}.json").write_text(json.dumps(reply, ensure_ascii=False), encoding="utf-8")
-    if changes is not None:
-        (folder / "lich-su.json").write_text(json.dumps(changes, ensure_ascii=False), encoding="utf-8")
-    return folder
