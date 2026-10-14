@@ -5,10 +5,10 @@
 .env
 
 # The bot's memory and list cache: names of people (A51, A57)
-state/
+/state/
 
 # Reports of assign: names and order data (A91)
-output/
+/output/
 
 # Docs for AI agents, kept local (D18)
 LLM.md

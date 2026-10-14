@@ -1,5 +1,5 @@
 """Command line (bot spec §1, §7, assignment spec §2, §11): parse, run `assign`, print, exit codes. The only module that
-prints; the flow hands its lines to `say`."""
+prints; `app.py` hands its lines to `say`."""
 
 from __future__ import annotations
 
@@ -11,10 +11,9 @@ import traceback
 from datetime import date, datetime
 from pathlib import Path
 
-from scrumbot.errors import AssignError, InputError
-from scrumbot.flows.assign_order import assign_order
-from scrumbot.flows.common import Options
-from scrumbot.normalize import parse_date
+from scrumbot.app import Options, run_assign
+from scrumbot.core.errors import AssignError, InputError
+from scrumbot.core.normalize import parse_date
 
 AI_TOOLS = ("gemini", "agy", "off")
 
@@ -38,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _dispatch(args: argparse.Namespace) -> int:
-    assign_order(_options(args), Path(args.file), _say, datetime.now())
+    run_assign(_options(args), Path(args.file), _say, datetime.now())
     return 0
 
 
