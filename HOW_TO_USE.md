@@ -8,7 +8,8 @@ hệ thống.
 scrumbot assign input/don/<file đơn>.md      # kết quả: output/output.md
 ```
 
-Muốn biết bot review và chọn PIC thế nào, đọc [`README.md`](README.md) mục 2.
+Muốn biết bot review và chọn PIC thế nào, đọc [`README.md`](README.md) mục 2. Flow 3 module Input → AI → Output và cách
+thay từng module: README mục 4. TM tích hợp phần lõi vào website: README mục 6.
 
 ## 1. Cài đặt (làm một lần)
 
@@ -213,8 +214,10 @@ Ghi chú tự do ngoài bảng thì bot bỏ qua.
    ```bash
    scrumbot assign input/don/req_from_ba_test.md
    ```
-   (trong repo: `uv run scrumbot assign … --ai agy --ai-timeout 400`). Lần đầu trong ngày, AI phải ước lượng mọi đơn
-   của sprint (với `agy` khoảng 5–6 phút cho 7 đơn). Các lần sau chỉ còn đơn trong file. Vội thì dùng `--ai off`.
+   (trong repo: `uv run scrumbot assign … --ai agy --ai-timeout 400`). Lần chạy đầu trên một máy (hoặc sau khi xoá
+   `state/`), AI phải ước lượng mọi đơn của sprint (với `agy` khoảng 5–6 phút cho 7 đơn). Bot nhớ câu trả lời theo ID
+   và tên đơn, nên các lần sau AI chỉ ước lượng đơn trong file cùng các đơn mới hoặc đổi tên. Trong lúc chờ, terminal
+   in `Đang ước lượng độ lớn bằng <AI>… (<n> đơn)`. Vội thì dùng `--ai off`.
 3. Mở `output/output.md` (mục 6):
    - **`Review: chưa đạt`**: sửa từng mục được liệt kê trong file đơn (hoặc trên hệ thống, nếu đơn đã có ở đó), rồi
      chạy lại bước 2. Lúc này bot chưa gọi AI nên xong ngay.
@@ -281,8 +284,8 @@ hoặc tắt thì đơn tính là `M` và lần chạy vẫn tiếp tục.
 
 ### 6.2 Terminal và mã thoát
 
-Terminal in tóm tắt: nguồn dữ liệu, file luật, đơn, kết quả review, độ lớn, PIC đề xuất, rủi ro, các cảnh báo, đường
-dẫn kết quả.
+Terminal in tóm tắt: nguồn dữ liệu, file luật, lịch sử, đơn, kết quả review, độ lớn, PIC đề xuất, rủi ro, các cảnh
+báo, đường dẫn kết quả.
 
 | Mã thoát | Khi nào |
 |---|---|
@@ -295,13 +298,17 @@ dẫn kết quả.
 | Bạn thấy | Làm gì |
 |---|---|
 | `scrumbot: command not found` | `uv tool update-shell`, mở terminal mới (mục 1.1) |
-| `Thiếu SCRUMBOT_API_TOKEN …` | Chưa đứng trong thư mục làm việc, hoặc thiếu `.env` (mục 1.1) |
-| `Không tìm thấy file devs.xlsx …` | Chưa đứng trong thư mục làm việc, hoặc thiếu `input/devs.xlsx` |
+| `Không có file đơn '…'` | Sai đường dẫn file đơn, hoặc chưa `cd` vào thư mục làm việc |
+| `Không có thư mục input 'input'` | Chưa `cd` vào thư mục làm việc (mục 1.1) |
+| `Không tìm thấy file devs.xlsx …` | Thiếu `input/devs.xlsx`, hoặc file bị đổi tên (ví dụ `devs (1).xlsx`) |
+| `Thiếu SCRUMBOT_API_TOKEN …` | Thiếu `.env` trong thư mục làm việc (mục 1.1) |
 | `API từ chối token (401)` | Token đã đổi: xin người giữ tool `.env` mới |
 | `API vẫn giới hạn tải (429)` hoặc lỗi server (5xx) | Chạy lại sau ít phút |
 | `Có nhiều … Chỉ định một file bằng --rules` | Chỉ để một file luật `.md` trong `input/`, hoặc dùng `--rules` |
+| `File '…' không có bảng luật …` | Một file `.md` không phải luật (thường là file đơn) nằm thẳng trong `input/`: chuyển nó vào `input/don/` |
 | `File đơn … trường '…' không hợp lệ` | Bảng trong file đơn chỉ dùng `ID`, `App`, `Ưu tiên`, `Hạn` |
 | `Có <k> đơn tên '…' trong …` | Nhiều đơn trùng tên: ghi `ID` của đơn vào file đơn |
+| `Không có đơn gốc ID '…' trong …` | ID sai, hoặc đơn không thuộc sprint đang chạy: sửa ID, để trống ID, hoặc dùng `--sprint-id` |
 | AI chạy lâu hoặc hết giờ | Tăng `--ai-timeout 400`, hoặc chạy `--ai off` |
 | Một dev có tải thấp bất thường | `Tên` trong `devs.xlsx` viết khác hệ thống (mục 3.1), hoặc PIC lần trước chưa được nhập vào hệ thống |
 | Muốn xem bot làm gì khi lỗi | Thêm `-v` |
