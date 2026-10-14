@@ -1,4 +1,4 @@
-"""Pure assembly of the rule outputs into one report result (assignment spec §7–§10, bot spec §3–§5)."""
+"""Pure assembly of the rule outputs into one result (assignment spec §7–§9, bot spec §3–§4)."""
 
 from __future__ import annotations
 
@@ -17,15 +17,12 @@ from scrumbot.model import (
     SprintSheet,
     TeamRule,
 )
-from scrumbot.model_risk import KeptProposal, OrderMark, Outcome
 from scrumbot.rules.assign import assign
 from scrumbot.rules.capacity import capacities, dev_loads
 from scrumbot.rules.carry_over import carry_over
-from scrumbot.rules.changes import change_rows
 from scrumbot.rules.familiarity import FamiliarityIndex
 from scrumbot.rules.leave import leave_count, on_leave_all_sprint, pre_assigned_on_leave, working_days
 from scrumbot.rules.pic_risks import suggester
-from scrumbot.rules.proposals import restore, with_kept
 from scrumbot.rules.risk_register import RiskContext, register
 from scrumbot.rules.summary import summarize
 from scrumbot.rules.team_rules import relaxed_findings, rules_day, unavailable_findings
@@ -72,11 +69,8 @@ def build_result(
     rules: tuple[TeamRule, ...] = (),
     run_day: date | None = None,
     now: datetime | None = None,
-    kept: dict[int, KeptProposal] | None = None,
-    baseline: tuple[OrderMark, ...] | None = None,
-    outcomes: tuple[Outcome, ...] = (),
 ) -> Result:
-    """Leave exclusion, §7 with kept proposals, the risk register and the change rows. `rules` are those in force.
+    """Leave exclusion, §7 and the risk register. `rules` are those in force.
 
     Without `run_day` the run is read as the sprint's first day (`team_for`)."""
     team = team_for(devs, target, run_day)
@@ -111,8 +105,7 @@ def build_result(
     fam = FamiliarityIndex.build(history, pool)
     carry = carry_over(prev, active)
     leave = {dev.code: leave_count(dev, rest or days) for dev in active}
-    for_rule, used = with_kept(orders, kept or {}, pool)
-    assignments = restore(assign(for_rule, sizes, pool, fam, carry, leave, prev_name, rules), orders, used)
+    assignments = assign(orders, sizes, pool, fam, carry, leave, prev_name, rules)
     extra += [*unavailable_findings(rules, devs, pool), *relaxed_findings(assignments)]
     context = RiskContext(
         sheet=target,
@@ -127,7 +120,6 @@ def build_result(
         rest=rest,
         now=now or datetime.combine(base, MORNING),
         suggest=suggester(orders, assignments, sizes, pool, fam, carry, leave, prev_name, rules),
-        baseline=baseline,
     )
     risks = register(context)
     summaries = summarize(devs, pool, days, carry, leave, assignments, fam, capacities(context), dev_loads(context))
@@ -137,5 +129,4 @@ def build_result(
             key=lambda finding: (0 if finding.severity is Severity.WARN else 1, finding.code, finding.where),
         )
     )
-    changes = change_rows(assignments, baseline, outcomes, active) if baseline is not None else ()
-    return Result(target.name, prev_name, sizing_note, assignments, ordered_findings, summaries, risks, changes)
+    return Result(target.name, prev_name, sizing_note, assignments, ordered_findings, summaries, risks)

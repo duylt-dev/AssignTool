@@ -1,7 +1,5 @@
-"""The memory between runs (bot spec §5, A51): one SQLite file in `state/`. The only module that imports sqlite3.
-
-Tables: kept proposals (A66), AI answers by order id + title (A67), the per-day state of each order (A62),
-and the outcomes of proposals (bot spec §5.2).
+"""The AI answers between runs (bot spec §5, A51, A67): one SQLite file in `state/`. The only module that imports
+sqlite3. A file written by an older version may hold more tables; they are left alone.
 """
 
 from __future__ import annotations
@@ -9,30 +7,20 @@ from __future__ import annotations
 import json
 import sqlite3
 from contextlib import closing
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 
 from scrumbot.errors import InputError
 from scrumbot.model import Size, SizeEstimate
-from scrumbot.model_risk import KeptProposal, OrderMark, Outcome
 from scrumbot.normalize import clean
 
 FILE = "scrumbot.sqlite"
 _TIME = "%Y-%m-%d %H:%M:%S"
 _SCHEMA = """
-CREATE TABLE IF NOT EXISTS proposals (
-    order_id TEXT PRIMARY KEY, sprint_id TEXT NOT NULL, code TEXT NOT NULL, reason TEXT NOT NULL,
-    backups TEXT NOT NULL, at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS ai_answers (
     order_id TEXT NOT NULL, title_key TEXT NOT NULL, size TEXT NOT NULL, reason TEXT NOT NULL, kind TEXT NOT NULL,
     items TEXT NOT NULL, tech_risks TEXT NOT NULL, tool TEXT NOT NULL, at TEXT NOT NULL,
     PRIMARY KEY (order_id, title_key));
-CREATE TABLE IF NOT EXISTS order_marks (
-    sprint_id TEXT NOT NULL, day TEXT NOT NULL, order_id TEXT NOT NULL, title TEXT NOT NULL, priority TEXT NOT NULL,
-    due TEXT, codes TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (sprint_id, day, order_id));
-CREATE TABLE IF NOT EXISTS outcomes (
-    order_id TEXT PRIMARY KEY, sprint_id TEXT NOT NULL, title TEXT NOT NULL, proposed TEXT NOT NULL,
-    actual TEXT NOT NULL, at TEXT NOT NULL);
 """
 
 
@@ -47,23 +35,6 @@ class StateStore:
                 connection.executescript(_SCHEMA)
         except sqlite3.DatabaseError as error:
             raise InputError(f"Không mở được bộ nhớ '{self.path}': {error}") from error
-
-    # A66: kept proposals
-    def proposals(self, sprint_id: str) -> tuple[KeptProposal, ...]:
-        rows = self._all("SELECT order_id, code, reason, backups, at FROM proposals WHERE sprint_id = ?", (sprint_id,))
-        return tuple(KeptProposal(row[0], row[1], row[2], tuple(json.loads(row[3])), _time(row[4])) for row in rows)
-
-    def save_proposals(self, sprint_id: str, proposals: tuple[KeptProposal, ...]) -> None:
-        self._many(
-            "INSERT OR REPLACE INTO proposals VALUES (?, ?, ?, ?, ?, ?)",
-            [
-                (item.order_id, sprint_id, item.code, item.reason, json.dumps(item.backups), item.at.strftime(_TIME))
-                for item in proposals
-            ],
-        )
-
-    def forget_proposals(self, order_ids: tuple[str, ...]) -> None:
-        self._many("DELETE FROM proposals WHERE order_id = ?", [(order_id,) for order_id in order_ids])
 
     # A67: AI answers
     def ai_answers(self, keys: list[tuple[str, str]]) -> dict[tuple[str, str], SizeEstimate]:
@@ -100,70 +71,6 @@ class StateStore:
             ],
         )
 
-    # A62: per-day state of the orders
-    def baseline(self, sprint_id: str, today: date) -> tuple[tuple[OrderMark, ...], datetime] | None:
-        """The latest state stored before `today` for this sprint, with the time it was stored."""
-        row = self._one(
-            "SELECT day FROM order_marks WHERE sprint_id = ? AND day < ? ORDER BY day DESC LIMIT 1",
-            (sprint_id, today.isoformat()),
-        )
-        if row is None:
-            return None
-        rows = self._all(
-            "SELECT order_id, title, priority, due, codes, at FROM order_marks WHERE sprint_id = ? AND day = ?",
-            (sprint_id, row[0]),
-        )
-        marks = tuple(
-            OrderMark(r[0], r[1], r[2], date.fromisoformat(r[3]) if r[3] else None, tuple(json.loads(r[4])))
-            for r in rows
-        )
-        return marks, max(_time(r[5]) for r in rows)
-
-    def save_marks(self, sprint_id: str, marks: tuple[OrderMark, ...], now: datetime) -> None:
-        """Replace today's state of the sprint; keep only the two latest days."""
-        day = now.date().isoformat()
-        with closing(self._connect()) as connection, connection:
-            connection.execute("DELETE FROM order_marks WHERE sprint_id = ? AND day = ?", (sprint_id, day))
-            connection.executemany(
-                "INSERT INTO order_marks VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                [
-                    (
-                        sprint_id,
-                        day,
-                        mark.id,
-                        mark.title,
-                        mark.priority_raw,
-                        mark.due.isoformat() if mark.due else None,
-                        json.dumps(mark.codes),
-                        now.strftime(_TIME),
-                    )
-                    for mark in marks
-                ],
-            )
-            connection.execute(
-                "DELETE FROM order_marks WHERE sprint_id = ? AND day NOT IN "
-                "(SELECT DISTINCT day FROM order_marks WHERE sprint_id = ? ORDER BY day DESC LIMIT 2)",
-                (sprint_id, sprint_id),
-            )
-
-    # bot spec §5.2: outcomes
-    def save_outcomes(self, sprint_id: str, outcomes: tuple[Outcome, ...]) -> None:
-        self._many(
-            "INSERT OR REPLACE INTO outcomes VALUES (?, ?, ?, ?, ?, ?)",
-            [
-                (item.order_id, sprint_id, item.title, item.proposed, json.dumps(item.actual), item.at.strftime(_TIME))
-                for item in outcomes
-            ],
-        )
-
-    def outcomes(self, sprint_id: str, day: date | None = None) -> tuple[Outcome, ...]:
-        """Outcomes of a sprint, or only those recorded on `day`."""
-        rows = self._all(
-            "SELECT order_id, title, proposed, actual, at FROM outcomes WHERE sprint_id = ? ORDER BY at", (sprint_id,)
-        )
-        found = (Outcome(r[0], r[1], r[2], tuple(json.loads(r[3])), _time(r[4])) for r in rows)
-        return tuple(item for item in found if day is None or item.at.date() == day)
-
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.path, timeout=30)
 
@@ -180,10 +87,6 @@ class StateStore:
             return
         with closing(self._connect()) as connection, connection:
             connection.executemany(query, rows)
-
-
-def _time(value: object) -> datetime:
-    return datetime.strptime(str(value), _TIME)
 
 
 def _title_key(title: str) -> str:

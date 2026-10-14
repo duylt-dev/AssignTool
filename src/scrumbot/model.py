@@ -1,6 +1,6 @@
 """Core value objects shared by sources, rules and actions (LLM.md §2). No I/O here.
 
-API items live in `model_board.py`; risks and changes in `model_risk.py`.
+API items live in `model_board.py`; risks in `model_risk.py`.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from datetime import date, datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from scrumbot.model_risk import Change, Risk
+    from scrumbot.model_risk import Risk
 
 
 class Level(enum.IntEnum):
@@ -199,6 +199,7 @@ class SizeEstimate:
     items: tuple[str, ...] = ()  # AI work items
     tech_risks: tuple[str, ...] = ()  # AI technical risks; shown, never scored (A79)
     remembered: bool = False  # taken from the memory of A67 instead of this run's AI call
+    questions: tuple[str, ...] = ()  # AI questions to the person who filed the order (A90); never remembered
 
 
 @dataclass(frozen=True, slots=True)
@@ -212,12 +213,11 @@ class Assignment:
     backups: tuple[str, ...]  # codes, at most 2; empty for PREASSIGNED
     rule_lines: tuple[int, ...] = ()  # lines of the TM rules that shaped the choice
     rules_relaxed: bool = False  # the rules left no candidate, so EXCLUDE and MAX_ORDERS were ignored (A31)
-    kept: bool = False  # a proposal remembered from an earlier run (A66)
 
 
 @dataclass(frozen=True, slots=True)
 class DevSummary:
-    """One row of the "Tải dev" sheet (spec §10)."""
+    """One dev in the dev table of output.md (bot spec §7.4)."""
 
     dev: Dev
     carry_over: int
@@ -250,6 +250,3 @@ class Result:
     findings: tuple[Finding, ...]
     devs: tuple[DevSummary, ...]
     risks: tuple[Risk, ...] = ()  # bot spec §4, sorted
-    changes: tuple[Change, ...] = ()  # bot spec §5.3
-    change_note: str = ""  # first row of the "Thay đổi" sheet
-    summary: tuple[tuple[str, str], ...] = ()  # rows of the "Tóm tắt" sheet, filled by the flow (bot spec §6)

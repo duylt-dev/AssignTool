@@ -1,4 +1,4 @@
-"""Build and parse the AI exchange: size (assignment spec §6.4) and understanding (bot spec §2.6). Pure."""
+"""Build and parse the AI exchange: size (assignment spec §6.4), understanding and questions (bot spec §2.6). Pure."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ DESC_LIMITS = (600, 200, 0)
 MAX_EXAMPLES = 30
 MAX_ITEMS = 5
 MAX_TECH_RISKS = 2
+MAX_QUESTIONS = 2
 ORDER_TYPES = {
     "ads": "Ads",
     "iap": "IAP",
@@ -47,11 +48,13 @@ Orders to size:
 
 For every order also give its type (ads, iap, flow_ui, policy, crash, sdk, feature or other), its work items (at most
 5, a few words each, as written in the order) and at most 2 technical risks visible from the text (a new SDK, a store
-or policy deadline, a new app), in Vietnamese; give an empty list when none is visible.
+or policy deadline, a new app), in Vietnamese; give an empty list when none is visible. For an order with a
+description, also give at most 2 short questions in Vietnamese to the person who filed it, about what the description
+leaves unclear for doing the work; give an empty list when the order has no description or nothing is unclear.
 
 Reply with only a JSON array, no prose and no code fence, one element per order:
 [{{\"stt\": <STT number>, \"size\": \"S|M|L|XL\", \"reason\": \"<at most 20 words, in Vietnamese>\",
-  \"type\": \"<type>\", \"items\": [\"<item>\"], \"tech_risks\": [\"<risk>\"]}}]
+  \"type\": \"<type>\", \"items\": [\"<item>\"], \"tech_risks\": [\"<risk>\"], \"questions\": [\"<question>\"]}}]
 """
 
 
@@ -102,6 +105,7 @@ def parse_reply(reply: AiReply, orders: tuple[Order, ...]) -> tuple[dict[int, Si
             _order_type(item.get("type")),
             _strings(item.get("items"), MAX_ITEMS),
             _strings(item.get("tech_risks"), MAX_TECH_RISKS),
+            questions=_strings(item.get("questions"), MAX_QUESTIONS, width=200),
         )
 
     missing = sorted(stt for stt, estimate in sizes.items() if estimate.is_default)
@@ -126,10 +130,10 @@ def _order_type(value: object) -> str:
     return key if key in ORDER_TYPES else ""
 
 
-def _strings(value: object, limit: int) -> tuple[str, ...]:
+def _strings(value: object, limit: int, width: int = 80) -> tuple[str, ...]:
     if not isinstance(value, list):
         return ()
-    return tuple(text[:80] for text in (clean(item) for item in value if isinstance(item, str)) if text)[:limit]
+    return tuple(text[:width] for text in (clean(item) for item in value if isinstance(item, str)) if text)[:limit]
 
 
 def _example_lines(orders: tuple[Order, ...], history: tuple[HistoryOrder, ...]) -> str:

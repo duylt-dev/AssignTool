@@ -10,7 +10,7 @@ class InputError(AssignError):
 
 
 class NoRunningSprint(InputError):
-    """No Maintain sprint is running on the run day (bot spec §2.3); a scheduled run treats it as a quiet skip."""
+    """No Maintain sprint is running on the run day (bot spec §2.3)."""
 
 
 class ApiError(AssignError):

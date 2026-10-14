@@ -1,4 +1,4 @@
-"""Rows for the report's Tải dev sheet."""
+"""One line per dev for the dev table of output.md (bot spec §7.4)."""
 
 from __future__ import annotations
 

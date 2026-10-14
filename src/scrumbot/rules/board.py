@@ -25,7 +25,6 @@ API_HEADERS = (
     "Bug tổng",
 )
 DONE_KINDS = frozenset({"done", "closed"})
-RECENT_DAYS = 30  # A65: the empty backlog also counts the orders filed in the last 30 days
 
 _SPRINT_NAME = re.compile(r"^Sprint\s+(\d+)\b")
 
@@ -168,22 +167,6 @@ def history_orders(board: Board) -> tuple[HistoryOrder, ...]:
             )
         )
     return tuple(orders)
-
-
-def empty_backlog(board: Board, day: date) -> tuple[int, int]:
-    """Empty, unfinished root orders of list Tech manager in no Maintain sprint (A65): all of them, and those filed
-    in the 30 days up to `day`."""
-    in_sprint = {task.id for sprint in maintain_sprints(board.sprints) for task in board.lists.get(sprint.id, ())}
-    found = [
-        task
-        for task in board.lists.get(TECH_MANAGER_LIST, ())
-        if not task.parent_id
-        and not task.is_bug
-        and not task.assignees
-        and not is_done_kind(task.status_kind)
-        and task.id not in in_sprint
-    ]
-    return len(found), sum((day - task.created.date()).days <= RECENT_DAYS for task in found)
 
 
 def newest_update(board: Board) -> datetime | None:

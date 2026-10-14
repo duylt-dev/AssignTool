@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 
 from scrumbot.model import Assignment, Dev, Order, Priority, Source, SprintRow, SprintSheet
-from scrumbot.model_risk import OrderMark, Risk, RiskLevel
+from scrumbot.model_risk import Risk, RiskLevel
 from scrumbot.normalize import text_key
 from scrumbot.rules.board import is_done_kind
 from scrumbot.rules.carry_over import BUSY_STATUSES
@@ -37,14 +37,12 @@ class RiskContext:
     rest: tuple[date, ...]  # remaining working days
     now: datetime
     suggest: Suggest
-    baseline: tuple[OrderMark, ...] | None = None
     status_kinds: Mapping[str, str] = field(default_factory=dict)
 
 
 def register(context: RiskContext) -> tuple[Risk, ...]:
     """Every risk of bot spec §4.2, in the register's order."""
     from scrumbot.rules.capacity import capacity_risks, carry_risks
-    from scrumbot.rules.changes import changed_risks
     from scrumbot.rules.pic_risks import absent_risks, unfamiliar_risks
     from scrumbot.rules.progress import due_risks, qa_risks, stuck_risks
 
@@ -56,7 +54,6 @@ def register(context: RiskContext) -> tuple[Risk, ...]:
         *due_risks(context),
         *stuck_risks(context),
         *qa_risks(context),
-        *changed_risks(context),
     ]
     return ordered(risks)
 

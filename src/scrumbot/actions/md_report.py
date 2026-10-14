@@ -1,4 +1,5 @@
-"""Write the order report of `scrumbot assign` (bot spec §7.3): one Markdown file, written to `.tmp` and renamed."""
+"""Write the report of `scrumbot assign`: the review when the order is not ready (bot spec §7.3), else the full order
+report (§7.4). One Markdown file, written to `.tmp` and renamed."""
 
 from __future__ import annotations
 
@@ -12,11 +13,12 @@ from scrumbot.model import Severity, Source
 from scrumbot.model_risk import LEVEL_TEXT, RiskLevel
 from scrumbot.normalize import LEVEL_NAMES
 from scrumbot.rules.new_order import OrderReport, Placement
+from scrumbot.rules.review import ReviewItem
 from scrumbot.understanding.sizing import ORDER_TYPES
 
 FILE = "output.md"
 _DATES = re.compile(r"\s*\(.*$")
-# "Nếu xảy ra" of bot spec §7.3: one fixed sentence per risk code.
+# "Nếu xảy ra" of bot spec §7.4: one fixed sentence per risk code.
 IF_IT_HAPPENS = {
     "CAPACITY-DEV": "Chuyển đơn chưa bắt đầu sang dev còn trống giờ; không còn ai trống thì lùi hạn đơn ưu tiên thấp.",
     "CAPACITY-SPRINT": "Chốt với BA/MO các đơn đẩy sang sprint sau; giữ lại đơn urgent/high.",
@@ -27,7 +29,6 @@ IF_IT_HAPPENS = {
     "DUE-AT-RISK": "Báo BA/MO lùi hạn hoặc cắt bớt hạng mục; cần thì thêm người hỗ trợ.",
     "STATUS-STUCK": "Gặp người làm để gỡ vướng; vướng ở khâu test hoặc phát hành thì báo người phụ trách khâu đó.",
     "QA-RETURNS": "Dừng gửi test; review code và tự test lại trước khi gửi QA lần nữa.",
-    "ORDER-CHANGED": "Ước lượng lại độ lớn và xác nhận lại hạn với BA/MO.",
 }
 RISK_HEADERS = ("Mức", "Mã", "Vấn đề", "Ảnh hưởng", "Phòng ngừa", "Nếu xảy ra", "Ai xử lý", "Hạn xử lý")
 
@@ -42,27 +43,46 @@ class Header:
     run_at: datetime
     freshness: datetime | None
     order_file: str
-    prev_name: str
-    sprint_risks: str  # "<x> cao · <y> trung bình · <z> thấp" of the whole register
+    prev_name: str = ""
+    sprint_risks: str = ""  # "<x> cao · <y> trung bình · <z> thấp" of the whole register
 
 
 def write_order_report(report: OrderReport, header: Header, out_dir: Path) -> Path:
-    path = out_dir / FILE
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(path.name + ".tmp")
-    temporary.write_text(render(report, header), encoding="utf-8")
-    os.replace(temporary, path)
-    return path
+    return _write(render(report, header), out_dir)
+
+
+def write_review_report(title: str, items: tuple[ReviewItem, ...], header: Header, out_dir: Path) -> Path:
+    return _write(render_review(title, items, header), out_dir)
+
+
+def render_review(title: str, items: tuple[ReviewItem, ...], header: Header) -> str:
+    """The order is not ready (bot spec §7.3): only what to fix, no PIC."""
+    lines = [
+        *_top(title, header),
+        "## Review: chưa đạt",
+        "",
+        f"Bot chưa đề xuất PIC. Sửa các mục dưới đây rồi chạy lại `scrumbot assign {header.order_file}`:",
+        "",
+        *(f"- `{item.code}`: {item.message}" for item in items),
+    ]
+    return "\n".join(lines) + "\n"
 
 
 def render(report: OrderReport, header: Header) -> str:
     item = report.item
     row, size = item.order.row, item.size
-    dates = f" ({_day(header.start)} – {_day(header.end)})" if header.start and header.end else ""
-    facts = [f"{short_name(header.sprint)}{dates}", f"chạy {header.run_at:%d/%m/%Y %H:%M}"]
-    if header.freshness is not None:
-        facts.append(f"dữ liệu API mới nhất {header.freshness:%d/%m/%Y %H:%M}")
-    lines = [f"# Giao đơn: {row.title}", "", " · ".join(facts), "", "## Kết luận", ""]
+    lines = _top(row.title, header)
+    if item.source is Source.PROPOSED:  # a pre-assigned order is not reviewed (A87)
+        lines += ["## Review: đạt", ""]
+        if size.is_default:
+            lines.append("Không có câu hỏi của AI (AI tắt hoặc lỗi).")
+        elif size.questions:
+            lines += ["Câu hỏi của AI cho người lên đơn (không chặn; trả lời trong file đơn nếu cần):", ""]
+            lines += [f"- {question}" for question in size.questions]
+        else:
+            lines.append("AI không có câu hỏi.")
+        lines.append("")
+    lines += ["## Kết luận", ""]
     if item.source is Source.PROPOSED:
         lines += [
             f"- **PIC đề xuất: {item.pic_codes[0]}**",
@@ -77,7 +97,7 @@ def render(report: OrderReport, header: Header) -> str:
     counts = [sum(risk.level is level for risk in report.risks) for level in RiskLevel]
     lines.append(f"- Rủi ro liên quan: {counts[0]} cao · {counts[1]} trung bình · {counts[2]} thấp")
     if item.source is Source.PROPOSED:
-        lines += ["", "Bot chưa ghi được vào hệ thống: TM nhập PIC vào hệ thống."]
+        lines += ["", "Bot chưa ghi được vào hệ thống: người lên đơn nhập PIC vào hệ thống."]
 
     lines += ["", "## Thông tin đơn", "", "| Trường | Giá trị |", "|---|---|"]
     info = [
@@ -125,7 +145,7 @@ def render(report: OrderReport, header: Header) -> str:
             lines.append("| " + " | ".join(_cell(cell) for cell in cells) + " |")
     else:
         lines.append("Không có rủi ro liên quan tới đơn này, PIC hoặc sprint.")
-    lines += ["", f"Sổ rủi ro cả sprint: {header.sprint_risks} (chi tiết: `scrumbot run`)."]
+    lines += ["", f"Sổ rủi ro cả sprint: {header.sprint_risks}."]
 
     lines += ["", "## Rủi ro kỹ thuật (AI nhận xét, chỉ để tham khảo)", ""]
     lines += [f"- {text}" for text in size.tech_risks] or ["Không có."]
@@ -136,6 +156,24 @@ def render(report: OrderReport, header: Header) -> str:
         for finding in report.findings
     ] or ["Không có cảnh báo."]
     return "\n".join(lines) + "\n"
+
+
+def _write(text: str, out_dir: Path) -> Path:
+    path = out_dir / FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(text, encoding="utf-8")
+    os.replace(temporary, path)
+    return path
+
+
+def _top(title: str, header: Header) -> list[str]:
+    """The title and the facts of the run (bot spec §7.3, §7.4)."""
+    dates = f" ({_day(header.start)} – {_day(header.end)})" if header.start and header.end else ""
+    facts = [f"{short_name(header.sprint)}{dates}", f"chạy {header.run_at:%d/%m/%Y %H:%M}"]
+    if header.freshness is not None:
+        facts.append(f"dữ liệu API mới nhất {header.freshness:%d/%m/%Y %H:%M}")
+    return [f"# Giao đơn: {title}", "", " · ".join(facts), ""]
 
 
 def short_name(sprint: str) -> str:

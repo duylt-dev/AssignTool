@@ -54,10 +54,15 @@ class Placed:
     stt: int
     how: Placement
 
+    @property
+    def row(self) -> SprintRow:
+        """The order of the file as placed in the sprint."""
+        return next(row for row in self.sheet.rows if row.stt == self.stt)
+
 
 @dataclass(frozen=True, slots=True)
 class DevLine:
-    """One row of the dev table of the order report (bot spec §7.3)."""
+    """One row of the dev table of the order report (bot spec §7.4)."""
 
     code: str
     level: Level
@@ -127,7 +132,7 @@ def place(sheet: SprintSheet, draft: OrderDraft, people: frozenset[str], day: da
 
 
 def order_report(result: Result, placed: Placed, team: Team, history: tuple[HistoryOrder, ...]) -> OrderReport:
-    """What the order report shows (bot spec §7.3)."""
+    """What the order report shows (bot spec §7.4)."""
     item = next(entry for entry in result.assignments if entry.order.row.stt == placed.stt)
     codes = set(item.pic_codes)
     risks = tuple(

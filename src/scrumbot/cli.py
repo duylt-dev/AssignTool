@@ -1,4 +1,4 @@
-"""Command line (bot spec §1, §7, assignment spec §2, §11): parse, run the flow, print, exit codes. The only module that
+"""Command line (bot spec §1, §7, assignment spec §2, §11): parse, run `assign`, print, exit codes. The only module that
 prints; the flow hands its lines to `say`."""
 
 from __future__ import annotations
@@ -14,19 +14,14 @@ from pathlib import Path
 from scrumbot.errors import AssignError, InputError
 from scrumbot.flows.assign_order import assign_order
 from scrumbot.flows.common import Options
-from scrumbot.flows.run_api import run_api
 from scrumbot.normalize import parse_date
 
-COMMANDS = ("run", "assign")
 AI_TOOLS = ("gemini", "agy", "off")
 
 
 def main(argv: list[str] | None = None) -> int:
     _utf8_console()
-    arguments = list(sys.argv[1:] if argv is None else argv)
-    if not arguments or arguments[0] not in (*COMMANDS, "-h", "--help"):
-        arguments.insert(0, "run")  # `scrumbot` alone is `scrumbot run` (D59)
-    args = _parser().parse_args(arguments)
+    args = _parser().parse_args(sys.argv[1:] if argv is None else argv)  # no sub-command: usage, exit 2 (A91)
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.WARNING, format="%(levelname)s %(name)s: %(message)s"
     )
@@ -43,10 +38,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _dispatch(args: argparse.Namespace) -> int:
-    if args.command == "assign":
-        assign_order(_options(args), Path(args.file), _say, datetime.now())
-    else:
-        run_api(_options(args), _say, datetime.now())
+    assign_order(_options(args), Path(args.file), _say, datetime.now())
     return 0
 
 
@@ -67,23 +59,20 @@ def _options(args: argparse.Namespace) -> Options:
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="scrumbot", description="Bot scrum master: giao PIC cho đơn trống và quản lý rủi ro sprint."
+        prog="scrumbot", description="Bot scrum master: review đơn của BA/MO, đề xuất PIC và rủi ro."
     )
     commands = parser.add_subparsers(dest="command", required=True)
-
-    run = commands.add_parser("run", help="giao đơn trống và lập sổ rủi ro (mặc định)")
-    _shared(run)
-    assign = commands.add_parser("assign", help="giao một đơn từ file .md của BA/MO, ghi output/output.md")
-    assign.add_argument("file", help="file đơn .md (mẫu: README mục 5)")
-    _shared(assign)
+    assign = commands.add_parser("assign", help="review và giao một đơn từ file .md của BA/MO, ghi output/output.md")
+    assign.add_argument("file", help="file đơn .md (mẫu: README mục 4)")
+    _options_of(assign)
     return parser
 
 
-def _shared(command: argparse.ArgumentParser) -> None:
-    command.add_argument("--sprint-id", help="id sprint cần giao (mặc định: sprint đang chạy)")
+def _options_of(command: argparse.ArgumentParser) -> None:
+    command.add_argument("--sprint-id", help="id sprint đặt đơn vào (mặc định: sprint đang chạy)")
     command.add_argument("--today", help="chạy như thể hôm nay là ngày này, YYYY-MM-DD hoặc DD/MM/YYYY")
-    command.add_argument("--out", default="output", help="thư mục ghi báo cáo (mặc định: output/)")
-    command.add_argument("--state", default="state", help="thư mục bộ nhớ và cache (mặc định: state/)")
+    command.add_argument("--out", default="output", help="thư mục ghi output.md (mặc định: output/)")
+    command.add_argument("--state", default="state", help="thư mục cache câu trả lời AI và list (mặc định: state/)")
     command.add_argument("-v", "--verbose", action="store_true", help="in traceback và trao đổi với AI")
     command.add_argument("--input", default="input", help="thư mục chứa devs.xlsx và file luật (mặc định: input/)")
     command.add_argument("--devs", help="file dev (mặc định: <input>/devs.xlsx)")
