@@ -1,43 +1,76 @@
 # Hướng dẫn sử dụng scrumbot
 
-scrumbot đề xuất **PIC** (dev chịu trách nhiệm chính) cho đơn của board Maintain và lập **sổ rủi ro** của sprint. Bot
-**chỉ đọc** hệ thống nội bộ (server dev); TM đọc kết quả rồi tự nhập PIC vào hệ thống.
+scrumbot dành cho **BA/MO khi lên đơn**: bot **review** đơn, rồi đề xuất **PIC** (dev chịu trách nhiệm chính) và báo
+**rủi ro** của đơn và của sprint. Bot **chỉ đọc** hệ thống nội bộ (server dev); đơn đạt thì người lên đơn nhập PIC vào
+hệ thống.
 
-| Bạn muốn | Lệnh | Kết quả |
-|---|---|---|
-| Giao **một đơn** BA/MO vừa gửi | `uv run scrumbot assign input/don/<file đơn>.md --ai agy` | `output/output.md` |
-| Giao **cả sprint** đang chạy và xem rủi ro | `uv run scrumbot run --ai agy` | `output/assignment_<sprint>_<giờ>.xlsx` |
+```bash
+scrumbot assign input/don/<file đơn>.md      # kết quả: output/output.md
+```
 
-Muốn biết bot chọn PIC thế nào và vì sao, đọc [`README.md`](README.md) mục 2.
+Muốn biết bot review và chọn PIC thế nào, đọc [`README.md`](README.md) mục 2.
 
 ## 1. Cài đặt (làm một lần)
 
-1. Cài Python ≥ 3.11 và [`uv`](https://docs.astral.sh/uv/), rồi trong thư mục repo chạy `uv sync`.
-2. Tạo file token: `cp .env.example .env`, rồi điền:
+### 1.1 Cho BA/MO: cài từ file `.whl`
+
+Người giữ tool gửi cho bạn ba thứ: file `scrumbot-<version>-py3-none-any.whl`, file `.env` và file `devs.xlsx`.
+
+1. Cài [`uv`](https://docs.astral.sh/uv/) (uv tự tải Python nếu máy chưa có):
+   - macOS, Linux: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+   - Windows (PowerShell): `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
+2. Cài tool: `uv tool install scrumbot-<version>-py3-none-any.whl`. Mở terminal mới rồi gõ `scrumbot --help` để thử;
+   không thấy lệnh thì chạy `uv tool update-shell` rồi mở lại terminal.
+3. Tạo một **thư mục làm việc**, ví dụ `scrumbot/`, và đặt file vào đúng chỗ (mục 2):
+   ```
+   scrumbot/
+   ├── .env
+   └── input/
+       ├── devs.xlsx
+       └── don/
+   ```
+   **Mọi lệnh `scrumbot` chạy trong thư mục này** (`cd scrumbot` trước), vì bot tìm `.env`, `input/`, `output/`,
+   `state/` ngay tại đó.
+4. Chọn AI (không bắt buộc), xem mục 1.3.
+
+**Có bản mới:** `uv tool install --force scrumbot-<version mới>-py3-none-any.whl`. Thư mục làm việc giữ nguyên.
+
+**Token:** mọi người dùng chung một token chỉ-đọc, vì server chỉ nhận một token. Không gửi `.env` cho người ngoài team.
+Khi token đổi, người giữ tool gửi `.env` mới; bot báo `API từ chối token (401)` là dấu hiệu cần file mới.
+
+### 1.2 Cho người giữ tool: chạy trong repo và đóng gói
+
+1. Cài Python ≥ 3.11 và `uv`, rồi trong thư mục repo chạy `uv sync`. Chạy bằng `uv run scrumbot assign …`.
+2. Tạo `.env`: `cp .env.example .env`, rồi điền:
    ```
    SCRUMBOT_API_TOKEN=<token TM cấp>
    SCRUMBOT_API_BASE=https://devclickup.datlt.site
    ```
-   Bot từ chối địa chỉ production. **Không commit, không gửi `.env` cho ai.**
-3. Kiểm tra `input/devs.xlsx` (mục 3.1).
-4. Chọn AI để ước lượng độ lớn đơn (không bắt buộc):
+   Bot từ chối địa chỉ production. **Không commit `.env`.**
+3. Đóng gói cho BA/MO: `uv build --wheel`, rồi gửi `dist/scrumbot-<version>-py3-none-any.whl` kèm `.env` và
+   `input/devs.xlsx`. File `.whl` chỉ chứa code, không chứa dữ liệu. Sửa `devs.xlsx` hoặc đổi token thì gửi lại cho
+   từng người.
 
-   | `--ai` | Cần gì |
-   |---|---|
-   | `agy` | `~/.gemini/bin/agy` (máy hiện tại dùng cái này) |
-   | `gemini` (mặc định) | lệnh `gemini` và `GEMINI_API_KEY` |
-   | `off` | Không cần gì; mọi đơn tính là `M` (16 giờ) |
+### 1.3 AI
 
-## 2. Thư mục
+| `--ai` | Cần gì |
+|---|---|
+| `gemini` (mặc định) | Lệnh `gemini` và `GEMINI_API_KEY` trên máy |
+| `agy` | `~/.gemini/bin/agy` (máy của người giữ tool dùng cái này) |
+| `off` | Không cần gì; mọi đơn tính là `M` (16 giờ) và không có câu hỏi của AI |
+
+Máy không có AI mà quên `--ai off` thì bot vẫn chạy: báo `SIZE-AI-FAILED` và tính mọi đơn là `M`.
+
+## 2. Thư mục làm việc
 
 ```
 input/
-├── devs.xlsx          danh sách dev                      bắt buộc, sửa tay
+├── devs.xlsx          danh sách dev                      bắt buộc
 ├── <tên bất kỳ>.md    luật TM (custom rule, mục 4)       tuỳ chọn, chỉ được 1 file .md ở đây
 └── don/
-    └── <tên đơn>.md   file đơn của BA/MO (mục 3.2)       cho lệnh assign
-output/                kết quả mỗi lần chạy
-state/                 bộ nhớ của bot: đề xuất, trạng thái đơn, cache. Đừng xoá.
+    └── <tên đơn>.md   file đơn (mục 3.2)                 mỗi đơn một file
+output/output.md       kết quả lần chạy gần nhất
+state/                 cache câu trả lời AI và các sprint cũ; xoá đi thì lần sau chạy lâu hơn
 .env                   token API
 ```
 
@@ -57,14 +90,15 @@ Sheet đầu tiên, dòng 1 là tiêu đề, mỗi dòng một dev.
 | `Nhận việc` | ✓ | `Y` hoặc `N`. `N` tạm đưa dev ra khỏi danh sách giao việc mà không phải xoá dòng |
 | `Ngày nghỉ` | | Các ngày nghỉ trong sprint, cách nhau bằng dấu phẩy: `YYYY-MM-DD` hoặc `DD/MM/YYYY` |
 
-Sửa file này khi có người vào hoặc rời team, có người tạm không nhận việc, hoặc có lịch nghỉ phép.
+Người giữ tool sửa file này khi có người vào hoặc rời team, có người tạm không nhận việc, hoặc có lịch nghỉ phép, rồi
+gửi lại cho BA/MO.
 
 > `Tên` viết khác hệ thống (thiếu dấu, thừa chữ) thì bot coi đó là người ngoài team: tải của dev đó bị tính thiếu
 > mà **không có cảnh báo**. Copy tên từ hệ thống cho chắc.
 
 Chỉ dev có `Nhận việc` = `Y` mới được đề xuất. QA, RnD và TM không bao giờ được đề xuất.
 
-### 3.2 File đơn (cho `assign`)
+### 3.2 File đơn
 
 Đặt trong `input/don/`, một đơn một file `.md`. Mẫu:
 
@@ -78,7 +112,7 @@ Chỉ dev có `Nhận việc` = `Y` mới được đề xuất. QA, RnD và TM 
 | Ưu tiên | high |
 | Hạn | 16/10/2026 |
 
-Mô tả tự do: nội dung đơn, link SRS, link Figma, link tracking, …
+Mô tả tự do: các hạng mục cần làm, link SRS, link Figma, link tracking, …
 ```
 
 | Phần | Cách bot đọc |
@@ -90,8 +124,8 @@ Mô tả tự do: nội dung đơn, link SRS, link Figma, link tracking, …
 | `Hạn` | `YYYY-MM-DD` hoặc `DD/MM/YYYY` |
 | Phần còn lại | Mô tả, giữ nguyên như viết |
 
-Mọi trường đều **không bắt buộc**: để trống ô là được, nhưng không thêm trường lạ (bot báo lỗi). Bot đọc file này
-**không dùng AI**.
+Ô trống thì để trống, nhưng không thêm trường lạ (bot báo lỗi). Bot đọc file này **không dùng AI**. Để đơn **qua
+review** (mục 5.1): có `App`, đơn `urgent`/`high` phải có `Hạn`, mô tả từ 30 ký tự trở lên (không tính link).
 
 **Bot tìm đơn trong sprint thế nào:**
 
@@ -113,7 +147,7 @@ TM điều chỉnh cách giao mà không phải sửa code, bằng **một file 
 - Hoặc để ở chỗ khác rồi chỉ đường dẫn: `--rules duong/dan/luat.md`.
 - Không có file nào thì chạy không có luật. Có từ 2 file `.md` trong `input/` thì bot dừng và báo lỗi: bỏ bớt hoặc
   dùng `--rules`.
-- **Đừng để file đơn trực tiếp trong `input/`**: `run` sẽ coi nó là file luật. File đơn để trong `input/don/`.
+- File đơn để trong `input/don/`. File đơn đang được chạy thì không bao giờ bị coi là file luật.
 
 ### 4.2 Mẫu
 
@@ -167,59 +201,63 @@ Ghi chú tự do ngoài bảng thì bot bỏ qua.
 | Muốn | Chỉnh ở |
 |---|---|
 | Tạm cho một dev nghỉ nhận việc, khai báo nghỉ phép, đổi level | `input/devs.xlsx` (mục 3.1) |
-| Đổi AI, cho AI chờ lâu hơn, giao sprint khác, chạy như thể ngày khác | Tuỳ chọn dòng lệnh (mục 5.3) |
-| Ngưỡng rủi ro, số giờ của mỗi độ lớn, thứ tự tiêu chí chọn PIC | Nằm trong code. Muốn đổi thì sửa spec ([`docs/bot-spec.md`](docs/bot-spec.md) §4, [`docs/assignment-spec.md`](docs/assignment-spec.md) §7) rồi mới sửa code |
+| Đổi AI, cho AI chờ lâu hơn, giao vào sprint khác, chạy như thể ngày khác | Tuỳ chọn dòng lệnh (mục 5.2) |
+| Ngưỡng review, ngưỡng rủi ro, số giờ của mỗi độ lớn, thứ tự tiêu chí chọn PIC | Nằm trong code. Muốn đổi thì sửa spec ([`docs/bot-spec.md`](docs/bot-spec.md) §4 và §7.3, [`docs/assignment-spec.md`](docs/assignment-spec.md) §7) rồi mới sửa code |
 
 ## 5. Chạy
 
-### 5.1 Giao một đơn: `assign`
+### 5.1 Lên một đơn
 
 1. Lưu file đơn vào `input/don/` (mục 3.2).
-2. Chạy:
+2. Chạy trong thư mục làm việc:
    ```bash
-   uv run scrumbot assign input/don/req_from_ba_test.md --ai agy --ai-timeout 400
+   scrumbot assign input/don/req_from_ba_test.md
    ```
-   Lần đầu trong ngày, AI phải ước lượng mọi đơn của sprint (khoảng 5–6 phút với 7 đơn). Các lần sau chỉ còn đơn
-   trong file (khoảng 2 phút). Vội thì dùng `--ai off`.
-3. Mở `output/output.md` (mục 6.1).
+   (trong repo: `uv run scrumbot assign … --ai agy --ai-timeout 400`). Lần đầu trong ngày, AI phải ước lượng mọi đơn
+   của sprint (với `agy` khoảng 5–6 phút cho 7 đơn). Các lần sau chỉ còn đơn trong file. Vội thì dùng `--ai off`.
+3. Mở `output/output.md` (mục 6):
+   - **`Review: chưa đạt`**: sửa từng mục được liệt kê trong file đơn (hoặc trên hệ thống, nếu đơn đã có ở đó), rồi
+     chạy lại bước 2. Lúc này bot chưa gọi AI nên xong ngay.
+   - **`Review: đạt`**: đọc câu hỏi của AI (nếu có; bổ sung mô tả nếu thấy đúng), đọc PIC đề xuất và rủi ro, rồi
+     **nhập PIC vào hệ thống**. Bot không nhớ đề xuất: nhập ngay để lần chạy sau tính đúng tải của dev.
 
-`assign` tính trên cả sprint đang chạy, nên tải và rủi ro là của sprint thật cộng thêm đơn này. Lệnh này **không lưu**
-đề xuất vào bộ nhớ: muốn bot giữ đề xuất qua các lần chạy thì dùng `run`.
+| Mã review | Bot dừng khi | Cách sửa |
+|---|---|---|
+| `REVIEW-APP` | Đơn không có App | Ghi dòng `App` |
+| `REVIEW-DUE` | Đơn `urgent`/`high` không có Hạn | Ghi dòng `Hạn` |
+| `REVIEW-DESC` | Mô tả dưới 30 ký tự, không tính link | Ghi rõ các hạng mục cần làm |
 
-### 5.2 Giao cả sprint: `run`
+Đơn đã có người làm trên hệ thống thì bot không review, chỉ báo ai đang giữ và rủi ro. Bot tính trên cả sprint đang
+chạy, nên tải và rủi ro là của sprint thật cộng thêm đơn này.
 
-```bash
-uv run scrumbot run --ai agy             # chạy bình thường: báo cáo vào output/, cập nhật bộ nhớ
-uv run scrumbot run --ai off             # không gọi AI; mọi đơn tính là M
-uv run scrumbot run --today 2026-10-15   # như thể hôm nay là 15/10; không đọc, không ghi bộ nhớ
-```
-
-### 5.3 Tuỳ chọn (dùng chung cho `run` và `assign`)
+### 5.2 Tuỳ chọn
 
 | Tuỳ chọn | Mặc định | Ý nghĩa |
 |---|---|---|
-| `--ai gemini\|agy\|off` | `gemini` | Công cụ AI ước lượng độ lớn |
+| `--ai gemini\|agy\|off` | `gemini` | Công cụ AI ước lượng độ lớn và đặt câu hỏi |
 | `--ai-timeout GIÂY` | `180` | Số giây chờ AI; với `agy` nên để `400` |
 | `--ai-model TÊN` | | Model truyền thẳng cho công cụ AI |
-| `--sprint-id ID` | sprint đang chạy | Giao một sprint khác |
+| `--sprint-id ID` | sprint đang chạy | Đặt đơn vào một sprint khác |
 | `--today NGÀY` | hôm nay | Chạy như thể hôm nay là ngày này (`YYYY-MM-DD` hoặc `DD/MM/YYYY`) |
 | `--input THƯ_MỤC` | `input/` | Nơi tìm `devs.xlsx` và file luật |
 | `--devs FILE` | `input/devs.xlsx` | File dev |
 | `--rules FILE` | file `.md` duy nhất trong `input/` | File luật TM |
-| `--out THƯ_MỤC` | `output/` | Nơi ghi kết quả |
-| `--state THƯ_MỤC` | `state/` | Bộ nhớ của bot |
+| `--out THƯ_MỤC` | `output/` | Nơi ghi `output.md` |
+| `--state THƯ_MỤC` | `state/` | Cache câu trả lời AI và các sprint cũ |
 | `-v` | tắt | In chi tiết lỗi và trao đổi với AI |
 
-Xem đủ: `uv run scrumbot run --help`.
+Xem đủ: `scrumbot assign --help`.
 
-## 6. Output
+## 6. Output: `output/output.md`
 
-### 6.1 `assign`: `output/output.md`
+**Đơn chưa đạt review:** tiêu đề, sprint, mục `Review: chưa đạt` liệt kê mã và cách sửa từng mục. Không có PIC,
+không có rủi ro.
 
-Đọc từ trên xuống:
+**Đơn đạt** (đọc từ trên xuống):
 
 | Mục | Nội dung |
 |---|---|
+| **Review: đạt** | Câu hỏi của AI cho người lên đơn (tối đa 2), chỉ để nhắc |
 | **Kết luận** | PIC đề xuất, lý do một câu, 2 người dự phòng, độ lớn AI ước lượng, số rủi ro liên quan. Đơn đã có người làm thì bot giữ nguyên, không đề xuất người khác |
 | **Thông tin đơn** | Đơn mới hay đơn đã có trên hệ thống, App, ưu tiên, hạn, loại đơn và hạng mục AI nhận ra, mô tả đúng như AI đã đọc |
 | **So sánh dev** | Mỗi dev một dòng: level, đã làm app chưa, số đơn, giờ việc còn lại / sức chứa, việc dở sprint trước, ngày nghỉ, vai trò (PIC, dự phòng) |
@@ -227,23 +265,9 @@ Xem đủ: `uv run scrumbot run --help`.
 | **Rủi ro kỹ thuật** | AI nhận xét, chỉ để tham khảo |
 | **Cảnh báo dữ liệu** | Dữ liệu thiếu hoặc lạ |
 
-Lần chạy sau **ghi đè** file này: muốn giữ thì copy ra chỗ khác.
+Lần chạy sau **ghi đè** file này: muốn giữ thì copy ra chỗ khác, hoặc dùng `--out <thư mục khác>`.
 
-### 6.2 `run`: `output/assignment_<sprint>_<YYYYMMDD-HHMMSS>.xlsx`
-
-| Sheet | Nội dung |
-|---|---|
-| `Tóm tắt` | Sprint, ngày chạy, số đơn (giao sẵn / đề xuất mới / giữ từ lần trước), số rủi ro theo mức, từng rủi ro Cao. **Đọc trước** |
-| `Phân công` | Mỗi đơn một dòng: dữ liệu gốc, độ lớn và lý do, PIC, lý do chọn, 2 người dự phòng, mã rủi ro |
-| `Rủi ro` | Sổ rủi ro: mức, mã, vấn đề, ảnh hưởng, đề xuất xử lý, ai xử lý, hạn xử lý |
-| `Thay đổi` | So với lần chạy trước: đơn mới hoặc bị bỏ, đổi ưu tiên / hạn / tên, TM giao có khớp đề xuất không |
-| `Cảnh báo` | Dữ liệu thiếu hoặc lạ (AI lỗi, đơn thiếu app, đơn gấp chưa có hạn, …) |
-| `Tải dev` | Mỗi dev: số đơn, giờ việc, sức chứa còn lại, việc dở, ngày nghỉ, app đã làm |
-
-Bot **nhớ** đề xuất trong `state/`: một đơn đã được đề xuất thì lần sau vẫn giữ người đó cho tới khi đơn có người làm
-trên hệ thống. Rủi ro chỉ để khuyên: không bao giờ đổi PIC.
-
-### 6.3 Độ lớn đơn
+### 6.1 Độ lớn đơn
 
 | Độ lớn | Giờ tính vào tải |
 |---|---|
@@ -252,29 +276,32 @@ trên hệ thống. Rủi ro chỉ để khuyên: không bao giờ đổi PIC.
 | `L` | 32 |
 | `XL` | 64 |
 
-AI ước lượng từ tên đơn (`assign` có thêm mô tả trong file đơn). AI lỗi, hết giờ hoặc tắt thì đơn tính là `M` và
-lần chạy vẫn tiếp tục.
+AI ước lượng đơn trong file từ tên và mô tả, các đơn khác của sprint từ tên đơn (API chưa trả mô tả). AI lỗi, hết giờ
+hoặc tắt thì đơn tính là `M` và lần chạy vẫn tiếp tục.
 
-### 6.4 Terminal và mã thoát
+### 6.2 Terminal và mã thoát
 
-Terminal in tóm tắt: file luật, sprint, cách ước lượng độ lớn, mỗi đề xuất một dòng, các cảnh báo, đường dẫn kết quả.
+Terminal in tóm tắt: nguồn dữ liệu, file luật, đơn, kết quả review, độ lớn, PIC đề xuất, rủi ro, các cảnh báo, đường
+dẫn kết quả.
 
 | Mã thoát | Khi nào |
 |---|---|
-| `0` | Đã ghi kết quả (có hoặc không có cảnh báo, có hoặc không có AI) |
-| `2` | Lỗi input hoặc lỗi API. Không ghi kết quả. Câu báo lỗi tiếng Việt chỉ rõ file, dòng, cột |
+| `0` | Đã ghi `output.md`, đơn đạt hay chưa đạt review (có hoặc không có cảnh báo, có hoặc không có AI) |
+| `2` | Lỗi input hoặc lỗi API, hoặc gõ thiếu lệnh. Không ghi kết quả. Câu báo lỗi tiếng Việt chỉ rõ file, dòng, cột |
 | `130` | Bấm Ctrl+C |
 
 ## 7. Lỗi thường gặp
 
 | Bạn thấy | Làm gì |
 |---|---|
-| `Thiếu SCRUMBOT_API_TOKEN …` | Tạo `.env` theo mục 1 |
-| `API từ chối token (401)` | Token sai hoặc hết hạn: xin TM token mới |
+| `scrumbot: command not found` | `uv tool update-shell`, mở terminal mới (mục 1.1) |
+| `Thiếu SCRUMBOT_API_TOKEN …` | Chưa đứng trong thư mục làm việc, hoặc thiếu `.env` (mục 1.1) |
+| `Không tìm thấy file devs.xlsx …` | Chưa đứng trong thư mục làm việc, hoặc thiếu `input/devs.xlsx` |
+| `API từ chối token (401)` | Token đã đổi: xin người giữ tool `.env` mới |
 | `API vẫn giới hạn tải (429)` hoặc lỗi server (5xx) | Chạy lại sau ít phút |
 | `Có nhiều … Chỉ định một file bằng --rules` | Chỉ để một file luật `.md` trong `input/`, hoặc dùng `--rules` |
 | `File đơn … trường '…' không hợp lệ` | Bảng trong file đơn chỉ dùng `ID`, `App`, `Ưu tiên`, `Hạn` |
 | `Có <k> đơn tên '…' trong …` | Nhiều đơn trùng tên: ghi `ID` của đơn vào file đơn |
 | AI chạy lâu hoặc hết giờ | Tăng `--ai-timeout 400`, hoặc chạy `--ai off` |
-| Một dev có tải thấp bất thường | `Tên` trong `devs.xlsx` viết khác hệ thống (mục 3.1) |
+| Một dev có tải thấp bất thường | `Tên` trong `devs.xlsx` viết khác hệ thống (mục 3.1), hoặc PIC lần trước chưa được nhập vào hệ thống |
 | Muốn xem bot làm gì khi lỗi | Thêm `-v` |
