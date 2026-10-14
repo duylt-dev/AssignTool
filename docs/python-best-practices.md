@@ -109,8 +109,8 @@ The tool runs on Windows, Linux and macOS (A2).
 
 - **Atomic writes.** The report goes to `<name>.tmp`, is saved, then `os.replace`d. A crash mid-write must leave no
   half report that looks complete.
-- **A new file name every run** (timestamp). A report left open in Excel holds a lock on Windows; overwriting it would
-  fail on the TM's machine and nowhere else.
+- **One report name, `output/output.md`** (A85). It is plain text, so an editor holding it open never locks it the way
+  Excel locked the old workbook on Windows; whoever wants to keep one copies it or passes `--out`.
 - **Never write into `input/`.** It holds the user's hand-kept files (`devs.xlsx`, the TM rules); a tool that
   "normalises" one in place destroys the only copy.
 
@@ -165,8 +165,9 @@ The tool runs on Windows, Linux and macOS (A2).
 1. `uv run ruff check .` and `uv run ruff format --check .` pass.
 2. `uv run pytest` passes; report the counts.
 3. Changed a rule, a finding or the prompt: spec §6–§9 updated, with a test that fails without the change.
-4. Changed the API source, a rule, a risk or the flow: ran `uv run scrumbot run --ai off --today <today> --out
-   <scratch dir>` against the dev server and read the report (`--today` keeps the memory untouched).
+4. Changed the API source, a rule, a risk, the review or the flow: ran `uv run scrumbot assign
+   input/don/<file>.md --ai off --out <scratch dir> --state <scratch dir>` against the dev server and read
+   `output.md`.
 5. Changed `ai_cli.py` or `rules/sizing.py`: ran `ASSIGNTOOL_TEST_AI=gemini uv run pytest -m ai` (or `=agy`) once with a real AI tool,
    or the report says plainly that it did not run.
 6. No `shell=True`; no file opened without `encoding=`; no column read by index; no `datetime` compared with a
@@ -186,9 +187,8 @@ The tool runs on Windows, Linux and macOS (A2).
   user's `.env` had `KEY = value`; a strict parser reported a missing token that was there.
 - **Decide from model values, never from JSON.** `raw_store.py` gets the raw replies (with the list cache) and
   `api_reader.py` turns them into `model_board` values; rules never see JSON, so they are tested with plain values.
-- **The memory is one SQLite file with one owner** (`actions/state_store.py`); each method opens, writes and commits
+- **The AI answers are one SQLite file with one owner** (`actions/state_store.py`); each method opens, writes and commits
   on its own. A long-lived connection would hold a lock while `agy` thinks for two minutes.
-- **Only live runs use the memory** (A66). A run with `--today` reads and writes nothing in it but AI answers.
 - **Times are naive local times,** like the API's (`YYYY-MM-DD HH:MM:SS`, server time = the team's time zone).
   Mixing an aware `datetime` with the API's naive ones raises `TypeError` in the middle of a comparison.
 

@@ -1,15 +1,16 @@
 # Assignment spec: the assignment core of `scrumbot`
 
 How the bot sizes orders, picks a PIC for each empty order, and what it writes. Reading the internal system's API,
-the risk register and the memory between runs are in [`bot-spec.md`](bot-spec.md); this file is the reference for the
-rule itself (§6–§8), the findings (§9), the report columns (§10–§11) and the TM rules (§14).
+the review of an order file, the risk register, the AI memory and `output.md` are in [`bot-spec.md`](bot-spec.md); this
+file is the reference for the rule itself (§6–§8), the findings (§9), the exit codes (§11) and the TM rules (§14).
 [`LLM.md`](../LLM.md) says where each part lives in code; [`confirm.md`](../confirm.md) holds the decisions cited
 here as `Dn` (user-locked), `An` (defaults) and `On` (open).
 
 **Status:** approved 2026-10-06 and implemented; the load cap in orders (D26) and the TM rules file (D28–D35, §14)
 added 2026-10-07; renamed `scrumbot` on 2026-10-13 (D46, D57). The same day the export-file source, the acceptance
 run on the sample and the backtest were removed (D59): the orders come from the API (bot spec §2.5), and §3, §5, §12
-and §13 keep their numbers so that citations stay valid.
+and §13 keep their numbers so that citations stay valid. On 2026-10-14 `run` and its workbook were removed (D62);
+§10 keeps its number.
 
 User-facing text (column headers, finding messages, reasons, terminal lines) is Vietnamese (D12). It is quoted here
 exactly as the tool must print it.
@@ -25,7 +26,7 @@ exactly as the tool must print it.
 | 7 | Choosing the PIC |
 | 8 | Reason text |
 | 9 | Findings |
-| 10 | Output workbook |
+| 10 | Output workbook (removed) |
 | 11 | Exit codes and terminal output |
 | 12 | Acceptance on the sample (removed) |
 | 13 | Backtest (removed) |
@@ -40,7 +41,7 @@ exactly as the tool must print it.
 | Order (*đơn*) | A root item of the target sprint whose `Loại` is `Task`: one version of one app, e.g. `1.0.2 - Add ads/Add SDK` for Phone Cleaner. The unit of assignment (D5). |
 | PIC | The one dev who owns an order and later splits it into subtasks (D5). |
 | Pool | Devs in `devs.xlsx` with `Nhận việc` = `Y`, minus those on leave for the whole sprint (A12). Today: LinhNV, MinhNM, AnTD, TiếnBV (D7). Everyone else is ignored everywhere, silently (D14). |
-| Target sprint | The running sprint of board Maintain (bot spec §2.3, A59), or the one given with `--sprint-id`. The tool may run at any time during it (D2): orders already assigned are kept, empty ones are assigned. |
+| Target sprint | The running sprint of board Maintain (bot spec §2.3, A59), or the one given with `--sprint-id`. BA/MO run the tool when they file an order (D61): orders already assigned are kept, empty ones are assigned. |
 | Previous sprint | The Maintain sprint that ended last before the target's first day (A59). Source of carry-over only (A60). |
 | Size | The AI's class for an order, `S`/`M`/`L`/`XL`, worth 4/16/32/64 hours (§6.4, A7). |
 | Load | The orders a pool dev holds in the target sprint, pre-assigned or proposed: counted in orders for the load cap (§7, D26) and summed in hours (their sizes) for key part 3. |
@@ -52,13 +53,12 @@ exactly as the tool must print it.
 ## 2 · Command line and input files
 
 ```
-scrumbot run [--input DIR] [--devs FILE] [--rules FILE] [--sprint-id ID] [--today DATE] [--state DIR] [--out DIR]
-             [--ai gemini|agy|off] [--ai-model NAME] [--ai-timeout SECONDS] [-v]
-scrumbot assign <order file> [the same options]
+scrumbot assign <order file> [--input DIR] [--devs FILE] [--rules FILE] [--sprint-id ID] [--today DATE]
+                [--state DIR] [--out DIR] [--ai gemini|agy|off] [--ai-model NAME] [--ai-timeout SECONDS] [-v]
 ```
 
 Every option is in bot spec §1. `--today DATE` (`YYYY-MM-DD` or `DD/MM/YYYY`, A35) is the run day of the history
-window (§5.1) and of the rules day (§14.3); the report's file name still uses the clock; unreadable is an input error.
+window (§5.1) and of the rules day (§14.3); unreadable is an input error.
 `--ai off` sizes every order `M` (§6.4).
 
 **Input files** (A2, D29): in `--input`, `devs.xlsx` is the dev workbook (§4) and the only `*.md` is the TM rules file
@@ -306,7 +306,8 @@ When the order has no app, part 1 is `Đơn không có App Name`. Pre-assigned o
 
 ## 9 · Findings
 
-A finding is a row in the `Cảnh báo` sheet, not an exception: the run goes on and the report is written. Codes are
+A finding is a line of `## Cảnh báo dữ liệu` in `output.md` (bot spec §7.4), not an exception: the run goes on and
+the report is written. The review checks of bot spec §7.3 (`REVIEW-…`) are not findings: they stop the assignment. Codes are
 never renamed once released. Nothing is ever reported about people outside the pool (D14).
 
 | Code | Level | When | Message (Vietnamese, exact) |
@@ -325,64 +326,26 @@ never renamed once released. Nothing is ever reported about people outside the p
 | `DUE-MISSING` | WARN | An `urgent` or `high` order has no `Hạn` (D53, bot spec §3). | `Đơn STT <n> là đơn <urgent\|high> nhưng chưa có Hạn.` |
 | `DEV-ON-LEAVE-REST` | INFO | A pool dev is off every remaining working day, not every day of the sprint (A75, bot spec §3). | `<Mã> nghỉ hết các ngày còn lại của sprint (từ <ngày gốc>); không được giao đơn mới.` |
 
-## 10 · Output workbook
+## 10 · Output workbook (removed 2026-10-14)
 
-`output/assignment_<sprint slug>_<YYYYMMDD-HHMMSS>.xlsx`, e.g. `assignment_sprint-10_20261006-143000.xlsx`. Written to
-`<name>.tmp`, then renamed (best practices §6). A fresh name each run, so a report left open in Excel never blocks the next one.
-Since 2026-10-13 the workbook has six sheets (`Tóm tắt`, `Phân công`, `Rủi ro`, `Thay đổi`, `Cảnh báo`, `Tải dev`) and
-`Phân công` has more columns: bot spec §6. This section describes the three sheets that existed before.
-
-Until the tool can write into the internal system (D19, O8), this report **is** the assignment: whoever has access
-enters each `PIC` into the system. The column `Nguồn` still says `Tool đề xuất` for the tool's choices.
-
-**Sheet `Phân công`:** one row per order, in source `STT` order. All original columns of the order row in their
-original order (including the original `Người làm`), followed by:
-
-| Column | Content |
-|---|---|
-| `Độ lớn` | `S`/`M`/`L`/`XL`, with ` (mặc định)` appended when it is the fallback (§6.4). |
-| `Giờ ước tính` | 4/16/32/64. |
-| `Lý do độ lớn` | The AI's reason; empty for a default. |
-| `PIC` | Full name of the PIC. For a pre-assigned order: the original `Người làm`. |
-| `Mã PIC` | Code(s) of the PIC; for a pre-assigned order, the codes of the pool devs named (empty if none). |
-| `Nguồn` | `Đã giao sẵn` or `Tool đề xuất`. |
-| `Lý do` | §8. |
-| `Dự phòng 1`, `Dự phòng 2` | Codes of the backups (§7); empty for pre-assigned orders. |
-
-**Sheet `Cảnh báo`:** `Mức` · `Mã` · `Vị trí` · `Nội dung`, sorted WARN before INFO, then by code. A run with no
-findings writes a single row `Không có cảnh báo`.
-
-**Sheet `Tải dev`:** one row per pool dev, plus devs removed for leave:
-
-| Column | Content |
-|---|---|
-| `Mã`, `Tên`, `Level` | From `devs.xlsx`. |
-| `Việc dở sprint trước` | Carry-over count (§6.2). |
-| `Ngày nghỉ` | Leave days on working days. |
-| `Đơn giao sẵn`, `Đơn tool đề xuất`, `Tổng đơn` | Counts in the target sprint. |
-| `Tổng giờ ước tính` | Load (§1). |
-| `Danh sách đơn` | Titles of the dev's orders with their size, one per line. |
-| `App đã làm` | Apps from the history where the dev has rank 0 or 1. |
+The workbook belonged to `run` (D62); it is in git history at `754b165`. What it showed for one order and for each
+dev is in `output.md` (bot spec §7.4). Until the tool can write into the internal system (D19, O8), `output.md` is the
+assignment: the person who filed the order enters the PIC into the system (D61).
 
 ## 11 · Exit codes and terminal output
 
 | Code | When |
 |---|---|
-| `0` | The report was written, with or without findings, with or without AI sizes. |
+| `0` | `output.md` was written: the order ready or not (bot spec §7.3), with or without findings, with or without AI sizes. |
 | `2` | Input or usage error. No report is written. The message names the file, sheet, row or column. |
 | `130` | Interrupted with Ctrl+C. |
 
-The terminal shows: the run day when `--today` is given (`Ngày chạy: 22/10/2026 (--today)`); the rules file (`Luật TM: file luat.md (4 luật, 3 có hiệu lực ngày 06/10/2026)`, or `Luật TM:
-không có`); the history (`Lịch sử: API (374 đơn gốc)`, the count being the root orders left
-after the window of §5.1); the target sprint; how sizing went (`Độ lớn: AI (gemini, 6/6 đơn)`, or the fallback and why);
-counts (orders, pre-assigned, proposed, findings by level); one line per proposed order
-(`STT 10 · Roblox skin 1.0.4 - Fix luồng/Add Ads/Fix UI [M] → MinhNM (dự phòng: LinhNV, TiếnBV)`); each WARN finding
-as `WARN <code>: <message>`; and the report path. The full detail is in the workbook.
+The terminal lines are listed in bot spec §7.4.
 
 ## 12 · Acceptance on the sample (removed 2026-10-13)
 
 The acceptance runs on the export sample in `input/` were removed with the sample (D59). The command line and a run
-are covered end to end against a local fake API: `tests/test_cli.py` and `tests/test_flows.py`.
+are covered end to end against a local fake API: `tests/test_cli.py` and `tests/test_assign_order.py`.
 
 ## 13 · Backtest (removed 2026-10-13)
 
