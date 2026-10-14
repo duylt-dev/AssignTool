@@ -1,6 +1,6 @@
 [project]
 name = "scrumbot"
-version = "0.2.0"
+version = "0.3.0"
 description = "Bot scrum master: review đơn của BA/MO, đề xuất PIC và sổ rủi ro sprint"
 readme = "README.md"
 requires-python = ">=3.11"
