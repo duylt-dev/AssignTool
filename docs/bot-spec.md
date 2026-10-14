@@ -4,7 +4,7 @@ What the scrum-master bot adds on top of the assignment core of [`assignment-spe
 the internal system's API, the review of an order file, the risk register and the AI memory. [`LLM.md`](../LLM.md) says where each part lives in code;
 [`confirm.md`](../confirm.md) holds the decisions cited here (`Dn` user-locked, `An` defaults, `On` open).
 
-**Status:** written 2026-10-13 for stage 1 (D57); scope cut the same day (D59); `assign` added the same day (D60); `run`, the Excel report and the memory between runs removed and the review added on 2026-10-14 (D62). User-facing text is Vietnamese (D12) and quoted exactly as the
+**Status:** written 2026-10-13 for stage 1 (D57); scope cut the same day (D59); `assign` added the same day (D60); `run`, the Excel report and the memory between runs removed and the review added on 2026-10-14 (D62); split into Input, Process and Output with two standard formats on 2026-10-14 (D63, §8). User-facing text is Vietnamese (D12) and quoted exactly as the
 bot writes it. `<n>` is an order's STT, `<Mã>` a dev code, dates are `DD/MM/YYYY`, hours are whole numbers.
 
 | § | Contents |
@@ -16,6 +16,7 @@ bot writes it. `<n>` is an order's STT, `<Mã>` a dev code, dates are `DD/MM/YYY
 | 5 | Memory: AI answers only |
 | 6 | Report (removed) |
 | 7 | `assign`: one order file, a review, one Markdown report |
+| 8 | Three steps and two standard formats: Input, Process, Output, AI |
 
 ---
 
@@ -107,9 +108,6 @@ Every non-root task is a subtask of its nearest root; bugs belong to the tree of
 | `Người làm` | the names of `nguoi_lam_ids`; matched with `devs.xlsx` by name (A10) |
 | created, updated, closed | `ngay_tao`, `ngay_cap_nhat`, `ngay_dong` |
 | description | none: the API has none (D50); the order file of `assign` gives one (§7.2) |
-
-Status kinds for names found only in the history (renamed statuses) come from every status table read in the run
-(A74); an unknown name has no kind.
 
 **History** (familiarity, assignment spec §6.1) is every root task of list Tech manager and of every Maintain sprint,
 once per `id`. Its sprints are the Maintain sprints whose `don` lists it, quoted by their label (A25); its filing day is
@@ -280,7 +278,7 @@ those of the real sprint plus this order.
 ### 7.1 The order file (A82)
 
 A `.md` file, usually in `input/don/` (an order file at the top of `--input` is never taken for the TM rules file).
-Read by `sources/order_reader.py`, without AI.
+Read by `input/files/order_md.py`, without AI.
 
 ```markdown
 # Game Emulator - Chỉnh sửa và bổ sung luồng auto scan game
@@ -408,3 +406,181 @@ pre-assigned order: `Đang ước lượng độ lớn bằng <tool>… (<n> đ�
 của AI)` (left out for a pre-assigned order), `Độ lớn: <size>[ (mặc định)] · <sizing note>`, `PIC đề xuất: <Mã> (dự
 phòng: …)` or `Đã có người làm: … (giữ nguyên)`, `Rủi ro liên quan: …`, each WARN finding of the report, and `Báo cáo:
 <path>`.
+
+## 8 · Three steps and two standard formats (D63)
+
+The bot is three steps joined by two standard formats, plus an AI module that the Process step calls. Whoever
+integrates the bot elsewhere (the TM, in the internal system's website) replaces an input adapter, an output adapter
+or the AI; the core never changes. Built on 2026-10-14 (0.3.0); `scrumbot assign` behaves exactly as before (A97).
+
+```
+INPUT (replaceable)                  PROCESS (core)                           OUTPUT (replaceable)
+dev API · production API · JSON  ─►  Inputs ─► prepare ─► decide ─► Outcome ─►  output.md · terminal · JSON · …
+· Excel  (one adapter per source)                           ▲
+                                                            └─ Sizer (AI module, replaceable)
+```
+
+### 8.1 Packages (A92)
+
+| Package | Step | Holds | Imports from `scrumbot` |
+|---|---|---|---|
+| `scrumbot.core` | Process | The two formats (§8.3, §8.4); the rules of assignment spec §7 and of §2.3, §2.5, §3, §4, §7.2, §7.3 here; `prepare`, `decide`, `evaluate` (§8.2). No file, network, clock, subprocess or printing; the standard library only. | nothing |
+| `scrumbot.input` | Input | One adapter per source, each building `Inputs`: `dev_api` (§2, with the list cache and `.env`) and `files` (`devs.xlsx`, the TM rules `.md`, the order `.md`, discovery in `--input`). | `core` |
+| `scrumbot.ai` | AI | The prompt and its parsing (pure; §2.6, assignment spec §6.4), the AI CLI tools `gemini` and `agy` (best practices §4), the memory of answers (§5), `AiSizer` (§8.5). | `core` |
+| `scrumbot.output` | Output | One adapter per format, each reading `Outcome`: `markdown` (`output.md`, §7.3, §7.4) and `terminal` (the lines of §7.4). | `core` |
+| `scrumbot.app` | — | `scrumbot assign`: `input.local` → `core.prepare` → `core.decide` with `ai.AiSizer` → `output`. Hands lines to `say`. | every package |
+| `scrumbot.cli` | — | Parses the options, calls `app`, prints, sets the exit code. | `app`, `core` |
+
+`input`, `ai` and `output` never import each other. `tests/test_boundaries.py` checks every import of every module
+against this table, that `core` imports only the standard library, that each kind of I/O has its one owner module
+(`openpyxl`: `input/files/devs_xlsx.py`; `urllib.request`: `input/dev_api/client.py`; `sqlite3`: `ai/memory.py`;
+`subprocess`: `ai/tools.py`), and that only `cli.py` prints.
+
+### 8.2 The core API (A93)
+
+```python
+from scrumbot import core
+
+prepared = core.prepare(inputs, now=now, today=None, sprint_id=None)  # §2.3 sprint, §7.2 place, §7.3 review
+outcome = core.decide(prepared, sizer=None)                          # §2.6 size, assignment spec §7, §4 register
+outcome = core.evaluate(inputs, now=now, today=None, sprint_id=None, sizer=None)  # prepare, then decide
+```
+
+- `now` is the run time: the core never reads the clock. `today` is the run day (`--today`); `None` is `now.date()`.
+  `sprint_id` is `--sprint-id`.
+- `prepare` checks `Inputs` (§8.3), picks the running sprint, places the order and reviews it. `prepared.review`
+  holds the blocking items (§7.3). `prepared` also carries what the terminal prints before the AI is called (§7.4):
+  the source and its freshness, the rules in force, the size of the history, the placed order.
+- `decide` returns the `not_ready` outcome of a blocked order without calling `sizer` (A86).
+- `sizer` is the AI (§8.5). `None` sizes every order `M` with the note `tắt AI (mọi đơn M)`, as `--ai off`.
+- Every error the user can act on is an `InputError` whose message is a Vietnamese text of this spec or of the
+  assignment spec. The core returns an outcome or raises; it never prints and never exits.
+
+### 8.3 Standard input: `Inputs` (A94)
+
+A frozen dataclass of `scrumbot.core`. `Inputs.from_dict(data)` reads its JSON form and `inputs.to_dict()` writes it.
+Field names are the same in Python and in JSON. In JSON a date is `"YYYY-MM-DD"` and a time `"YYYY-MM-DDTHH:MM:SS"`
+(the system's local time, no zone, as the API writes it); an optional field may be absent or `null`; every text is
+NFC-normalised when read; unknown keys are ignored.
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `format` | text | ✓ (JSON) | `scrumbot-input/1`. |
+| `source` | text | ✓ | Label of the data, printed as `Nguồn: <source>`, e.g. `API devclickup.datlt.site`. |
+| `fetched_at` | time | ✓ | When the data was read. |
+| `sprints` | list of Sprint | ✓ | Every list of board Maintain; §2.3 picks the sprints among them. |
+| `lists` | map: list id → list of Task | ✓ | The items of every list read, every level of the tree: at least every Maintain sprint. A task in several lists appears in each. |
+| `history_lists` | list of text | — | Ids of `lists` that are not sprints but count as history (§2.5). The dev API adapter gives list Tech manager, `901609972453`. |
+| `status_changes` | list of StatusChange | — | Status history, at least of every item of the running sprint. Without it `STATUS-STUCK` falls back to `updated` and `QA-RETURNS` sees no return to `qa - need fix`. |
+| `devs` | list of Dev | ✓ | The dev list (assignment spec §4). |
+| `rules` | list of TeamRule | — | The TM rules (assignment spec §14). |
+| `rules_source` | text | — | Where the rules came from, quoted in rule errors (`File '<rules_source>', dòng …`) and on the terminal; empty without rules. |
+| `order` | Order | ✓ | The order being filed (§7.1). |
+
+**Sprint**: one list of board Maintain (`/api/doc/sprints`).
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `id` | text | ✓ | List id. |
+| `name` | text | ✓ | E.g. `Sprint 10 (10/6 - 10/17)`; the number after `Sprint` is the sprint number. |
+| `kind` | text | ✓ | `sprint` or `list` (A56). |
+| `start`, `end` | date | — | First and last day; a sprint without them never runs. |
+| `archived` | yes/no | — | Default no. |
+| `total` | number | ✓ | Root orders in the list; a list with 0 is not a Maintain sprint (A56). |
+
+**Task**: one item of a list (`/api/doc/don`): a root order, a subtask or a bug.
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `id` | text | ✓ | Item id. |
+| `title` | text | ✓ | |
+| `parent_id` | text | — | The parent item; empty for a root. A root that is not a bug is an order (D5). |
+| `is_bug` | yes/no | — | A bug item, never an order. Default no. |
+| `status` | text | — | Status name, e.g. `in progress`. |
+| `status_kind` | text | — | `open`, `custom`, `done`, `closed`, or empty when unknown. |
+| `assignees` | list of text | — | Full names of `Người làm`, matched with `devs[].name` (A10). |
+| `priority_raw` | text | — | `urgent`, `high`, `normal`, `low` or empty, as written. |
+| `due` | date | — | `Hạn`. |
+| `hours` | number | — | The human estimate: only an AI example on history orders, never a size (D3). |
+| `app` | text | — | App name. |
+| `created` | time | ✓ | Filing time; orders are numbered by it (A76). |
+| `updated`, `closed` | time | — | Last update, closing time. |
+
+**StatusChange**: `task_id` (text, ✓), `new` (text, ✓: the status entered), `at` (time, ✓).
+
+**Dev** (assignment spec §4): `name` (text, ✓; as in `assignees`), `code` (text, ✓), `level` (text, ✓: `junior`,
+`junior+`, `middle`, `middle+`, `senior`), `active` (yes/no, ✓: `Nhận việc`), `leave_days` (list of dates).
+
+**TeamRule** (assignment spec §14): `kind` (text, ✓: `Chỉ định`, `Không giao`, `Tối đa đơn`, `Ưu tiên`), `dev` (text,
+✓: a `code`), `app` (text), `max_orders` (number), `start`, `end` (dates), `note` (text), `line` (number, ✓: names
+the rule in messages and reasons; the line in the rules file, or any number unique among the rules).
+
+**Order** (§7.1): `title` (text, ✓), `order_id` (text: the order's id on the system; empty to match by title or file a
+new order, §7.2), `app`, `priority_raw` (text), `due` (date), `description` (text as written; the core removes links
+and names before the AI reads it, §7.2), `origin` (text: where the order came from, e.g. the file path; shown as
+`File đơn` and in the not-ready line of `output.md`).
+
+**Checks.** A JSON form that does not fit is the input error `Dữ liệu đầu vào không đúng dạng: <path>: <problem>.`,
+where `<path>` reads like `devs[2].level` or `lists[<list id>][3].created` and `<problem>` is `thiếu`, `không phải
+<kind>` (`chữ`, `số nguyên`, `số`, `đúng/sai`, `danh sách`, `bảng`, `ngày YYYY-MM-DD`, `thời điểm YYYY-MM-DDTHH:MM:SS`) or
+`'<value>' không hợp lệ` (a level or a rule kind). A top level that is not an object is `Dữ liệu đầu vào không đúng
+dạng: không phải bảng.`; a missing `format` is `Dữ liệu đầu vào không đúng dạng: format: thiếu.`; another one is `Dữ
+liệu đầu vào không đúng dạng: format '<value>', cần scrumbot-input/1.` On every `Inputs`, whatever adapter built it, `prepare` checks before anything else, in this order:
+no dev (`Dữ liệu đầu vào không có dev nào.`), a dev name or code used twice (`Dữ liệu đầu vào trùng tên dev '<name>'.`,
+`Dữ liệu đầu vào trùng mã dev '<code>'.`, compared like names, A10), then the rules against the devs (assignment spec
+§14.2, `rules_source` standing for the file name). The file adapter keeps its own messages with row numbers
+(assignment spec §4), so these fire only for another adapter; the file adapter also checks the rules against the
+devs before any API call, so that a mistake in the files never waits for the API.
+
+### 8.4 Standard outcome: `Outcome` (A95)
+
+A frozen dataclass of `scrumbot.core`; `outcome.to_dict()` gives its JSON form, with the value formats of §8.3. Texts
+are the Vietnamese texts of this spec. A code (`REVIEW-…`, a risk code, a finding code) never changes once released,
+so another output may show its own words for a code.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `format` | text | `scrumbot-outcome/1` (JSON only). |
+| `status` | text | `not_ready` (§7.3 blocks), `proposed` (the bot proposes a PIC) or `pre_assigned` (the order has a `Người làm` and is kept, D10). |
+| `run_at` | time | The run time; with `--today`, that day at the time of `now`. |
+| `source`, `freshness` | text, time | `Inputs.source`; the newest `updated` read (D49), may be empty. |
+| `sprint` | object | `id`, `name`, `start`, `end`, `previous` (the previous sprint's name, §2.3; `sprint trước` without one). |
+| `order` | object | `title`, `stt`, `id` (empty for a new order), `placement` (`new`, `id` or `title`, §7.2), `origin`, `app`, `priority_raw`, `due`, `description` (as the AI read it, §7.2). |
+| `review` | list of {`code`, `message`} | The blocking items of §7.3; empty unless `not_ready`. |
+| `assignment` | object or null | Null when `not_ready`. `pic_codes` (`proposed`: the PIC; `pre_assigned`: the pool devs holding it, may be empty), `pic_names`, `reason` (assignment spec §8), `backups` (at most 2 codes; empty for `pre_assigned`), `rule_lines` (the TM rules that shaped the choice), `rules_relaxed` (A31). |
+| `size` | object or null | Null when `not_ready`. `size` (`S`, `M`, `L`, `XL`), `hours` (4, 16, 32, 64), `is_default` (`M` because the AI was off or failed), `reason`, `kind` and `kind_label` (the AI type and its label, §2.6), `items`, `tech_risks`, `questions` (A90), `remembered`, `note` (the sizing note of the run, e.g. `AI (agy, 6/6 đơn; 5 từ bộ nhớ)`). |
+| `risks` | list of Risk | The risks of this order, of its PIC and of the sprint (§7.4), in register order: `level` (`high`, `medium`, `low`), `level_text` (`Cao`, `Trung bình`, `Thấp`), `code`, `group` (`Năng lực`, `Phân công`, `Tiến độ`, `Chất lượng`), `where`, `problem`, `impact`, `action`, `if_it_happens` (§7.4), `owner`, `due`, `stt`. Empty when `not_ready`. |
+| `sprint_risks` | {`high`, `medium`, `low`} | Counts over the whole register; zeros when `not_ready`. |
+| `devs` | list of DevLine | The dev table of §7.4: `code`, `level`, `familiarity`, `orders`, `open_hours`, `capacity` (null without sprint dates), `carry_over`, `leave_days`, `role`. Empty when `not_ready`. |
+| `findings` | list of {`severity`, `code`, `where`, `message`} | `severity` `WARN` or `INFO`; every finding except those about another order (§7.4). Empty when `not_ready`. |
+
+`output.md` is built from `Outcome` alone, and the terminal lines from `prepared` and `Outcome`. The `Nếu xảy ra`
+sentences (§7.4) and the labels of the AI types (§2.6) move from the Markdown writer into the core, so every output
+shows the same words.
+
+### 8.5 The AI module (A96)
+
+The core sees the AI only as a **sizer**: a callable `sizer(orders, examples, fresh) -> Sizing`. `orders` are the
+sprint's orders, the filed order's description already scrubbed (§7.2); `examples` are the history orders of the
+window (assignment spec §5.1); `fresh` holds the STTs that must be sized by this call and never remembered (§2.6).
+`Sizing` holds a `SizeEstimate` per STT, the findings of the AI reply and the sizing note. A sizer never raises for an
+AI failure: it sizes the orders `M` and says why in the note. An order the sizer leaves out is sized `M` by the core.
+
+`scrumbot.ai` gives today's sizer, `AiSizer(ask, tool=…, now=…, memory=…, say=…)`; `tool` names the AI in the notes
+and the memory, `now` is the run time stored with an answer:
+
+- `ask(prompt) -> AiReply` is one AI call. `ai.tools.cli_ask(tool, model, timeout)` runs `gemini` or `agy` as now
+  (best practices §4). Another AI (an HTTP API, another vendor) is another `ask`; the prompt, its parsing and the
+  memory stay as they are.
+- `memory` is the SQLite store of §5, or `None` for no memory.
+- `say` receives `Đang ước lượng độ lớn bằng <tool>… (<n> đơn)` before the call.
+
+What reaches the AI does not change: titles, App, priority, the history's titles and hours and the scrubbed
+description (A18, A83); never a name, a code or a link.
+
+### 8.6 What does not change
+
+`scrumbot assign` keeps its options, its terminal lines, its exit codes, its files on disk and `output.md` byte for
+byte; the end-to-end tests of today are the reference (A97). The adapter `input.dev_api` still reads only the dev
+server and refuses production (D49, A64): reading production is another adapter, written by whoever integrates the
+bot. There is still one command (D62); a JSON entry point for a website not written in Python is open (O15).

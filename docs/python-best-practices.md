@@ -37,12 +37,16 @@ Every rule states what breaking it costs. A rule with no reason gets ignored, th
 
 ## 2 · Modules and files
 
-- Module names are `snake_case.py`. This overrides the kebab-case rule in `.claude/rules/development-rules.md`: a
-  module named with `-` cannot be imported.
+- Module names are `snake_case.py`, never kebab-case: a module named with `-` cannot be imported.
 - Keep files under about 200 lines. A file that grows past that is usually doing two jobs.
-- **Pure core, thin edges.** `rules/*`, `understanding/sizing.py` and `normalize.py` do no I/O (LLM.md §2). Readers turn files into `model.py`
-  values and contain no decisions; `ai_cli.py` runs a command and returns text. If a decision creeps into an edge
-  module, move it into `rules/`: a rule inside a reader can only be tested with a real file shaped for it.
+- **Pure core, thin edges** (bot spec §8). `core/` does no I/O and imports only the standard library, and
+  `ai/prompt.py` is pure too (LLM.md §2). Input adapters turn files and API replies into the values of
+  `core/inputs.py` and contain no decisions; `ai/tools.py` runs a command and returns text; output adapters only
+  format an `Outcome`. If a decision creeps into an adapter, move it into `core/rules/`: a rule inside a reader can
+  only be tested with a real file shaped for it, and a website that replaces the reader would lose it.
+- **The two standard formats are the contract** (`core/inputs.py`, `core/outcome.py`, bot spec §8.3–§8.4). A field
+  added to one is added to the spec's table in the same change, with its JSON form; a field nobody reads is removed,
+  not kept "for later": the TM maps every field of the table.
 - No module-level mutable state. A cache or a counter at module level leaks between test cases and makes their result
   depend on order.
 
@@ -53,14 +57,14 @@ Every rule states what breaking it costs. A rule with no reason gets ignored, th
 - **Open workbooks with `load_workbook(path, read_only=True, data_only=True)`.** `data_only` returns cached values,
   so the footer's `=COUNTIF(…)` never arrives as text; `read_only` keeps memory flat. Close the workbook in a
   `finally` (or use `contextlib.closing`): on Windows an unclosed read-only workbook keeps the file locked.
-- **Normalise text once, at the reader boundary,** with `normalize.py`: `unicodedata.normalize("NFC", …)`, trimmed,
+- **Normalise text once, at the reader boundary,** with `core/normalize.py`: `unicodedata.normalize("NFC", …)`, trimmed,
   whitespace collapsed. Excel on macOS and copy-pasted names can be NFD; two spellings of "Linh" in different forms
   compare unequal, and a dev's load is then silently wrong.
 - **Dates:** a cell may hold a `datetime`, a `date`, a string or nothing. The reader converts all of them to
   `datetime.date | None` and raises `InputError` naming the sheet, row and column for an unreadable string. The
   API's times are strings too (§12). Never
   compare a `datetime` with a `date`; it raises `TypeError` at runtime in the middle of a sort.
-- **The TM rules `.md`: tables by header, everything else ignored.** `rules_reader.py` opens the file with
+- **The TM rules `.md`: tables by header, everything else ignored.** `input/files/rules_md.py` opens the file with
   `encoding="utf-8-sig"` (editors on Windows add a BOM), finds tables by their delimiter row and keeps those whose
   header has `Loại` and `Dev`; columns go by header name like `devs.xlsx`. Text outside the tables is the TM's
   notes. A parser that read the file line by line as rules would turn a note into an input error, and one that read
@@ -68,13 +72,13 @@ Every rule states what breaking it costs. A rule with no reason gets ignored, th
 
 ## 4 · Calling the AI tool (subprocess)
 
-All child processes go through `ai_cli.py`. Rules it enforces:
+All child processes go through `ai/tools.py`. Rules it enforces:
 
 - **Arguments are a list, never `shell=True`.** The prompt carries text BA typed: quotes, `$`, backticks, `&`.
   Through a shell, an order description becomes a command on the TM's machine.
 - **Never pass order text as an argument to a `.cmd` or `.bat` file.** On Windows, arguments to a batch file are
   re-parsed by `cmd.exe` and the same injection returns even without `shell=True`. `gemini` (an npm shim on Windows)
-  therefore gets the prompt on **stdin**; if the resolved `agy` is a batch file, `ai_cli.py` refuses it and the run
+  therefore gets the prompt on **stdin**; if the resolved `agy` is a batch file, `ai/tools.py` refuses it and the run
   falls back to `M`.
 - **Start the child in its own process group, and on timeout or Ctrl+C kill the whole group** (`_run_child`:
   `Popen(start_new_session=True)` + `os.killpg` on POSIX, `CREATE_NEW_PROCESS_GROUP` + `taskkill /F /T` on Windows),
@@ -89,9 +93,10 @@ All child processes go through `ai_cli.py`. Rules it enforces:
   read, log or copy an API key.
 - **Log the prompt and reply only at DEBUG** (`-v`). They contain internal order text; a default log line ends up in
   a terminal screenshot.
-- **Every failure becomes a value, not an exception:** `ai_cli.py` returns either the reply text or a short failure
-  reason (`không tìm thấy gemini`, `hết thời gian 180s`, `mã thoát 41: <error.message>`), and `rules/sizing.py` turns that into
-  sizes and a finding (spec §6.4, §9).
+- **Every failure becomes a value, not an exception:** `ai/tools.py` returns either the reply text or a short failure
+  reason (`không tìm thấy gemini`, `hết thời gian 180s`, `mã thoát 41: <error.message>`), and `ai/prompt.py` turns that
+  into sizes and a finding (spec §6.4, §9). Another `ask` (an HTTP AI) must do the same: a sizer never raises for an
+  AI failure (bot spec §8.5).
 
 ## 5 · Cross-platform
 
@@ -136,8 +141,10 @@ The tool runs on Windows, Linux and macOS (A2).
 ## 9 · Types and value objects
 
 - Type hints on every function signature. Use `X | None`, `list[str]`, not `Optional`/`List`.
-- Value objects in `model.py` are `@dataclass(frozen=True, slots=True)`, with tuples instead of lists inside them.
-  Rules then cannot mutate their inputs, and the order in which rules run cannot change a result.
+- Value objects in `core/` are `@dataclass(frozen=True, slots=True)`, with tuples instead of lists inside them.
+  Rules then cannot mutate their inputs, and the order in which rules run cannot change a result. The types of the
+  standard input with optional fields are `kw_only=True`: a field's default is its JSON default, and a call names
+  every field it sets.
 - `Level`, `Priority` and `Size` are `enum.IntEnum`: `Level.JUNIOR` (0) … `Level.SENIOR` (4); `Priority.URGENT` (0) …
   `Priority.LOW` (3), smaller first; `Size` values are the hours (`S = 4` … `XL = 64`), so a load is a plain sum.
 - **Test a parsed enum with `is None`, never with truthiness.** `Priority.URGENT` and `Level.JUNIOR` are 0, so
@@ -152,7 +159,10 @@ The tool runs on Windows, Linux and macOS (A2).
   key part of spec §7 has a case where it alone decides (LLM.md §8).
 - **Readers: real files.** Build `devs.xlsx` with `openpyxl` inside the test (one name stored as NFD) and write the
   rules `.md` with each supported shape (BOM, CRLF, fenced blocks).
-- **`ai_cli.py`: a real child process** (`tests/fake_ai.py`), never a mocked `subprocess` (LLM.md §8).
+- **`ai/tools.py`: a real child process** (`tests/fake_ai.py`), never a mocked `subprocess` (LLM.md §8).
+- **The core through its API** (`tests/test_engine.py`): an `Inputs` built in Python, as a website would, no HTTP and
+  no file. **The boundaries from the source** (`tests/test_boundaries.py`): imports read with `ast`, so a forbidden
+  import fails the build instead of waiting for a review.
 - **The API client: a real local HTTP server** (`tests/http_server.py`), never a mocked urllib. **No test reaches the
   dev server:** `tests/conftest.py` points `SCRUMBOT_API_BASE` at a closed local port for every test; a test that
   forgets to start the fake server fails in milliseconds instead of calling the dev server with the real token.
@@ -168,7 +178,7 @@ The tool runs on Windows, Linux and macOS (A2).
 4. Changed the API source, a rule, a risk, the review or the flow: ran `uv run scrumbot assign
    input/don/<file>.md --ai off --out <scratch dir> --state <scratch dir>` against the dev server and read
    `output.md`.
-5. Changed `ai_cli.py` or `rules/sizing.py`: ran `ASSIGNTOOL_TEST_AI=gemini uv run pytest -m ai` (or `=agy`) once with a real AI tool,
+5. Changed `ai/tools.py` or `ai/prompt.py`: ran `ASSIGNTOOL_TEST_AI=gemini uv run pytest -m ai` (or `=agy`) once with a real AI tool,
    or the report says plainly that it did not run.
 6. No `shell=True`; no file opened without `encoding=`; no column read by index; no `datetime` compared with a
    `date` (§3–§5).
@@ -177,7 +187,7 @@ The tool runs on Windows, Linux and macOS (A2).
 
 ## 12 · The internal system's API and the memory
 
-- **One HTTP client, GET only** (`sources/api_client.py`): `Authorization: Bearer`, `User-Agent: scrumbot/<version>`,
+- **One HTTP client, GET only** (`input/dev_api/client.py`): `Authorization: Bearer`, `User-Agent: scrumbot/<version>`,
   timeout 60 s, `429` waits 30 s and retries three times, every other failure an `ApiError` with a Vietnamese message.
   Measured 2026-10-13: urllib's default User-Agent gets a Cloudflare 403 (code 1010), and 4,816 history rows need 97
   requests against a limit of 120 a minute; a client without the header or the retry fails on the first run.
@@ -185,9 +195,10 @@ The tool runs on Windows, Linux and macOS (A2).
   reports never carry it. A token in a log line ends up in a screenshot or a committed file.
 - **Read the configuration from the environment first, then `.env`, leniently** (spaces around `=`, quotes). The
   user's `.env` had `KEY = value`; a strict parser reported a missing token that was there.
-- **Decide from model values, never from JSON.** `raw_store.py` gets the raw replies (with the list cache) and
-  `api_reader.py` turns them into `model_board` values; rules never see JSON, so they are tested with plain values.
-- **The AI answers are one SQLite file with one owner** (`actions/state_store.py`); each method opens, writes and commits
+- **Decide from standard-input values, never from API JSON.** `input/dev_api/cache.py` gets the raw replies (with the
+  list cache) and `input/dev_api/reader.py` turns them into `core/inputs.py` values; rules never see the API's JSON,
+  so they are tested with plain values.
+- **The AI answers are one SQLite file with one owner** (`ai/memory.py`); each method opens, writes and commits
   on its own. A long-lived connection would hold a lock while `agy` thinks for two minutes.
 - **Times are naive local times,** like the API's (`YYYY-MM-DD HH:MM:SS`, server time = the team's time zone).
   Mixing an aware `datetime` with the API's naive ones raises `TypeError` in the middle of a comparison.

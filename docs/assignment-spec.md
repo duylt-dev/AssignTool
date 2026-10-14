@@ -68,9 +68,8 @@ and `.` are ignored.
 
 ## 3 · Input: the target sprint
 
-The orders come from the API (bot spec §2.5): the target sprint becomes rows with the columns `STT` · `ID` · `Task` ·
-`App Name` · `Trạng thái` · `Người làm` · `Ưu tiên` · `Hạn` · `Ngày tạo` · `Bug mở` · `Bug tổng` (A76), and the
-sprint's first and last days come from the sprint list. An order with a `Người làm` is **pre-assigned**: kept as it
+The orders come from the standard input (bot spec §2.5, §8.3): the running sprint becomes numbered rows, roots by
+filing time (A76), then subtasks, bugs apart, and the sprint's first and last days come from the sprint list. An order with a `Người làm` is **pre-assigned**: kept as it
 is (D10), its size added to its devs' load. An empty one is assigned by §7. Subtasks are never assigned and never
 measure size (D5, D9). The export workbook this section once described was removed on 2026-10-13 (D59).
 
@@ -302,7 +301,7 @@ With a pin: `Luật TM dòng 5: chỉ định LinhNV cho AR Dog (Linh giữ AR D
 Tải sprint này: 32h (2 đơn) · Việc dở Sprint 9: 1`.
 
 When the order has no app, part 1 is `Đơn không có App Name`. Pre-assigned orders get the reason
-`Đã giao sẵn trong file`. Dates in messages are written `DD/MM/YYYY`.
+`Đã có người làm trên hệ thống`. Dates in messages are written `DD/MM/YYYY`.
 
 ## 9 · Findings
 
@@ -317,7 +316,6 @@ never renamed once released. Nothing is ever reported about people outside the p
 | `APP-MISSING` | WARN | An order has an empty `App Name`. | `Đơn STT <n> không có App Name; coi như app chưa ai làm.` |
 | `PRIORITY-UNKNOWN` | WARN | `Ưu tiên` is not urgent/high/normal/low/empty. | `Đơn STT <n> có Ưu tiên "<giá trị>" không hợp lệ; coi như normal.` |
 | `DUE-BEFORE-CREATED` | WARN | `Hạn` is before `Ngày tạo`. | `Đơn STT <n> có Hạn <hạn> trước Ngày tạo <ngày tạo>.` |
-| `TYPE-UNKNOWN` | WARN | `Loại` is neither `Task` nor `Subtask`. | `Dòng STT <n> có Loại "<giá trị>" không hợp lệ; bỏ qua dòng này.` |
 | `PREV-SPRINT-MISSING` | WARN | No previous Maintain sprint (A59). | `Không có sheet <tên>; coi như không dev nào còn việc dở.` |
 | `DEV-ON-LEAVE` | INFO | A pool dev is off for every working day. | `<Mã> nghỉ cả sprint; không được giao đơn.` |
 | `PRE-ASSIGNED-ON-LEAVE` | WARN | A pre-assigned order names a dev who is off for every working day (`DEV-ON-LEAVE`) and no other pool dev, so nobody in the pool works on it (A43). The order is still kept (D10). `where` = `Đơn STT <n>`. | `Đơn STT <n> giao sẵn cho <Mã> nhưng <Mã> nghỉ cả sprint; đơn chưa có ai làm, cân nhắc giao lại.` |
@@ -345,7 +343,7 @@ The terminal lines are listed in bot spec §7.4.
 ## 12 · Acceptance on the sample (removed 2026-10-13)
 
 The acceptance runs on the export sample in `input/` were removed with the sample (D59). The command line and a run
-are covered end to end against a local fake API: `tests/test_cli.py` and `tests/test_assign_order.py`.
+are covered end to end against a local fake API: `tests/test_cli.py` and `tests/test_app.py`; the core alone in `tests/test_engine.py`.
 
 ## 13 · Backtest (removed 2026-10-13)
 
