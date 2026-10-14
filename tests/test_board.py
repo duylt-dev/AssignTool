@@ -1,4 +1,4 @@
-"""From API values to the rules' inputs (bot spec §2.3, §2.5): which sprint runs, its orders, history, backlog."""
+"""From API values to the rules' inputs (bot spec §2.3, §2.5): which sprint runs, its orders, history, freshness."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from scrumbot.errors import InputError, NoRunningSprint
 from scrumbot.model_board import TECH_MANAGER_LIST, Board
 from scrumbot.rules.board import (
     API_HEADERS,
-    empty_backlog,
     history_orders,
     maintain_sprints,
     newest_update,
@@ -116,20 +115,15 @@ def test_history_is_every_root_once_with_the_sprints_that_list_it() -> None:
     assert (found["Research"].sprint, found["Research"].sprints) == ("", ())
 
 
-def test_the_empty_backlog_counts_unfinished_empty_roots_outside_every_sprint() -> None:
+def test_freshness_is_the_newest_update_read() -> None:
     board = _board(
         {
             "S10": orders(item("in-sprint", people=())),
             TECH_MANAGER_LIST: orders(
-                item("in-sprint", people=()),
                 item("old", status="all issue", created=datetime(2026, 2, 1, 9)),
                 item("new", status="ready to progress", created=datetime(2026, 10, 1, 9)),
-                item("done", status="done"),
-                item("taken", people=(LINH,)),
-                item("sub", parent="old"),
             ),
         }
     )
 
-    assert empty_backlog(board, date(2026, 10, 13)) == (2, 1)
     assert newest_update(board) == datetime(2026, 10, 1, 9)

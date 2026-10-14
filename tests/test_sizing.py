@@ -36,9 +36,10 @@ def test_build_prompt_has_exact_headers_removes_urls_and_never_includes_people()
     assert "Orders to size:\n- STT 7 · Camera · high · Fix crash · See [link] please" in prompt
     assert prompt.endswith(
         '[{"stt": <STT number>, "size": "S|M|L|XL", "reason": "<at most 20 words, in Vietnamese>",\n'
-        '  "type": "<type>", "items": ["<item>"], "tech_risks": ["<risk>"]}]\n'
+        '  "type": "<type>", "items": ["<item>"], "tech_risks": ["<risk>"], "questions": ["<question>"]}]\n'
     )
     assert "its type (ads, iap, flow_ui, policy, crash, sdk, feature or other)" in prompt
+    assert "also give at most 2 short questions in Vietnamese to the person who filed it" in prompt
     assert "Nguyen Van A" not in prompt
     assert "Tran Thi B" not in prompt
     assert "https://" not in prompt
@@ -162,3 +163,21 @@ def test_parse_reply_reads_the_understanding_fields_and_never_lets_them_change_t
     )
     assert (sizes[2].size, sizes[2].kind, sizes[2].items, sizes[2].tech_risks) == (Size.S, "", (), ())
     assert (sizes[3].size, sizes[3].kind) == (Size.XL, "")
+
+
+def test_parse_reply_keeps_at_most_two_questions_and_a_wrong_key_never_changes_the_size() -> None:
+    """A90: questions to the person who filed the order; bad values are dropped, the size stays."""
+    orders = (_order(1), _order(2))
+    long = "Có " + "x" * 300
+    reply = AiReply(
+        "agy",
+        '[{"stt": 1, "size": "M", "reason": "r", "questions": ["Màn nào?", "", "' + long + '", "Thừa?"]},'
+        ' {"stt": 2, "size": "S", "questions": "not a list"}]',
+        None,
+    )
+
+    sizes, findings, _ = parse_reply(reply, orders)
+
+    assert findings == ()
+    assert sizes[1].questions == ("Màn nào?", long[:200])
+    assert (sizes[2].size, sizes[2].questions) == (Size.S, ())

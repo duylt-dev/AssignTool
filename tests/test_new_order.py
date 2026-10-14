@@ -186,6 +186,5 @@ def test_every_risk_code_has_a_contingency_sentence() -> None:
         "DUE-AT-RISK",
         "STATUS-STUCK",
         "QA-RETURNS",
-        "ORDER-CHANGED",
     }
     assert set(IF_IT_HAPPENS) == codes and all(text.endswith(".") for text in IF_IT_HAPPENS.values())

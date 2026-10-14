@@ -38,19 +38,24 @@ def _sprint(sprint_id: str, *, archived: bool = False, end: date = date(2026, 10
     return SprintInfo(sprint_id, sprint_id, "sprint", date(2026, 10, 6), end, archived, 1, 0)
 
 
+def _written_at(path: Path, moment: datetime) -> None:
+    os.utime(path, (moment.timestamp(), moment.timestamp()))
+
+
 def test_archived_lists_come_from_the_cache_and_ended_ones_only_on_the_day_they_were_cached(tmp_path: Path) -> None:
     client = CountingClient()
     source = LiveSource(client, tmp_path / "cache", TODAY)  # type: ignore[arg-type]
     archived, ended, running = _sprint("A", archived=True), _sprint("E", end=date(2026, 10, 2)), _sprint("R")
 
+    cached = tmp_path / "cache" / "don" / "E.json.gz"
     for _ in range(2):
         source.orders("A", archived)
         source.orders("E", ended)
+        _written_at(cached, datetime(2026, 10, 13, 9))  # the run day, not the machine's clock
         source.orders("R", running)
     assert client.fetched == ["A", "E", "R", "R"]
 
-    yesterday = (datetime(2026, 10, 12, 9)).timestamp()
-    os.utime(tmp_path / "cache" / "don" / "E.json.gz", (yesterday, yesterday))
+    _written_at(cached, datetime(2026, 10, 12, 9))
     source.orders("E", ended)
     source.orders("A", archived)
     assert client.fetched == ["A", "E", "R", "R", "E"]

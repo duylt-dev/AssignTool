@@ -1,5 +1,5 @@
-"""The command line against a real local HTTP server (assignment spec §2, §10, §11; bot spec §1, §6): input
-discovery, exit codes, the report's sheets, the TM rules and the AI wiring. Nothing reaches the dev server."""
+"""The command line against a real local HTTP server (assignment spec §2, §11; bot spec §1, §7): input discovery,
+exit codes, output.md, the TM rules and the AI wiring. Nothing reaches the dev server."""
 
 from __future__ import annotations
 
@@ -8,9 +8,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 import pytest
-from openpyxl import load_workbook
 
-from scrumbot.actions.xlsx_report import report_name
 from scrumbot.cli import main
 from scrumbot.model import AiReply
 from scrumbot.model_board import TECH_MANAGER_LIST
@@ -22,6 +20,8 @@ from tests.http_server import FakeDevServer
 DONE = item("old", "1.0.0", people=(LINH,), status="done", hours=12, created=datetime(2026, 9, 23, 9))
 EMPTY = item("new", "1.0.1 - Add ads", status="ready to progress", created=datetime(2026, 10, 7, 9))
 RULES = "# Luật\n\n| Loại | Dev | App | Ghi chú |\n|---|---|---|---|\n| Chỉ định | MinhNM | Demo | thử |\n"
+# The file names the empty order of the sprint by its title (bot spec §7.2) and passes the review (§7.3).
+ORDER = "# 1.0.1 - Add ads\n\nThêm quảng cáo xen kẽ ở màn hình chính và màn kết quả.\n"
 
 
 @pytest.fixture
@@ -50,39 +50,30 @@ def source(tmp_path: Path) -> Path:
 
 
 def _run(source: Path, tmp_path: Path, *flags: str) -> int:
+    order = tmp_path / "don" / "order.md"
+    order.parent.mkdir(exist_ok=True)
+    order.write_text(ORDER, encoding="utf-8")
     paths = ["--input", str(source), "--state", str(tmp_path / "state"), "--out", str(tmp_path / "out")]
-    return main(["run", *paths, *flags])
+    return main(["assign", str(order), *paths, *flags])
 
 
-def _report(tmp_path: Path) -> Path:
-    (path,) = (tmp_path / "out").glob("assignment_sprint-2_*.xlsx")
-    return path
+def _report(tmp_path: Path) -> str:
+    return (tmp_path / "out" / "output.md").read_text(encoding="utf-8")
 
 
-def _assignment(tmp_path: Path) -> dict[str, object]:
-    header, row = list(load_workbook(_report(tmp_path))["Phân công"].iter_rows(values_only=True))
-    return dict(zip(header, row, strict=True))
-
-
-def test_off_run_writes_the_six_sheets_and_prints_the_proposal(
+def test_an_off_run_writes_output_md_and_prints_the_proposal(
     server: FakeDevServer, source: Path, tmp_path: Path, capsys
 ) -> None:
     assert _run(source, tmp_path, "--ai", "off", "--today", "2026-10-08") == 0
 
-    workbook = load_workbook(_report(tmp_path))
-    assert workbook.sheetnames == ["Tóm tắt", "Phân công", "Rủi ro", "Thay đổi", "Cảnh báo", "Tải dev"]
-    row = _assignment(tmp_path)
-    assert (row["Độ lớn"], row["Giờ ước tính"], row["Mã PIC"], row["Nguồn"]) == (
-        "M (mặc định)",
-        16,
-        "LinhNV",
-        "Tool đề xuất",
-    )
-    assert str(row["Lý do"]).startswith("Làm version gần nhất của Demo (Sprint 1 (9/22 - 10/3): 1.0.0)")
+    report = _report(tmp_path)
+    assert "- **PIC đề xuất: LinhNV**" in report and "- Độ lớn (AI): M (16h) (mặc định)" in report
+    assert "- Lý do: Làm version gần nhất của Demo (Sprint 1 (9/22 - 10/3): 1.0.0)" in report
+    assert "Không có câu hỏi của AI (AI tắt hoặc lỗi)." in report
     printed = capsys.readouterr().out
-    assert "Ngày chạy: 08/10/2026 (--today)" in printed and "Độ lớn: tắt AI (mọi đơn M)" in printed
-    assert "Luật TM: không có" in printed
-    assert "STT 1 · Demo 1.0.1 - Add ads [M] → LinhNV (dự phòng: MinhNM, AnTD)" in printed
+    assert "Ngày chạy: 08/10/2026 (--today)" in printed and "Độ lớn: M (mặc định) · tắt AI (mọi đơn M)" in printed
+    assert "Luật TM: không có" in printed and "Review: đạt (0 câu hỏi của AI)" in printed
+    assert "PIC đề xuất: LinhNV (dự phòng: MinhNM, AnTD)" in printed
     assert not list((tmp_path / "out").glob("*.tmp"))
 
 
@@ -93,16 +84,19 @@ def test_ai_reply_sizes_the_order_without_names_and_with_the_history_hours(
 
     def fake(tool, prompt, *, model, timeout):
         calls.append((tool, model, timeout, LINH in prompt, "- Demo · 1.0.0 · 12h" in prompt))
-        return AiReply(tool, '[{"stt": 1, "size": "L", "reason": "Thêm ads"}]', None)
+        reply = '[{"stt": 1, "size": "L", "reason": "Thêm ads", "questions": ["Quảng cáo loại nào?"]}]'
+        return AiReply(tool, reply, None)
 
     monkeypatch.setattr(ai_cli, "run_ai", fake)
 
     assert _run(source, tmp_path, "--ai-model", "m1", "--ai-timeout", "9", "--today", "2026-10-08") == 0
 
     assert calls == [("gemini", "m1", 9, False, True)]
-    row = _assignment(tmp_path)
-    assert (row["Độ lớn"], row["Giờ ước tính"], row["Lý do độ lớn"]) == ("L", 32, "Thêm ads")
-    assert "Độ lớn: AI (gemini, 1/1 đơn)" in capsys.readouterr().out
+    report = _report(tmp_path)
+    assert "- Độ lớn (AI): L (32h): Thêm ads" in report
+    assert "## Review: đạt\n\nCâu hỏi của AI cho người lên đơn" in report and "- Quảng cáo loại nào?" in report
+    printed = capsys.readouterr().out
+    assert "Độ lớn: L · AI (gemini, 1/1 đơn)" in printed and "Review: đạt (1 câu hỏi của AI)" in printed
 
 
 def test_ai_failure_falls_back_to_m_and_still_writes_the_report(
@@ -113,9 +107,8 @@ def test_ai_failure_falls_back_to_m_and_still_writes_the_report(
     assert _run(source, tmp_path, "--today", "2026-10-08") == 0
 
     printed = capsys.readouterr().out
-    assert "Độ lớn: mặc định M (mã thoát 41)" in printed and "WARN SIZE-AI-FAILED" in printed
-    findings = list(load_workbook(_report(tmp_path))["Cảnh báo"].iter_rows(values_only=True))
-    assert findings[1][:2] == ("WARN", "SIZE-AI-FAILED")
+    assert "mặc định M (mã thoát 41)" in printed and "WARN SIZE-AI-FAILED" in printed
+    assert "- WARN `SIZE-AI-FAILED`" in _report(tmp_path)
 
 
 def test_the_md_file_in_the_input_folder_is_the_rules_file_and_its_pin_reaches_the_report(
@@ -127,8 +120,8 @@ def test_the_md_file_in_the_input_folder_is_the_rules_file_and_its_pin_reaches_t
 
     printed = capsys.readouterr().out
     assert "Luật TM: file luat.md (1 luật, 1 có hiệu lực ngày 08/10/2026)" in printed
-    assert "STT 1 · Demo 1.0.1 - Add ads [M] → MinhNM " in printed
-    assert str(_assignment(tmp_path)["Lý do"]).startswith("Luật TM dòng 5: chỉ định MinhNM cho Demo (thử)")
+    assert "PIC đề xuất: MinhNM " in printed
+    assert "- Lý do: Luật TM dòng 5: chỉ định MinhNM cho Demo (thử)" in _report(tmp_path)
 
 
 @pytest.mark.parametrize(("today", "pic"), [("2026-10-14", "MinhNM"), ("2026-10-08", "LinhNV")])
@@ -144,7 +137,7 @@ def test_today_replaces_the_clock_for_the_rules_day(
 
     assert _run(source, tmp_path, "--ai", "off", "--today", today) == 0
 
-    assert f"STT 1 · Demo 1.0.1 - Add ads [M] → {pic} " in capsys.readouterr().out
+    assert f"PIC đề xuất: {pic} " in capsys.readouterr().out
 
 
 @pytest.mark.parametrize(
@@ -181,7 +174,21 @@ def test_missing_input_directory_exits_2(tmp_path: Path, capsys) -> None:
     assert "Không có thư mục input" in capsys.readouterr().err
 
 
-def test_report_name_uses_a_windows_safe_slug() -> None:
-    now = datetime(2026, 10, 6, 14, 30, 0)
-    assert report_name("Sprint 10", now) == "assignment_sprint-10_20261006-143000.xlsx"
-    assert report_name("Sprint: 1/2", now) == "assignment_sprint_-1_2_20261006-143000.xlsx"
+def test_the_cli_refuses_the_production_server(
+    monkeypatch: pytest.MonkeyPatch, source: Path, tmp_path: Path, capsys
+) -> None:
+    monkeypatch.setenv("SCRUMBOT_API_BASE", "https://circle.datlt.site")
+
+    assert _run(source, tmp_path, "--ai", "off") == 2
+
+    assert "trỏ tới production (circle.datlt.site); bot chỉ đọc server dev" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("argv", [[], ["run"], ["input/don/order.md"]])
+def test_only_assign_is_a_command(argv: list[str], capsys) -> None:
+    """`run` was removed (D62); without `assign` the usage is printed and the exit code is 2 (A91)."""
+    with pytest.raises(SystemExit) as stopped:
+        main(argv)
+
+    assert stopped.value.code == 2
+    assert "usage: scrumbot" in capsys.readouterr().err

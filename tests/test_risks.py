@@ -18,7 +18,7 @@ from scrumbot.model import (
     SprintSheet,
     StatusChange,
 )
-from scrumbot.model_risk import OrderMark, Risk, RiskLevel
+from scrumbot.model_risk import Risk, RiskLevel
 from scrumbot.rules.pipeline import build_result
 from scrumbot.rules.risk_register import defer_list, due_for, escalate, ordered
 from scrumbot.rules.validate import orders_and_findings
@@ -77,7 +77,6 @@ def run(
     history: tuple[HistoryOrder, ...] = (),
     bugs: tuple[SprintRow, ...] = (),
     changes: tuple[StatusChange, ...] = (),
-    baseline: tuple[OrderMark, ...] | None = None,
 ) -> list[Risk]:
     sheet = SprintSheet("Sprint 10 (10/6 - 10/17)", 10, START, END, (), tuple(rows), "S10", bugs, changes)
     orders, findings = orders_and_findings(sheet)
@@ -94,7 +93,6 @@ def run(
         sizing_note="",
         run_day=day,
         now=now,
-        baseline=baseline,
     )
     return list(result.risks)
 
@@ -362,23 +360,6 @@ def test_qa_returns_counts_returns_bugs_and_open_bugs_near_the_deadline() -> Non
         "Đơn STT 2 có 5 bug (1 chưa xong); còn 1 bug mở khi còn 2 ngày làm việc tới hạn 14/10/2026"
     )
     assert "Đơn STT 3" not in risks
-
-
-# 9: changes
-
-
-def test_order_changed_compares_with_the_stored_state_and_needs_one() -> None:
-    rows = [row(1, people=(LINH,), priority="urgent", due=date(2026, 10, 15), title="1.0.2 - Fix")]
-    stored = (OrderMark("o1", "1.0.1 - Fix", "", date(2026, 10, 17), ("LinhNV",)),)
-
-    (risk,) = codes(run(rows, baseline=stored), "ORDER-CHANGED")
-
-    assert risk.level is RiskLevel.MEDIUM  # Thấp + urgent
-    assert risk.problem == (
-        'Đơn STT 1 đổi ưu tiên trống → urgent; hạn 17/10/2026 → 15/10/2026; tên "1.0.1 - Fix" → "1.0.2 - Fix"'
-    )
-    assert risk.action == "Báo LinhNV; xem lại độ lớn và hạn."
-    assert codes(run(rows), "ORDER-CHANGED") == []
 
 
 def test_defer_list_stops_once_the_excess_is_covered() -> None:

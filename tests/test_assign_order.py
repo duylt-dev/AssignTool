@@ -1,5 +1,5 @@
 """`scrumbot assign <file>` end to end against a real local HTTP server (bot spec §7): the order file in the sprint,
-the AI prompt, the Markdown report, the memory left alone. Nothing reaches the dev server."""
+the review, the AI prompt, the Markdown report, the memory. Nothing reaches the dev server."""
 
 from __future__ import annotations
 
@@ -99,9 +99,8 @@ def test_a_new_order_gets_a_pic_and_the_report_says_why(
     assert "Đơn: Demo 1.0.2 - Add IAP (đơn mới, STT 2 của Sprint 2)" in printed
     assert "PIC đề xuất: LinhNV (dự phòng: " in printed
     assert not list((tmp_path / "out").glob("*.xlsx")) and not list((tmp_path / "out").glob("*.tmp"))
-    with closing(sqlite3.connect(tmp_path / "state" / "scrumbot.sqlite")) as db:
-        assert db.execute("SELECT COUNT(*) FROM proposals").fetchone() == (0,)
-        assert db.execute("SELECT COUNT(*) FROM order_marks").fetchone() == (0,)
+    with closing(sqlite3.connect(tmp_path / "state" / "scrumbot.sqlite")) as db:  # only the other orders' answers
+        assert db.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall() == [("ai_answers",)]
         assert db.execute("SELECT order_id FROM ai_answers").fetchall() == [("t",)]
 
 
@@ -148,3 +147,47 @@ def test_input_errors_exit_2_without_a_report(
 
     assert message in capsys.readouterr().err
     assert not (tmp_path / "out").exists()
+
+
+def test_an_order_that_is_not_ready_gets_only_what_to_fix_and_no_ai_call(
+    server: FakeDevServer, source: Path, tmp_path: Path, monkeypatch, capsys
+) -> None:
+    def no_ai(*_, **__):
+        raise AssertionError("the AI is not called before the review passes (A86)")
+
+    monkeypatch.setattr(ai_cli, "run_ai", no_ai)
+    order = source / "don.md"
+    order.write_text("# Demo 1.0.3 - Fix\n\n| Trường | Giá trị |\n|---|---|\n| Ưu tiên | urgent |\n\nSửa lỗi.\n")
+
+    assert _assign(source, tmp_path, order, "--ai", "agy") == 0
+
+    report = (tmp_path / "out" / "output.md").read_text(encoding="utf-8")
+    assert report.startswith("# Giao đơn: Demo 1.0.3 - Fix\n\nSprint 2 (06/10/2026 – 17/10/2026) · chạy ")
+    assert report.endswith(
+        "## Review: chưa đạt\n\n"
+        f"Bot chưa đề xuất PIC. Sửa các mục dưới đây rồi chạy lại `scrumbot assign {order}`:\n\n"
+        "- `REVIEW-APP`: Thiếu App: ghi tên app vào dòng App của file đơn.\n"
+        "- `REVIEW-DUE`: Đơn urgent chưa có Hạn: ghi dòng Hạn của file đơn (YYYY-MM-DD hoặc DD/MM/YYYY).\n"
+        "- `REVIEW-DESC`: Mô tả quá ngắn (8 ký tự, cần từ 30, không tính link): ghi rõ các hạng mục cần làm.\n"
+    )
+    assert "Kết luận" not in report and "Rủi ro" not in report
+    printed = capsys.readouterr().out
+    assert "Đơn: Demo 1.0.3 - Fix (đơn mới, STT 2 của Sprint 2)\nReview: chưa đạt (3 mục)\n- REVIEW-APP: " in printed
+    assert "PIC đề xuất" not in printed and f"Báo cáo: {tmp_path / 'out' / 'output.md'}" in printed
+    assert not (tmp_path / "state" / "scrumbot.sqlite").exists()
+
+
+def test_a_ready_order_is_reviewed_once_the_file_is_fixed(
+    server: FakeDevServer, source: Path, tmp_path: Path, capsys
+) -> None:
+    order = source / "don.md"
+    order.write_text("# Demo 1.0.3 - Fix\n\n| Trường | Giá trị |\n|---|---|\n| App | Demo |\n\nSửa lỗi.\n")
+    assert _assign(source, tmp_path, order, "--ai", "off") == 0
+    assert "- `REVIEW-DESC`: Mô tả quá ngắn (8 ký tự" in (tmp_path / "out" / "output.md").read_text(encoding="utf-8")
+
+    order.write_text(order.read_text(encoding="utf-8") + "Sửa crash khi mở màn hình cài đặt trên Android 15.\n")
+    assert _assign(source, tmp_path, order, "--ai", "off") == 0
+
+    report = (tmp_path / "out" / "output.md").read_text(encoding="utf-8")
+    assert "## Review: đạt\n\nKhông có câu hỏi của AI (AI tắt hoặc lỗi).\n\n## Kết luận" in report
+    assert "- **PIC đề xuất: LinhNV**" in report and "Sổ rủi ro cả sprint: " in report

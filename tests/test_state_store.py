@@ -1,32 +1,25 @@
-"""The memory between runs (bot spec §5, A51): each table round-trips through a real SQLite file."""
+"""The AI answers between runs (bot spec §5, A51, A67): they round-trip through a real SQLite file."""
 
 from __future__ import annotations
 
-from datetime import date, datetime
+import sqlite3
+from contextlib import closing
+from datetime import datetime
 from pathlib import Path
 
-from scrumbot.actions.state_store import StateStore
+from scrumbot.actions.state_store import FILE, StateStore
 from scrumbot.model import Size, SizeEstimate
-from scrumbot.model_risk import KeptProposal, OrderMark, Outcome
 
 AT = datetime(2026, 10, 13, 9, 30)
-
-
-def test_proposals_round_trip_and_can_be_forgotten(tmp_path: Path) -> None:
-    store = StateStore(tmp_path)
-    store.save_proposals("S10", (KeptProposal("o1", "LinhNV", "lý do", ("MinhNM", "AnTD"), AT),))
-    store.save_proposals("S10", (KeptProposal("o1", "AnTD", "mới", (), AT),))  # replaced, not doubled
-
-    assert StateStore(tmp_path).proposals("S10") == (KeptProposal("o1", "AnTD", "mới", (), AT),)
-    store.forget_proposals(("o1",))
-    assert store.proposals("S10") == ()
 
 
 def test_ai_answers_are_found_by_id_and_title_casefolded_and_defaults_are_never_kept(tmp_path: Path) -> None:
     store = StateStore(tmp_path)
     store.save_ai_answers(
         {
-            ("o1", "1.0.1 - Add Ads"): SizeEstimate(Size.L, "Thêm ads", False, "ads", ("Add ads",), ("SDK mới",)),
+            ("o1", "1.0.1 - Add Ads"): SizeEstimate(
+                Size.L, "Thêm ads", False, "ads", ("Add ads",), ("SDK mới",), questions=("Có màn nào mới?",)
+            ),
             ("o2", "x"): SizeEstimate(Size.M, "", True),
         },
         "agy",
@@ -35,28 +28,19 @@ def test_ai_answers_are_found_by_id_and_title_casefolded_and_defaults_are_never_
 
     found = store.ai_answers([("o1", "1.0.1 -   add ads"), ("o1", "1.0.2 - Add ads"), ("o2", "x")])
 
+    # questions are never remembered (bot spec §2.6, A90)
     assert found == {
         ("o1", "1.0.1 -   add ads"): SizeEstimate(Size.L, "Thêm ads", False, "ads", ("Add ads",), ("SDK mới",), True)
     }
 
 
-def test_the_baseline_is_the_latest_state_before_today_and_only_two_days_are_kept(tmp_path: Path) -> None:
+def test_a_file_written_by_the_old_version_still_opens(tmp_path: Path) -> None:
+    """Before D62 the file also held proposals, order states and outcomes; they are left alone."""
+    with closing(sqlite3.connect(tmp_path / FILE)) as connection, connection:
+        connection.execute("CREATE TABLE proposals (order_id TEXT PRIMARY KEY, code TEXT)")
+        connection.execute("INSERT INTO proposals VALUES ('o1', 'LinhNV')")
+
     store = StateStore(tmp_path)
-    for day in (10, 11, 12, 13):
-        store.save_marks(
-            "S10", (OrderMark("o1", f"day {day}", "", date(2026, 10, 17), ("LinhNV",)),), datetime(2026, 10, day, 9)
-        )
+    store.save_ai_answers({("o1", "x"): SizeEstimate(Size.S, "nhỏ", False)}, "agy", AT)
 
-    marks, stored_at = store.baseline("S10", date(2026, 10, 13))
-
-    assert [mark.title for mark in marks] == ["day 12"] and stored_at == datetime(2026, 10, 12, 9)
-    assert store.baseline("S10", date(2026, 10, 12)) is None  # day 11 was pruned: only 12 and 13 remain
-    assert store.baseline("S9", date(2026, 10, 13)) is None
-
-
-def test_outcomes_are_found_by_the_day_they_were_recorded(tmp_path: Path) -> None:
-    store = StateStore(tmp_path)
-    store.save_outcomes("S10", (Outcome("o1", "Order 1", "LinhNV", ("LinhNV",), AT),))
-
-    assert store.outcomes("S10", date(2026, 10, 13)) == (Outcome("o1", "Order 1", "LinhNV", ("LinhNV",), AT),)
-    assert store.outcomes("S10", date(2026, 10, 14)) == ()
+    assert store.ai_answers([("o1", "x")])[("o1", "x")].size is Size.S
