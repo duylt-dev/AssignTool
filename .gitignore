@@ -7,6 +7,9 @@
 # The bot's memory and list cache: names of people (A51, A57)
 state/
 
+# Reports of assign: names and order data (A91)
+output/
+
 # Docs for AI agents, kept local (D18)
 LLM.md
 
