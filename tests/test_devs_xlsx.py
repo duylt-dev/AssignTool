@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from scrumbot.errors import InputError
-from scrumbot.model import Level
-from scrumbot.sources.dev_reader import read_devs
+from scrumbot.core.errors import InputError
+from scrumbot.core.model import Level
+from scrumbot.input.files.devs_xlsx import read_devs
 from tests.conftest import build_devs
 
 

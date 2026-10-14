@@ -2,9 +2,9 @@ from datetime import date
 
 import pytest
 
-from scrumbot.errors import InputError
-from scrumbot.model import Dev, Level, RuleKind, TeamRule
-from scrumbot.rules.team_rules import check_rules, in_force, rules_day, unavailable_findings
+from scrumbot.core.errors import InputError
+from scrumbot.core.model import Dev, Level, RuleKind, TeamRule
+from scrumbot.core.rules.team_rules import check_rules, in_force, rules_day, unavailable_findings
 
 LINH = Dev("Ngọc Văn Linh", "LinhNV", Level.MIDDLE_PLUS, True, ())
 MINH = Dev("Nguyễn Nhật Minh", "MinhNM", Level.MIDDLE, True, ())
@@ -24,7 +24,7 @@ def rule(
     start: date | None = None,
     end: date | None = None,
 ) -> TeamRule:
-    return TeamRule(kind, dev, app, count, start, end, "", line)
+    return TeamRule(kind=kind, dev=dev, line=line, app=app, max_orders=count, start=start, end=end)
 
 
 def test_a_dev_missing_from_devs_xlsx_is_an_input_error_and_codes_ignore_case() -> None:

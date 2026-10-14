@@ -1,8 +1,8 @@
 from datetime import date
 
-from scrumbot.model import HistoryOrder, Level, Priority
-from scrumbot.rules.familiarity import AppFamiliarity
-from scrumbot.rules.reasons import PREASSIGNED_REASON, proposed_reason
+from scrumbot.core.model import HistoryOrder, Level, Priority
+from scrumbot.core.rules.familiarity import AppFamiliarity
+from scrumbot.core.rules.reasons import PREASSIGNED_REASON, proposed_reason
 
 
 def test_proposed_reason_joins_all_applicable_parts_in_spec_order() -> None:
@@ -30,7 +30,7 @@ def test_proposed_reason_joins_all_applicable_parts_in_spec_order() -> None:
 
 
 def test_proposed_reason_handles_new_empty_and_non_middle_orders() -> None:
-    assert PREASSIGNED_REASON == "Đã giao sẵn trong file"
+    assert PREASSIGNED_REASON == "Đã có người làm trên hệ thống"
     assert "Đơn không có App Name" in proposed_reason(
         app="",
         familiarity=AppFamiliarity(2, None, 0),

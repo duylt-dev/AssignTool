@@ -7,9 +7,8 @@ from datetime import date
 
 import pytest
 
-from scrumbot.model import SprintRow
-from scrumbot.rules.new_order import Placement
-from scrumbot.rules.review import review
+from scrumbot.core.model import Placement, SprintRow
+from scrumbot.core.rules.review import review
 
 ENOUGH = "Thêm màn cài đặt và sửa luồng mua gói tháng."  # 44 characters
 
@@ -22,7 +21,7 @@ def _row(
     description: str = ENOUGH,
     assignees: tuple[str, ...] = (),
 ) -> SprintRow:
-    return SprintRow(2, "1.0.2 - Fix", "Task", app, assignees, "", priority, due, date(2026, 10, 13), description, ())
+    return SprintRow(2, "1.0.2 - Fix", "Task", app, assignees, "", priority, due, date(2026, 10, 13), description)
 
 
 def _codes(row: SprintRow, how: Placement = Placement.NEW) -> list[str]:

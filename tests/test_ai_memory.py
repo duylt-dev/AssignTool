@@ -7,15 +7,15 @@ from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 
-from scrumbot.actions.state_store import FILE, StateStore
-from scrumbot.model import Size, SizeEstimate
+from scrumbot.ai.memory import FILE, AnswerMemory
+from scrumbot.core.model import Size, SizeEstimate
 
 AT = datetime(2026, 10, 13, 9, 30)
 
 
 def test_ai_answers_are_found_by_id_and_title_casefolded_and_defaults_are_never_kept(tmp_path: Path) -> None:
-    store = StateStore(tmp_path)
-    store.save_ai_answers(
+    memory = AnswerMemory(tmp_path)
+    memory.save_ai_answers(
         {
             ("o1", "1.0.1 - Add Ads"): SizeEstimate(
                 Size.L, "Thêm ads", False, "ads", ("Add ads",), ("SDK mới",), questions=("Có màn nào mới?",)
@@ -26,7 +26,7 @@ def test_ai_answers_are_found_by_id_and_title_casefolded_and_defaults_are_never_
         AT,
     )
 
-    found = store.ai_answers([("o1", "1.0.1 -   add ads"), ("o1", "1.0.2 - Add ads"), ("o2", "x")])
+    found = memory.ai_answers([("o1", "1.0.1 -   add ads"), ("o1", "1.0.2 - Add ads"), ("o2", "x")])
 
     # questions are never remembered (bot spec §2.6, A90)
     assert found == {
@@ -40,7 +40,7 @@ def test_a_file_written_by_the_old_version_still_opens(tmp_path: Path) -> None:
         connection.execute("CREATE TABLE proposals (order_id TEXT PRIMARY KEY, code TEXT)")
         connection.execute("INSERT INTO proposals VALUES ('o1', 'LinhNV')")
 
-    store = StateStore(tmp_path)
-    store.save_ai_answers({("o1", "x"): SizeEstimate(Size.S, "nhỏ", False)}, "agy", AT)
+    memory = AnswerMemory(tmp_path)
+    memory.save_ai_answers({("o1", "x"): SizeEstimate(Size.S, "nhỏ", False)}, "agy", AT)
 
-    assert store.ai_answers([("o1", "x")])[("o1", "x")].size is Size.S
+    assert memory.ai_answers([("o1", "x")])[("o1", "x")].size is Size.S

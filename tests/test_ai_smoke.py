@@ -8,9 +8,9 @@ import os
 
 import pytest
 
-from scrumbot.model import Order, Priority, SprintRow
-from scrumbot.understanding.ai_cli import run_ai
-from scrumbot.understanding.sizing import build_prompt, parse_reply
+from scrumbot.ai.prompt import build_prompt, parse_reply
+from scrumbot.ai.tools import run_ai
+from scrumbot.core.model import Order, Priority, SprintRow
 
 TOOL = os.environ.get("ASSIGNTOOL_TEST_AI", "")
 
@@ -23,7 +23,7 @@ TITLES = ("1.0.1 - Fix crash khi mở app", "2.0.0 - Thêm IAP + đổi luồng 
 
 
 def _order(stt: int, title: str) -> Order:
-    row = SprintRow(stt, title, "Task", "Demo", (), "ready to progress", "normal", None, None, "", ())
+    row = SprintRow(stt, title, "Task", "Demo", (), "ready to progress", "normal", None, None, "")
     return Order(row, Priority.NORMAL)
 
 

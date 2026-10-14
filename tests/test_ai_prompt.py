@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from scrumbot.model import AiReply, HistoryOrder, Order, Priority, Size, SprintRow
-from scrumbot.understanding.sizing import MAX_EXAMPLES, PROMPT_BUDGET, build_prompt, default_sizes, parse_reply
+from scrumbot.ai.prompt import MAX_EXAMPLES, PROMPT_BUDGET, AiReply, build_prompt, default_sizes, parse_reply
+from scrumbot.core.model import HistoryOrder, Order, Priority, Size, SprintRow
 
 
 def _order(
@@ -14,7 +14,7 @@ def _order(
     description: str = "",
     assignees: tuple[str, ...] = (),
 ) -> Order:
-    row = SprintRow(stt, title, "Task", app, assignees, "", "high", None, None, description, ())
+    row = SprintRow(stt, title, "Task", app, assignees, "", "high", None, None, description)
     return Order(row, Priority.HIGH)
 
 

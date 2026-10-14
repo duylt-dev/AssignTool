@@ -1,4 +1,5 @@
-"""Raw `/api/doc/` replies into model values (bot spec §2.5): names and statuses looked up, NFC text, times, bugs."""
+"""Raw `/api/doc/` replies into standard-input values (bot spec §2.5): names and statuses looked up, NFC text, times,
+bugs, status history."""
 
 from __future__ import annotations
 
@@ -7,10 +8,8 @@ from datetime import date, datetime
 
 import pytest
 
-from scrumbot.errors import InputError
-from scrumbot.model_board import TECH_MANAGER_LIST
-from scrumbot.normalize import text_key
-from scrumbot.sources.api_reader import read_board, read_sprints, read_tasks
+from scrumbot.core.errors import InputError
+from scrumbot.input.dev_api.reader import read_changes, read_sprints, read_tasks
 from tests.api_builders import LINH, OUTSIDER, history, item, orders, sprint, sprints
 
 
@@ -47,22 +46,23 @@ def test_tasks_carry_names_statuses_kinds_and_times() -> None:
     assert (bug.is_bug, bug.parent_id, bug.status_kind) == (True, "r1", "done")
 
 
-def test_the_board_merges_status_kinds_over_every_list_and_reads_the_history() -> None:
-    board = read_board(
-        sprints(sprint("S1", "Sprint 1 (10/6 - 10/17)", date(2026, 10, 6), date(2026, 10, 17))),
-        {"S1": orders(item("a", status="ready to release")), TECH_MANAGER_LIST: orders(item("b", status="close"))},
+def test_sprints_and_the_status_history_are_read_oldest_change_first() -> None:
+    (found,) = read_sprints(sprints(sprint("S1", "Sprint 1 (10/6 - 10/17)", date(2026, 10, 6), date(2026, 10, 17))))
+    changes = read_changes(
         history(
-            ("a", None, "in progress", datetime(2026, 10, 6, 9)),
             ("a", "in progress", "release", datetime(2026, 10, 8, 9)),
-        ),
-        datetime(2026, 10, 13, 9),
-        "API test",
+            ("a", None, "in progress", datetime(2026, 10, 6, 9)),
+        )
     )
 
-    assert board.status_kinds[text_key("ready to release")] == "done"
-    assert board.status_kinds[text_key("close")] == "closed"
-    assert [(c.old, c.new) for c in board.changes] == [("", "in progress"), ("in progress", "release")]
-    assert board.sprints[0].start == date(2026, 10, 6) and board.source == "API test"
+    assert (found.id, found.kind, found.start, found.end, found.total) == (
+        "S1",
+        "sprint",
+        date(2026, 10, 6),
+        date(2026, 10, 17),
+        1,
+    )
+    assert [(change.task_id, change.new) for change in changes] == [("a", "in progress"), ("a", "release")]
 
 
 @pytest.mark.parametrize(

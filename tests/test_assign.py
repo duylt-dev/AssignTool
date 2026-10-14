@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from scrumbot.model import (
+from scrumbot.core.model import (
     Dev,
     HistoryOrder,
     Level,
@@ -14,8 +14,8 @@ from scrumbot.model import (
     SprintRow,
     TeamRule,
 )
-from scrumbot.rules.assign import GAP_ORDERS, assign
-from scrumbot.rules.familiarity import FamiliarityIndex
+from scrumbot.core.rules.assign import GAP_ORDERS, assign
+from scrumbot.core.rules.familiarity import FamiliarityIndex
 
 
 def dev(code: str, level: Level = Level.MIDDLE) -> Dev:
@@ -23,7 +23,7 @@ def dev(code: str, level: Level = Level.MIDDLE) -> Dev:
 
 
 def order(stt: int, app: str = "Known", *, people: tuple[str, ...] = (), priority: Priority = Priority.NORMAL) -> Order:
-    return Order(SprintRow(stt, f"Order {stt}", "Task", app, people, "", "", None, date(2026, 10, 1), "", ()), priority)
+    return Order(SprintRow(stt, f"Order {stt}", "Task", app, people, "", "", None, date(2026, 10, 1), ""), priority)
 
 
 def estimate(size: Size = Size.M) -> SizeEstimate:
@@ -173,7 +173,7 @@ def test_reason_names_seniors_excluded_by_the_cap() -> None:
 
 
 def rule(kind: RuleKind, dev: str, app: str = "", line: int = 1, *, count: int | None = None, note: str = ""):
-    return TeamRule(kind, dev, app, count, None, None, note, line)
+    return TeamRule(kind=kind, dev=dev, line=line, app=app, max_orders=count, note=note)
 
 
 def latest(*people: str, app: str = "Known") -> tuple[HistoryOrder, ...]:

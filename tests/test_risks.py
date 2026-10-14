@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import date, datetime
 
-from scrumbot.model import (
+from scrumbot.core.model import (
     Assignment,
     Dev,
     HistoryOrder,
@@ -15,13 +15,13 @@ from scrumbot.model import (
     SizeEstimate,
     Source,
     SprintRow,
-    SprintSheet,
+    SprintView,
     StatusChange,
 )
-from scrumbot.model_risk import Risk, RiskLevel
-from scrumbot.rules.pipeline import build_result
-from scrumbot.rules.risk_register import defer_list, due_for, escalate, ordered
-from scrumbot.rules.validate import orders_and_findings
+from scrumbot.core.model_risk import Risk, RiskLevel
+from scrumbot.core.rules.pipeline import build_result
+from scrumbot.core.rules.risk_register import defer_list, due_for, escalate, ordered
+from scrumbot.core.rules.validate import orders_and_findings
 from tests.api_builders import AN, LINH, MINH, POOL, TIEN
 
 START, END = date(2026, 10, 6), date(2026, 10, 17)  # Tue 06/10 – Sat 17/10, as Sprint 10
@@ -55,12 +55,10 @@ def row(
         due,
         created,
         "",
-        (),
         None,
         ident,
         f"o{root}" if root is not None else ident,
         kind_status,
-        datetime.combine(created, datetime.min.time()),
         updated,
         None,
     )
@@ -73,16 +71,16 @@ def run(
     day: date = TUESDAY,
     now: datetime | None = None,
     devs: tuple[Dev, ...] = POOL,
-    prev: SprintSheet | None = None,
+    prev: SprintView | None = None,
     history: tuple[HistoryOrder, ...] = (),
     bugs: tuple[SprintRow, ...] = (),
     changes: tuple[StatusChange, ...] = (),
 ) -> list[Risk]:
-    sheet = SprintSheet("Sprint 10 (10/6 - 10/17)", 10, START, END, (), tuple(rows), "S10", bugs, changes)
-    orders, findings = orders_and_findings(sheet)
+    view = SprintView("Sprint 10 (10/6 - 10/17)", 10, START, END, tuple(rows), "S10", bugs, changes)
+    orders, findings = orders_and_findings(view)
     estimates = {o.row.stt: SizeEstimate((sizes or {}).get(o.row.stt, Size.M), "", False) for o in orders}
     result = build_result(
-        target=sheet,
+        target=view,
         prev=prev,
         prev_name="Sprint 9",
         orders=orders,
@@ -210,7 +208,7 @@ def test_carry_over_needs_carry_over_and_an_open_order_and_is_medium_from_three(
         row(20 + n, people=(LINH,) if n < 3 else (MINH,), status="all issue", kind="Task" if n == 0 else "Subtask")
         for n in range(4)
     )
-    prev = SprintSheet("Sprint 9", 9, None, None, (), prev_rows)
+    prev = SprintView("Sprint 9", 9, None, None, prev_rows)
     rows = [row(1, people=(LINH,)), row(2, people=(TIEN,))]
 
     risks = codes(run(rows, prev=prev), "CARRY-OVER")
@@ -299,9 +297,9 @@ def test_due_at_risk_on_a_proposal_asks_to_assign_now() -> None:
 
 
 def test_status_stuck_counts_working_days_since_the_last_move_into_the_status() -> None:
-    entered = StatusChange("o1", "ready to progress", "in progress", datetime(2026, 10, 7, 9))
+    entered = StatusChange("o1", "in progress", datetime(2026, 10, 7, 9))
     sub = row(10, people=(LINH,), kind="Subtask", root=1, status="ready to qa-testing")
-    sub_moved = StatusChange("o10", "in progress", "ready to qa-testing", datetime(2026, 10, 8, 9))
+    sub_moved = StatusChange("o10", "ready to qa-testing", datetime(2026, 10, 8, 9))
     rows = [row(1, people=(LINH,)), sub]
 
     (risk,) = codes(run(rows, now=datetime(2026, 10, 13, 9), changes=(entered, sub_moved)), "STATUS-STUCK")
@@ -312,7 +310,7 @@ def test_status_stuck_counts_working_days_since_the_last_move_into_the_status() 
 
 
 def test_status_stuck_is_compared_as_shown_and_skips_proposals() -> None:
-    entered = StatusChange("o1", "", "in progress", datetime(2026, 10, 7, 9))
+    entered = StatusChange("o1", "in progress", datetime(2026, 10, 7, 9))
     exactly_four = codes(
         run([row(1, people=(LINH,))], now=datetime(2026, 10, 13, 9), changes=(entered,)), "STATUS-STUCK"
     )
@@ -336,7 +334,7 @@ def test_status_stuck_is_compared_as_shown_and_skips_proposals() -> None:
 
 
 def test_qa_returns_counts_returns_bugs_and_open_bugs_near_the_deadline() -> None:
-    returns = tuple(StatusChange("o1", "qa - testing", "qa - need fix", datetime(2026, 10, d, 9)) for d in (8, 9))
+    returns = tuple(StatusChange("o1", "qa - need fix", datetime(2026, 10, d, 9)) for d in (8, 9))
     bugs = tuple(
         row(
             30 + n,
@@ -367,8 +365,8 @@ def test_defer_list_stops_once_the_excess_is_covered() -> None:
         row(1, people=(LINH,), status="ready to progress"),
         row(2, people=(MINH,), status="ready to progress"),
     ]
-    sheet = SprintSheet("S", 10, START, END, (), tuple(risks_input))
-    orders, _ = orders_and_findings(sheet)
+    view = SprintView("S", 10, START, END, tuple(risks_input))
+    orders, _ = orders_and_findings(view)
     items = [
         Assignment(o, SizeEstimate(Size.L, "", False), Source.PREASSIGNED, o.row.assignees, (), "", ()) for o in orders
     ]

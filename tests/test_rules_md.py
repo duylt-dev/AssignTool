@@ -3,9 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from scrumbot.errors import InputError
-from scrumbot.model import RuleKind, TeamRule
-from scrumbot.sources.rules_reader import read_rules
+from scrumbot.core.errors import InputError
+from scrumbot.core.model import RuleKind, TeamRule
+from scrumbot.input.files.rules_md import read_rules
 
 EXAMPLE = """\
 # Luật giao việc
@@ -43,19 +43,19 @@ def test_reads_every_rules_table_by_header_name_and_skips_notes_other_tables_and
     rules = read_rules(write(tmp_path, EXAMPLE, bom=True))
 
     assert rules == (
-        TeamRule(RuleKind.PIN, "LinhNV", "AR Dog", None, None, None, "Linh giữ AR Dog", 7),
+        TeamRule(kind=RuleKind.PIN, dev="LinhNV", line=7, app="AR Dog", note="Linh giữ AR Dog"),
         TeamRule(
-            RuleKind.EXCLUDE,
-            "MinhNM",
-            "",
-            None,
-            date(2026, 10, 6),
-            date(2026, 10, 17),
-            "Minh làm MVP sprint này",
-            8,
+            kind=RuleKind.EXCLUDE,
+            dev="MinhNM",
+            line=8,
+            start=date(2026, 10, 6),
+            end=date(2026, 10, 17),
+            note="Minh làm MVP sprint này",
         ),
-        TeamRule(RuleKind.MAX_ORDERS, "AnTD", "", 1, date(2026, 10, 6), date(2026, 10, 17), "", 10),
-        TeamRule(RuleKind.PREFER, "TiếnBV", "PS Remote", None, None, None, "học app | kèm Minh", 22),
+        TeamRule(
+            kind=RuleKind.MAX_ORDERS, dev="AnTD", line=10, max_orders=1, start=date(2026, 10, 6), end=date(2026, 10, 17)
+        ),
+        TeamRule(kind=RuleKind.PREFER, dev="TiếnBV", line=22, app="PS Remote", note="học app | kèm Minh"),
     )
 
 

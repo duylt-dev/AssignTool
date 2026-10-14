@@ -12,9 +12,8 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 
 from scrumbot import __version__
-from scrumbot.errors import ApiError
-from scrumbot.sources.api_client import ApiClient
-from scrumbot.sources.env_config import ApiConfig
+from scrumbot.input.dev_api.client import ApiClient, ApiError
+from scrumbot.input.dev_api.config import ApiConfig
 
 TOKEN = "secret-token-123"
 
@@ -96,7 +95,7 @@ def test_history_is_read_in_batches_of_fifty(server: Server) -> None:
     merged = _client(server).history(ids)
 
     assert [len(request[1]["task_id"][0].split(",")) for request in server.requests] == [50, 50, 20]
-    assert len(merged["doi_trang_thai"]) == 3 and merged["ids"] == ids
+    assert merged == {"doi_trang_thai": [{"task_id": "x"}] * 3}
 
 
 def test_429_waits_and_retries_then_succeeds(server: Server) -> None:

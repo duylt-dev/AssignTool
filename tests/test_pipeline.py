@@ -3,8 +3,8 @@ from datetime import date
 
 import pytest
 
-from scrumbot.errors import InputError
-from scrumbot.model import (
+from scrumbot.core.errors import InputError
+from scrumbot.core.model import (
     Dev,
     HistoryOrder,
     Level,
@@ -14,10 +14,10 @@ from scrumbot.model import (
     Size,
     SizeEstimate,
     SprintRow,
-    SprintSheet,
+    SprintView,
     TeamRule,
 )
-from scrumbot.rules.pipeline import build_result
+from scrumbot.core.rules.pipeline import build_result
 
 LINH = Dev("Ngọc Văn Linh", "LinhNV", Level.MIDDLE_PLUS, True, ())
 MINH = Dev("Nguyễn Nhật Minh", "MinhNM", Level.MIDDLE, True, ())
@@ -26,7 +26,7 @@ TIEN = Dev("Bùi Văn Tiến", "TiếnBV", Level.JUNIOR, True, ())
 DEVS = (LINH, MINH, AN, TIEN)
 
 
-def target(*, clear_assignees: bool) -> tuple[SprintSheet, tuple[Order, ...]]:
+def target(*, clear_assignees: bool) -> tuple[SprintView, tuple[Order, ...]]:
     people = {
         1: (LINH.name, TIEN.name),
         7: (MINH.name,),
@@ -55,11 +55,10 @@ def target(*, clear_assignees: bool) -> tuple[SprintSheet, tuple[Order, ...]]:
             due,
             created,
             "",
-            (),
         )
         for stt, title, app, priority, created, due in details
     )
-    return SprintSheet("Sprint 10", 10, date(2026, 10, 6), date(2026, 10, 17), (), rows), tuple(
+    return SprintView("Sprint 10", 10, date(2026, 10, 6), date(2026, 10, 17), rows), tuple(
         Order(row, priority) for row, (_, _, _, priority, _, _) in zip(rows, details, strict=True)
     )
 
@@ -81,20 +80,20 @@ def history() -> tuple[HistoryOrder, ...]:
     )
 
 
-def previous() -> SprintSheet:
+def previous() -> SprintView:
     rows = (
-        SprintRow(1, "Linh", "Task", "", (LINH.name,), "qa - need fix", "", None, None, "", ()),
-        SprintRow(2, "Tien", "Task", "", (TIEN.name,), "need to be clean", "", None, None, "", ()),
-        SprintRow(3, "Tien sub", "Subtask", "", (TIEN.name,), "internal - cant fix", "", None, None, "", ()),
-        SprintRow(4, "Minh", "Task", "", (MINH.name,), "pending", "", None, None, "", ()),
+        SprintRow(1, "Linh", "Task", "", (LINH.name,), "qa - need fix", "", None, None, ""),
+        SprintRow(2, "Tien", "Task", "", (TIEN.name,), "need to be clean", "", None, None, ""),
+        SprintRow(3, "Tien sub", "Subtask", "", (TIEN.name,), "internal - cant fix", "", None, None, ""),
+        SprintRow(4, "Minh", "Task", "", (MINH.name,), "pending", "", None, None, ""),
     )
-    return SprintSheet("Sprint 9", 9, None, None, (), rows)
+    return SprintView("Sprint 9", 9, None, None, rows)
 
 
 def run(*, clear_assignees: bool):
-    target_sheet, orders = target(clear_assignees=clear_assignees)
+    target_view, orders = target(clear_assignees=clear_assignees)
     return build_result(
-        target=target_sheet,
+        target=target_view,
         prev=previous(),
         prev_name="Sprint 9",
         orders=orders,
@@ -113,11 +112,11 @@ def test_pipeline_reproduces_spec_sample_run_a_and_clean_findings() -> None:
     assert proposed.pic_codes == ("MinhNM",)
     assert proposed.backups == ("LinhNV", "TiếnBV")
     assert result.findings == ()
-    assert {item.dev.code: item.hours for item in result.devs} == {
-        "LinhNV": 32,
-        "MinhNM": 32,
-        "AnTD": 32,
-        "TiếnBV": 16,
+    assert {item.dev.code: item.orders for item in result.devs} == {  # every order is M (16h)
+        "LinhNV": 2,
+        "MinhNM": 2,
+        "AnTD": 2,
+        "TiếnBV": 1,
     }
 
 
@@ -132,19 +131,19 @@ def test_pipeline_reproduces_spec_sample_run_b() -> None:
         18: "TiếnBV",
         24: "AnTD",
     }
-    assert {item.dev.code: item.hours for item in result.devs} == {
-        "LinhNV": 32,
-        "MinhNM": 32,
-        "AnTD": 16,
-        "TiếnBV": 16,
+    assert {item.dev.code: item.orders for item in result.devs} == {
+        "LinhNV": 2,
+        "MinhNM": 2,
+        "AnTD": 1,
+        "TiếnBV": 1,
     }
 
 
 def test_pipeline_reports_missing_previous_and_full_sprint_leave() -> None:
-    target_sheet, orders = target(clear_assignees=True)
+    target_view, orders = target(clear_assignees=True)
     off = Dev("Off", "OFF", Level.MIDDLE, True, tuple(date(2026, 10, day) for day in range(6, 17)))
     result = build_result(
-        target=target_sheet,
+        target=target_view,
         prev=None,
         prev_name="Sprint 9",
         orders=orders,
@@ -159,19 +158,19 @@ def test_pipeline_reports_missing_previous_and_full_sprint_leave() -> None:
         ("PREV-SPRINT-MISSING", "Sprint 9"),
         ("DEV-ON-LEAVE", "OFF"),
     ]
-    assert result.devs[-1].dev.code == "OFF" and result.devs[-1].on_leave_all_sprint
+    assert (result.devs[-1].dev.code, result.devs[-1].orders) == ("OFF", 0)
 
 
 def test_pipeline_warns_when_a_kept_order_is_held_only_by_a_dev_off_for_the_whole_sprint() -> None:
     """PRE-ASSIGNED-ON-LEAVE (A43): fires when nobody else in the pool holds the order, which is still kept (D10)."""
-    target_sheet, orders = target(clear_assignees=True)
+    target_view, orders = target(clear_assignees=True)
     off = Dev("Đỗ Văn Nghỉ", "OFF", Level.MIDDLE, True, tuple(date(2026, 10, day) for day in range(6, 17)))
     back = Dev("Đỗ Văn Nghỉ", "OFF", Level.MIDDLE, True, (date(2026, 10, 6),))
 
     def warnings(people: tuple[str, ...], devs: tuple[Dev, ...]) -> list[tuple[str, str, str]]:
         kept = tuple(Order(replace(o.row, assignees=people), o.priority) if o.row.stt == 7 else o for o in orders)
         result = build_result(
-            target=target_sheet,
+            target=target_view,
             prev=previous(),
             prev_name="Sprint 9",
             orders=kept,
@@ -196,12 +195,12 @@ def test_pipeline_warns_when_a_kept_order_is_held_only_by_a_dev_off_for_the_whol
 
 
 def test_pipeline_rejects_an_empty_available_pool() -> None:
-    target_sheet, orders = target(clear_assignees=True)
+    target_view, orders = target(clear_assignees=True)
     off = Dev("Off", "OFF", Level.MIDDLE, True, tuple(date(2026, 10, day) for day in range(6, 17)))
 
     with pytest.raises(InputError, match="Không còn dev nào"):
         build_result(
-            target=target_sheet,
+            target=target_view,
             prev=previous(),
             prev_name="Sprint 9",
             orders=orders,
@@ -215,12 +214,12 @@ def test_pipeline_rejects_an_empty_available_pool() -> None:
 
 def test_pipeline_reports_rules_that_cannot_act_and_orders_they_left_without_candidates() -> None:
     """RULE-DEV-UNAVAILABLE and RULE-NO-CANDIDATE fire; the same run with rules that can act reports neither."""
-    target_sheet, orders = target(clear_assignees=True)
+    target_view, orders = target(clear_assignees=True)
     out = Dev("Out", "OutDev", Level.MIDDLE, False, ())
 
     def findings(*rules: TeamRule) -> list[tuple[str, str, str]]:
         result = build_result(
-            target=target_sheet,
+            target=target_view,
             prev=previous(),
             prev_name="Sprint 9",
             orders=orders,
@@ -233,8 +232,8 @@ def test_pipeline_reports_rules_that_cannot_act_and_orders_they_left_without_can
         )
         return [(finding.code, finding.where, finding.message) for finding in result.findings]
 
-    every = tuple(TeamRule(RuleKind.EXCLUDE, dev.code, "PS Remote", None, None, None, "", 2) for dev in DEVS)
-    pin_out = TeamRule(RuleKind.PIN, "outdev", "AR Dog", None, None, None, "", 3)
+    every = tuple(TeamRule(kind=RuleKind.EXCLUDE, dev=dev.code, line=2, app="PS Remote") for dev in DEVS)
+    pin_out = TeamRule(kind=RuleKind.PIN, dev="outdev", line=3, app="AR Dog")
     assert findings(pin_out, *every) == [
         (
             "RULE-DEV-UNAVAILABLE",
@@ -247,17 +246,17 @@ def test_pipeline_reports_rules_that_cannot_act_and_orders_they_left_without_can
             "Luật TM loại hết dev khỏi đơn STT 7; đơn này được giao như khi không có luật Không giao và Tối đa đơn.",
         ),
     ]
-    assert findings(TeamRule(RuleKind.PIN, "LinhNV", "AR Dog", None, None, None, "", 3), *every[1:]) == []
+    assert findings(TeamRule(kind=RuleKind.PIN, dev="LinhNV", line=3, app="AR Dog"), *every[1:]) == []
 
 
 def test_a_dev_off_every_remaining_day_takes_no_new_order_from_the_base_day_on() -> None:
     """R8 (A75): AnTD is off 14–17/10; run on 14/10 he is out with DEV-ON-LEAVE-REST, run on 06/10 he is in."""
     off_rest = replace(AN, leave_days=tuple(date(2026, 10, day) for day in (14, 15, 16, 17)))
-    target_sheet, orders = target(clear_assignees=True)
+    target_view, orders = target(clear_assignees=True)
 
     def run_on(day: date):
         return build_result(
-            target=target_sheet,
+            target=target_view,
             prev=previous(),
             prev_name="Sprint 9",
             orders=orders,

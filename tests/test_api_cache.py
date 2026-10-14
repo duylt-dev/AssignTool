@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from scrumbot.errors import InputError
-from scrumbot.model_board import SprintInfo
-from scrumbot.sources.raw_store import LiveSource, read_json
+from scrumbot.core.errors import InputError
+from scrumbot.core.inputs import SprintInfo
+from scrumbot.input.dev_api.cache import LiveSource, read_json, write_json
 
 TODAY = date(2026, 10, 13)
 
@@ -31,11 +31,13 @@ class CountingClient:
         return {"ok": True, "don": [{"id": list_id}], "trang_thai": [], "nguoi": []}
 
     def history(self, ids: list[str]) -> dict[str, object]:
-        return {"ok": True, "ids": ids, "doi_trang_thai": [], "comment": [], "nguoi": [], "khong_thay": []}
+        return {"doi_trang_thai": []}
 
 
 def _sprint(sprint_id: str, *, archived: bool = False, end: date = date(2026, 10, 17)) -> SprintInfo:
-    return SprintInfo(sprint_id, sprint_id, "sprint", date(2026, 10, 6), end, archived, 1, 0)
+    return SprintInfo(
+        id=sprint_id, name=sprint_id, kind="sprint", total=1, start=date(2026, 10, 6), end=end, archived=archived
+    )
 
 
 def _written_at(path: Path, moment: datetime) -> None:
@@ -61,9 +63,11 @@ def test_archived_lists_come_from_the_cache_and_ended_ones_only_on_the_day_they_
     assert client.fetched == ["A", "E", "R", "R", "E"]
 
 
-def test_plain_json_is_read_too_and_a_missing_file_is_an_input_error(tmp_path: Path) -> None:
-    (tmp_path / "sprints.json").write_text('{"ok": true, "sprints": []}', encoding="utf-8")
+def test_a_cached_list_round_trips_and_a_broken_one_is_an_input_error(tmp_path: Path) -> None:
+    path = tmp_path / "L.json.gz"
+    write_json(path, {"ok": True, "don": [{"id": "Lê"}]})
 
-    assert read_json(tmp_path, "sprints") == {"ok": True, "sprints": []}
-    with pytest.raises(InputError, match="không có MISSING.json.gz"):
-        read_json(tmp_path, "MISSING")
+    assert read_json(path) == {"ok": True, "don": [{"id": "Lê"}]}
+    path.write_bytes(b"not gzip")
+    with pytest.raises(InputError, match="Không đọc được file"):
+        read_json(path)

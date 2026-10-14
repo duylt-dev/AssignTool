@@ -11,10 +11,10 @@ from pathlib import Path
 
 import pytest
 
+from scrumbot.ai import tools as ai_cli
+from scrumbot.ai.prompt import AiReply
 from scrumbot.cli import main
-from scrumbot.model import AiReply
-from scrumbot.model_board import TECH_MANAGER_LIST
-from scrumbot.understanding import ai_cli
+from scrumbot.input.dev_api.config import TECH_MANAGER_LIST
 from tests.api_builders import AN, DEV_ROWS, LINH, OUTSIDER, item, orders, sprint, sprints
 from tests.conftest import build_devs
 from tests.http_server import FakeDevServer

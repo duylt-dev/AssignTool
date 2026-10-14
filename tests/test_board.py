@@ -6,19 +6,19 @@ from datetime import date, datetime
 
 import pytest
 
-from scrumbot.errors import InputError, NoRunningSprint
-from scrumbot.model_board import TECH_MANAGER_LIST, Board
-from scrumbot.rules.board import (
-    API_HEADERS,
+from scrumbot.core.errors import InputError, NoRunningSprint
+from scrumbot.core.inputs import Inputs
+from scrumbot.core.rules.board import (
     history_orders,
     maintain_sprints,
     newest_update,
     previous_of,
     select_current,
-    sprint_sheet,
+    sprint_view,
 )
-from scrumbot.sources.api_reader import read_board, read_sprints
-from tests.api_builders import AN, LINH, item, orders, sprint, sprints
+from scrumbot.input.dev_api.config import TECH_MANAGER_LIST
+from scrumbot.input.dev_api.reader import read_sprints
+from tests.api_builders import AN, LINH, api_inputs, item, orders, sprint, sprints
 
 S9 = sprint("S9", "Sprint 9 (9/21 - 10/2)", date(2026, 9, 21), date(2026, 10, 2), archived=True)
 S10 = sprint("S10", "Sprint 10 (10/6 - 10/17)", date(2026, 10, 6), date(2026, 10, 17))
@@ -27,8 +27,8 @@ TECH = sprint("TS", "tech sprint", date(2026, 10, 6), date(2026, 10, 17))
 EMPTY = sprint("E10", "Sprint 20 (10/6 - 10/17)", date(2026, 10, 6), date(2026, 10, 17), total=0)
 
 
-def _board(lists: dict, *, extra: tuple = ()) -> Board:
-    return read_board(sprints(S9, S10, TEST, TECH, *extra), lists, None, datetime(2026, 10, 13, 9), "test")
+def _board(lists: dict, *, extra: tuple = ()) -> Inputs:
+    return api_inputs(sprints(S9, S10, TEST, TECH, *extra), lists)
 
 
 def test_maintain_sprints_drop_test_lists_and_empty_ones_oldest_first() -> None:
@@ -63,7 +63,7 @@ def test_the_previous_sprint_is_the_latest_that_ended_before_and_may_be_archived
     assert previous_of(listed, next(s for s in listed if s.id == "S9")) is None
 
 
-def test_the_sheet_numbers_roots_by_creation_then_subtasks_and_keeps_bugs_apart() -> None:
+def test_the_view_numbers_roots_by_creation_then_subtasks_and_keeps_bugs_apart() -> None:
     board = _board(
         {
             "S10": orders(
@@ -77,20 +77,19 @@ def test_the_sheet_numbers_roots_by_creation_then_subtasks_and_keeps_bugs_apart(
         }
     )
 
-    sheet = sprint_sheet(board, board.sprints[1])
+    view = sprint_view(board, board.sprints[1])
 
-    assert (sheet.name, sheet.number, sheet.id, sheet.headers) == ("Sprint 10 (10/6 - 10/17)", 10, "S10", API_HEADERS)
-    assert [(row.stt, row.id, row.kind, row.root_id) for row in sheet.rows] == [
+    assert (view.name, view.number, view.id) == ("Sprint 10 (10/6 - 10/17)", 10, "S10")
+    assert [(row.stt, row.id, row.kind, row.root_id) for row in view.rows] == [
         (1, "early", "Task", "early"),
         (2, "late", "Task", "late"),
         (3, "sub", "Subtask", "early"),
         (4, "deep", "Subtask", "early"),
     ]
-    assert [(bug.id, bug.kind, bug.root_id) for bug in sheet.bugs] == [
+    assert [(bug.id, bug.kind, bug.root_id) for bug in view.bugs] == [
         ("bug", "Bug", "early"),
         ("bug2", "Bug", "early"),
     ]
-    assert sheet.rows[0].cells[9:] == (1, 2)  # Bug mở, Bug tổng
 
 
 def test_history_is_every_root_once_with_the_sprints_that_list_it() -> None:

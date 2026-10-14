@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from scrumbot.errors import InputError
-from scrumbot.sources.order_reader import read_order
+from scrumbot.core.errors import InputError
+from scrumbot.input.files.order_md import read_order
 
 FULL = """# Demo 1.0.2 - Add ads native
 

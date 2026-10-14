@@ -3,10 +3,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import date, datetime
 
-from scrumbot.model import Dev, Level
-from scrumbot.model_board import TECH_MANAGER_LIST
+from scrumbot.core.inputs import Inputs
+from scrumbot.core.model import Dev, Level, OrderDraft, TeamRule
+from scrumbot.input.dev_api.config import TECH_MANAGER_LIST
+from scrumbot.input.dev_api.reader import read_changes, read_sprints, read_tasks
 
 LINH, MINH, AN, TIEN = "Ngọc Văn Linh", "Nguyễn Nhật Minh", "Trần Đức An", "Bùi Văn Tiến"
 OUTSIDER = "Người Ngoài Team"
@@ -153,3 +156,27 @@ def history(*changes: tuple[str, str | None, str, datetime]) -> dict[str, object
         "comment": [],
         "nguoi": [],
     }
+
+
+def api_inputs(
+    raw_sprints: Mapping[str, object],
+    lists: Mapping[str, Mapping[str, object]],
+    raw_history: Mapping[str, object] | None = None,
+    *,
+    devs: tuple[Dev, ...] = POOL,
+    order: OrderDraft | None = None,
+    rules: tuple[TeamRule, ...] = (),
+    fetched_at: datetime = datetime(2026, 10, 13, 9),
+) -> Inputs:
+    """The standard input the dev API adapter builds from these replies."""
+    return Inputs(
+        source="test",
+        fetched_at=fetched_at,
+        sprints=read_sprints(raw_sprints),
+        lists={list_id: read_tasks(raw, list_id) for list_id, raw in lists.items()},
+        history_lists=(TECH_MANAGER_LIST,),
+        status_changes=read_changes(raw_history) if raw_history is not None else (),
+        devs=devs,
+        rules=rules,
+        order=order or OrderDraft(title="Đơn thử"),
+    )

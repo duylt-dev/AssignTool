@@ -4,8 +4,8 @@ from datetime import date, datetime
 
 import pytest
 
-from scrumbot.model import Level
-from scrumbot.normalize import clean, header_key, parse_date, parse_level, text_key
+from scrumbot.core.model import Level
+from scrumbot.core.normalize import clean, header_key, parse_date, parse_level, text_key
 
 
 def test_text_helpers_normalize_nfc_and_headers() -> None:

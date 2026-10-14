@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from scrumbot.errors import InputError
-from scrumbot.sources.env_config import load_config
+from scrumbot.core.errors import InputError
+from scrumbot.input.dev_api.config import load_config
 
 
 def _env_file(tmp_path: Path, text: str) -> Path:

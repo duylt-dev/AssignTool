@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from scrumbot.understanding.ai_cli import run_ai
+from scrumbot.ai.tools import run_ai
 
 _FAKE = Path(__file__).with_name("fake_ai.py")
 _COMMAND = (sys.executable, str(_FAKE))
