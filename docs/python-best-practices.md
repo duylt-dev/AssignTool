@@ -175,9 +175,9 @@ The tool runs on Windows, Linux and macOS (A2).
 1. `uv run ruff check .` and `uv run ruff format --check .` pass.
 2. `uv run pytest` passes; report the counts.
 3. Changed a rule, a finding or the prompt: spec §6–§9 updated, with a test that fails without the change.
-4. Changed the API source, a rule, a risk, the review or the flow: ran `uv run scrumbot assign
-   input/don/<file>.md --ai off --out <scratch dir> --state <scratch dir>` against the dev server and read
-   `output.md`.
+4. Changed the API source, a rule, a risk, the review or the flow: ran `uv run scrumbot review
+   input/don/<file>.md --ai off --out <scratch dir> --state <scratch dir>`, then the same with `assign`, against the
+   dev server and read `output.md` after each.
 5. Changed `ai/tools.py` or `ai/prompt.py`: ran `ASSIGNTOOL_TEST_AI=gemini uv run pytest -m ai` (or `=agy`) once with a real AI tool,
    or the report says plainly that it did not run.
 6. No `shell=True`; no file opened without `encoding=`; no column read by index; no `datetime` compared with a
@@ -198,8 +198,8 @@ The tool runs on Windows, Linux and macOS (A2).
 - **Decide from standard-input values, never from API JSON.** `input/dev_api/cache.py` gets the raw replies (with the
   list cache) and `input/dev_api/reader.py` turns them into `core/inputs.py` values; rules never see the API's JSON,
   so they are tested with plain values.
-- **The AI answers are one SQLite file with one owner** (`ai/memory.py`); each method opens, writes and commits
-  on its own. A long-lived connection would hold a lock while `agy` thinks for two minutes.
+- **The AI answers and the passed reviews are one SQLite file with one owner** (`ai/memory.py`); each method opens,
+  writes and commits on its own. A long-lived connection would hold a lock while `agy` thinks for two minutes.
 - **Times are naive local times,** like the API's (`YYYY-MM-DD HH:MM:SS`, server time = the team's time zone).
   Mixing an aware `datetime` with the API's naive ones raises `TypeError` in the middle of a comparison.
 

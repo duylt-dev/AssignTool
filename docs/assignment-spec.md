@@ -306,7 +306,7 @@ When the order has no app, part 1 is `Đơn không có App Name`. Pre-assigned o
 ## 9 · Findings
 
 A finding is a line of `## Cảnh báo dữ liệu` in `output.md` (bot spec §7.4), not an exception: the run goes on and
-the report is written. The review checks of bot spec §7.3 (`REVIEW-…`) are not findings: they stop the assignment. Codes are
+the report is written. The review checks of bot spec §7.3 (`REVIEW-…`) are not findings: they stop the review, and `assign` needs a passed review. Codes are
 never renamed once released. Nothing is ever reported about people outside the pool (D14).
 
 | Code | Level | When | Message (Vietnamese, exact) |
@@ -334,11 +334,11 @@ assignment: the person who filed the order enters the PIC into the system (D61).
 
 | Code | When |
 |---|---|
-| `0` | `output.md` was written: the order ready or not (bot spec §7.3), with or without findings, with or without AI sizes. |
-| `2` | Input or usage error. No report is written. The message names the file, sheet, row or column. |
+| `0` | `output.md` was written: by `review`, the order ready or not (bot spec §7.3); by `assign`, with or without findings, with or without AI sizes. |
+| `2` | Input or usage error, or `assign` on an order without a passed review (bot spec §7.4). No report is written. The message names the file, sheet, row or column. |
 | `130` | Interrupted with Ctrl+C. |
 
-The terminal lines are listed in bot spec §7.4.
+The terminal lines are listed in bot spec §7.3 (`review`) and §7.4 (`assign`).
 
 ## 12 · Acceptance on the sample (removed 2026-10-13)
 
