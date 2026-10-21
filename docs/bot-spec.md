@@ -4,7 +4,7 @@ What the scrum-master bot adds on top of the assignment core of [`assignment-spe
 the internal system's API, the review of an order file, the risk register and the AI memory. [`LLM.md`](../LLM.md) says where each part lives in code;
 [`confirm.md`](../confirm.md) holds the decisions cited here (`Dn` user-locked, `An` defaults, `On` open).
 
-**Status:** written 2026-10-13 for stage 1 (D57); scope cut the same day (D59); `assign` added the same day (D60); `run`, the Excel report and the memory between runs removed and the review added on 2026-10-14 (D62); split into Input, Process and Output with two standard formats on 2026-10-14 (D63, §8); `review` split from `assign` into its own command and core module on 2026-10-21 (D64). User-facing text is Vietnamese (D12) and quoted exactly as the
+**Status:** written 2026-10-13 for stage 1 (D57); scope cut the same day (D59); `assign` added the same day (D60); `run`, the Excel report and the memory between runs removed and the review added on 2026-10-14 (D62); split into Input, Process and Output with two standard formats on 2026-10-14 (D63, §8); `review` split from `assign` into its own command and core module on 2026-10-21 (D64); the review follows the Sprint Tech process (`rule.html`, 19/10/2026) since 2026-10-21: four more fixed checks and the AI's check of the description against the 8 order templates (D65). User-facing text is Vietnamese (D12) and quoted exactly as the
 bot writes it. `<n>` is an order's STT, `<Mã>` a dev code, dates are `DD/MM/YYYY`, hours are whole numbers.
 
 | § | Contents |
@@ -26,8 +26,8 @@ One program, `scrumbot`, with two sub-commands run on the same order file (D60, 
 file an order (D61):
 
 1. **`review <file>`** reads the system (§2), places the order file in the running sprint and reviews it (§7.3): the
-   fixed checks, then, when they pass, the AI's questions. It writes `<--out>/output.md` and, when the order is ready,
-   remembers that this order passed (§5).
+   fixed checks, then, when they pass, the AI's check against the order templates, which may block too, and its
+   questions (D65). It writes `<--out>/output.md` and, when the order is ready, remembers that this order passed (§5).
 2. **`assign <file>`** reads the system again, places the order, and assigns it (assignment spec §7) only when that
    order, unchanged, passed `review` before (§7.4, A101); it builds the risk register (§4) and writes
    `<--out>/output.md` (§7.4), replacing the review's.
@@ -44,7 +44,7 @@ runs were removed on 2026-10-14 (D62); they are in git history at `754b165`. Bot
 | `--today DATE` | the clock | Run day (A35). |
 | `--state DIR` | `state/` | AI answers, passed reviews and list cache (§5). |
 | `--out DIR` | `output/` | Where `output.md` goes. |
-| `--ai gemini\|agy\|off`, `--ai-model`, `--ai-timeout` | `gemini`, none, 180 s | The AI tool: the questions of `review` (§7.3), the sizes of `assign` (assignment spec §6.4). |
+| `--ai gemini\|agy\|off`, `--ai-model`, `--ai-timeout` | `gemini`, none, 180 s | The AI tool: the template check and the questions of `review` (§7.3), the sizes of `assign` (assignment spec §6.4). |
 | `-v` | off | Traceback and the AI exchange on errors. |
 
 Exit codes are those of assignment spec §11. An API error (§2.2) is exit `2`; so is `assign` on an order without a
@@ -268,8 +268,9 @@ the action.
 ## 5 · Memory: AI answers and passed reviews (D62, D64)
 
 `state/scrumbot.sqlite` (A51) holds the AI answers of §2.6 (A67) in `ai_answers` and the passed reviews of §7.3
-(A101) in `reviews`: one row per fingerprint, with the order file and the time of the review; a row never expires.
-`state/cache/` holds the list cache (§2.3, A58). The AI's questions are never remembered (A90). Kept proposals, the
+(A101, A109) in `reviews`: one row per fingerprint, with the order file and the time of the review; a row never
+expires. The fingerprint changed in 0.5.0 (A109): a review passed before needs one more run. `state/cache/` holds the
+list cache (§2.3, A58). The AI's template check and questions are never remembered (A90, A107). Kept proposals, the
 stored state of orders, outcomes and the `Thay đổi` sheet were removed with `run` (D62). A file written before may
 still hold their tables; the bot ignores them.
 
@@ -280,41 +281,58 @@ The six-sheet Excel report belonged to `run`. The only report is `output.md` (§
 ## 7 · `review` and `assign`: one order file, two commands, one Markdown report (D60, D62, D64)
 
 `scrumbot review <file> [options]`, then `scrumbot assign <file> [options]`, e.g. `scrumbot review input/don/req.md
---ai agy`. BA/MO run them when they file an order (D61). `review` answers: is the order ready to be assigned, and
-what does the AI find unclear in it (§7.3). `assign` answers, for an order that passed `review`: who takes it, why,
+--ai agy`. BA/MO run them when they file an order (D61). `review` answers: is the order written as the Sprint Tech
+process asks, ready to be assigned, and what does the AI find unclear in it (§7.3). `assign` answers, for an order that passed `review`: who takes it, why,
 who backs up, and what may go wrong (§7.4). Both place the order in the whole running sprint (§7.2), so the load and
 the risks are those of the real sprint plus this order. Both write `<--out>/output.md`; the later run replaces it.
 
-### 7.1 The order file (A82)
+### 7.1 The order file (A82, A105)
 
 A `.md` file, usually in `input/don/` (an order file at the top of `--input` is never taken for the TM rules file).
 Read by `input/files/order_md.py`, without AI.
 
 ```markdown
-# Game Emulator - Chỉnh sửa và bổ sung luồng auto scan game
+# Game Emulator v1.2.0 - Chỉnh sửa và bổ sung luồng auto scan game
 
 | Trường | Giá trị |
 |---|---|
 | ID | |
 | App | Game Emulator |
-| Ưu tiên | high |
-| Hạn | 16/10/2026 |
+| Ưu tiên | normal |
+| Hạn | 30/10/2026 |
+| Loại đơn | Tính năng |
+| Người chịu trách nhiệm | TaiDT – BA |
 
-Free text: the description, links, anything.
+Free text: the description, links, anything; with a `Nghiệm thu khi:` part.
 ```
 
 - **Title:** the first `# ` line; without one, the file name without `.md`.
-- **Fields:** the first table whose header starts with `Trường`; keys `ID` (or `ID trên hệ thống`), `App` (or `App
-  Name`), `Ưu tiên`, `Hạn` (`YYYY-MM-DD` or `DD/MM/YYYY`), case-insensitive; an empty cell is an empty field. Every
-  field is optional.
+- **Fields:** the first table whose header starts with `Trường`; keys compared case-insensitively, an empty cell is an
+  empty field, every field is optional:
+
+  | Key | Field | Note |
+  |---|---|---|
+  | `ID`, `ID trên hệ thống` | the order on the system | §7.2 |
+  | `App`, `App Name` | App | |
+  | `Ưu tiên` | priority | `urgent`, `high`, `normal`, `low` |
+  | `Hạn` | due date | `YYYY-MM-DD` or `DD/MM/YYYY` |
+  | `Loại đơn` | order type (A105) | one of the 8 types of §7.3, by its name or a part of it between `/`: `Quảng cáo`, `IAP`, `Tracking`, `Tính năng / luồng / UI` (`Tính năng`, `luồng`, `UI`), `Fix bug / crash` (`Fix bug`, `crash`), `Sửa policy`, `Nghiên cứu`, `Chuyển store / hạ tầng` (`Chuyển store`, `hạ tầng`) |
+  | `Người chịu trách nhiệm` | owner | the person who answers the devs; never sent to the AI |
+  | `Bằng chứng` | evidence | required for an urgent or high order (§7.3) |
+  | `Người nghiệm thu`, `Tài liệu còn thiếu` | — | fields of the process; accepted and not read (A105) |
+
 - **Description:** every other line, as written.
+
+An order on the system takes `Loại đơn`, `Người chịu trách nhiệm` and `Bằng chứng` from the file too: the API has
+none of them.
 
 | Input error (exit 2) | Message |
 |---|---|
 | The file is missing | `Không có file đơn '<file>'.` |
 | Unreadable | `Không đọc được file đơn '<file>': <reason>` |
-| Unknown key | `File đơn '<file>' dòng <n>: trường '<key>' không hợp lệ; dùng ID, App, Ưu tiên hoặc Hạn.` |
+| Unknown key | `File đơn '<file>' dòng <n>: trường '<key>' không hợp lệ; dùng ID, App, Ưu tiên, Hạn, Loại đơn, Người chịu trách nhiệm, Bằng chứng, Người nghiệm thu hoặc Tài liệu còn thiếu.` |
 | `Hạn` not a date | `File đơn '<file>': Hạn '<value>' không đọc được; dùng YYYY-MM-DD hoặc DD/MM/YYYY.` |
+| `Loại đơn` unknown | `File đơn '<file>': Loại đơn '<value>' không hợp lệ; dùng Quảng cáo, IAP, Tracking, Tính năng / luồng / UI, Fix bug / crash, Sửa policy, Nghiên cứu hoặc Chuyển store / hạ tầng.` |
 
 ### 7.2 The order in the sprint (A82, A83)
 
@@ -338,17 +356,58 @@ its answer is never remembered (§2.6): the same `id` and title may carry anothe
 
 **Memory** (A84, D62): `assign` reads the AI answers of §5 and writes those of the other orders of the sprint.
 
-### 7.3 `review`: the checks, then the AI's questions (D62, D64, A86–A90, A101–A103)
+### 7.3 `review`: the checks, then the AI's check and questions (D62, D64, D65, A86–A90, A101–A103, A105–A110)
 
-Right after the order is placed (§7.2), the bot checks the order as placed: an order found on the system has its App,
-priority and `Hạn` from the API (A82). An order that already has a `Người làm` is not reviewed (A87). Checks, in this
-order (a "file order" is a new order, §7.2 case 3; an "order on the system" is cases 1 and 2):
+The review follows the Sprint Tech process (`rule.html`, 19/10/2026, D65): the fields every order needs, and the
+description template of its type. Right after the order is placed (§7.2), the bot checks the order as placed: an order
+found on the system has its title, App, priority and `Hạn` from the API (A82), and `Loại đơn`, `Người chịu trách
+nhiệm` and `Bằng chứng` from the file (§7.1). An order that already has a `Người làm` is not reviewed (A87).
+
+**Fixed checks**, in this order (a "file order" is a new order, §7.2 case 3; an "order on the system" is cases 1 and
+2):
 
 | Code | Blocks when | Message for a file order | Message for an order on the system |
 |---|---|---|---|
 | `REVIEW-APP` | App is empty | `Thiếu App: ghi tên app vào dòng App của file đơn.` | `Thiếu App: điền App cho đơn trên hệ thống.` |
-| `REVIEW-DUE` | Priority `urgent` or `high` and no `Hạn` | `Đơn <urgent\|high> chưa có Hạn: ghi dòng Hạn của file đơn (YYYY-MM-DD hoặc DD/MM/YYYY).` | `Đơn <urgent\|high> chưa có Hạn: điền Hạn cho đơn trên hệ thống.` |
+| `REVIEW-TITLE` | The title has no version: no group of digits joined by dots, such as `1.0.3` or `v1.0.3` (A108) | `Tiêu đề chưa có version: ghi dòng # của file đơn theo mẫu App + version + việc cần làm, vd App A v1.0.3 – Gắn interstitial ở màn Spin.` | `Tiêu đề chưa có version: sửa tiêu đề đơn trên hệ thống theo mẫu App + version + việc cần làm.` |
+| `REVIEW-DUE` | No `Hạn`, whatever the priority (D65) | `Đơn chưa có Hạn: ghi dòng Hạn của file đơn (YYYY-MM-DD hoặc DD/MM/YYYY).` | `Đơn chưa có Hạn: điền Hạn cho đơn trên hệ thống.` |
+| `REVIEW-OWNER` | No `Người chịu trách nhiệm` | `Thiếu người chịu trách nhiệm: ghi dòng Người chịu trách nhiệm của file đơn (người trả lời Dev về đơn).` | the same |
+| `REVIEW-EVIDENCE` | Priority `urgent` or `high` (Khẩn cấp in the process, A108) and no `Bằng chứng` | `Đơn <urgent\|high> là đơn Khẩn cấp nhưng chưa có Bằng chứng: ghi dòng Bằng chứng của file đơn (ảnh dashboard, email store/đối tác, số liệu KPI), hoặc hạ Ưu tiên về normal.` | `Đơn <urgent\|high> là đơn Khẩn cấp nhưng chưa có Bằng chứng: ghi dòng Bằng chứng của file đơn (ảnh dashboard, email store/đối tác, số liệu KPI), hoặc hạ Ưu tiên của đơn trên hệ thống về normal.` |
 | `REVIEW-DESC` | The description the AI reads (§7.2), without its `[link …]` and with whitespace collapsed, has fewer than 30 characters (A88) | `Mô tả quá ngắn (<k> ký tự, cần từ 30, không tính link): ghi rõ các hạng mục cần làm.` | the same |
+| `REVIEW-ACCEPT` | The description the AI reads has no `Nghiệm thu khi`, in any case (A108) | `Mô tả chưa có mục "Nghiệm thu khi": ghi các điều kiện kiểm tra được, đủ để tester viết test case.` | the same |
+
+**The AI's check** (no fixed check fires; A102, A107): one AI call for this order alone: its title, App, priority, the
+description the AI reads (§7.2) cut at 2000 characters, and the templates below, each point numbered: the template of
+`Loại đơn` when the file gives one, else all 8. The prompt asks for `{"type": "<type>", "missing": [<n>],
+"questions": ["<question>"]}`: the type (`ads`, `iap`, `tracking`, `feature`, `bugfix`, `policy`, `research`,
+`infra`, or `other` when none fits, e.g. a new app, which follows its own SRS); the numbers of the points of that
+type's template the description does not cover, where a point that starts with `Sửa thì` or ends with `(nếu có)`
+counts only when it applies; and at most 2 short Vietnamese questions to the person who filed the order, about what
+the description leaves unclear for doing the work. `Loại đơn` of the file wins over the AI's type.
+
+| Code | Blocks when | Message |
+|---|---|---|
+| `REVIEW-TEMPLATE` | The AI names points of the type's template that the description does not cover | `Mô tả chưa đủ ý của mẫu <loại> (AI chấm): <ý>; <ý>.` |
+
+`<loại>` is the label of the type and each `<ý>` the point as the template writes it, in the template's order: a point
+number outside the template is ignored, and no text of the AI reaches this message. **No template check** (the
+review may pass) when the AI is off or failed, when its reply has no `missing` list, when, without `Loại đơn`, its
+type is not one of the above, or when the type is `other`. The questions never block and, like the check, are never
+remembered (A90).
+
+**The 8 templates** (A106): the points of `rule.html` §1.3 as written, without the `Tài liệu: …` point of each
+template (documents may come later in the process).
+
+| Type | Label | Points |
+|---|---|---|
+| `ads` | Quảng cáo | 1. Sửa thì ghi Hiện trạng và Mong muốn của từng vị trí · 2. Danh sách vị trí quảng cáo: màn hình, thời điểm hiển thị · 3. Mỗi vị trí: định dạng, mạng QC, ad unit ID, config name trên Remote Config, timeout · 4. Luồng hiển thị (link Flow), tần suất, preload · 5. Nghiệm thu khi: từng vị trí hiện đúng định dạng, đúng thời điểm, bật/tắt được bằng config |
+| `iap` | IAP | 1. Danh sách gói: product ID, loại (subscription / mua một lần), chu kỳ, trial · 2. Paywall: màn nào, điều kiện hiển thị · 3. Remote Config: key, giá trị mặc định · 4. Event tracking IAP cần bắn · 5. Nghiệm thu khi: mua thử sandbox, khôi phục, hủy, hết hạn đều đúng |
+| `tracking` | Tracking | 1. Danh sách event theo từng màn · 2. Mỗi event: tên, parameter/value, thời điểm bắn · 3. Ảnh màn hình đánh dấu vị trí bắn · 4. Nơi nhận: Firebase, AppsFlyer… · 5. Nghiệm thu khi: event hiện đúng tên, đúng param trên DebugView |
+| `feature` | Tính năng / luồng / UI | 1. Mục tiêu và lý do, kèm số liệu nếu có · 2. Hiện trạng · 3. Mong muốn: luồng từng bước, màn hình, điều kiện · 4. Remote Config bật/tắt: key, giá trị mặc định · 5. Ngoài phạm vi · 6. Nghiệm thu khi: điều kiện kiểm tra được |
+| `bugfix` | Fix bug / crash | 1. Tên lỗi, mã lỗi và link lỗi cho từng lỗi · 2. Version app, build; thiết bị, OS nếu biết · 3. Bước tái hiện, kết quả thực tế và mong đợi · 4. Ảnh, video hoặc log (nếu có) |
+| `policy` | Sửa policy | 1. Lý do bị từ chối, copy nguyên văn, kèm email hoặc ảnh Play Console · 2. Hạn store yêu cầu (nếu có) · 3. Danh sách hành động, mỗi hành động có Hiện trạng và Mong muốn · 4. Nội dung chữ thay đổi ghi nguyên văn · 5. Nghiệm thu khi: build đã sửa đủ mọi hành động, sẵn sàng nộp lại |
+| `research` | Nghiên cứu | 1. Câu hỏi cần trả lời và vì sao · 2. Input: dữ liệu, tài liệu, app tham khảo (đính kèm) · 3. Output mong muốn và định dạng · 4. Giới hạn: timebox, những gì không làm · 5. Nghiệm thu khi: điều kiện để coi là xong |
+| `infra` | Chuyển store / hạ tầng | 1. Hiện trạng: đang dùng tài khoản, project, SDK nào · 2. Đích: chuyển sang đâu, phiên bản nào · 3. Danh sách việc: Remote Config, Firebase, keystore, ad unit, IAP… · 4. Lý do và hạn (ví dụ hạn target API của Google) · 5. Nghiệm thu khi: app chạy trên đích mới, config và dữ liệu đúng |
 
 Every `output.md` of `review` starts with the same two lines and ends with a short `Thông tin đơn` table:
 
@@ -370,10 +429,14 @@ Every `output.md` of `review` starts with the same two lines and ends with a sho
 | App | <app or trống> |
 | Ưu tiên | <priority or trống> |
 | Hạn | <dd/mm/yyyy or trống> |
+| Loại đơn | <label> (file đơn) · <label> (AI) · ngoài 8 loại (AI) · trống |
+| Người chịu trách nhiệm | <as written, or trống> |
+| Bằng chứng | <as written, or trống> |
 | Mô tả AI đọc | <§7.2, or không có> |
 ```
 
-**Not ready** (any check fires): no AI call (A86), nothing remembered; exit `0` (A89). The section reads:
+**Not ready** (a check fires): nothing remembered; exit `0` (A89). A fixed check that fires means no AI call (A86).
+The section reads:
 
 ```markdown
 ## Review: chưa đạt
@@ -383,15 +446,17 @@ Sửa các mục dưới đây rồi chạy lại `scrumbot review <file>`:
 - `REVIEW-APP`: <message>
 ```
 
-**Ready** (no check fires): one AI call for this order alone (A102): its title, App, priority and the description the
-AI reads (§7.2), cut at 2000 characters. The prompt asks for `{"questions": [...]}`: at most 2 short Vietnamese
-questions to the person who filed the order, about what the description leaves unclear for doing the work, an empty
-list when nothing is unclear. The questions never block and are never remembered (A90). The bot then remembers the
-order's **fingerprint** (§5, A101): its title, `ID`, App, priority, `Hạn` and the description the AI reads, as placed.
+When `REVIEW-TEMPLATE` blocks and the AI asked questions, the section goes on with a blank line, `Câu hỏi của AI cho
+người lên đơn (không chặn; trả lời trong file đơn nếu cần):`, a blank line and one `- <question>` per question.
+
+**Ready** (no check fires): the bot remembers the order's **fingerprint** (§5, A101, A109): its title, `ID`, App,
+priority, `Hạn`, `Loại đơn`, `Người chịu trách nhiệm`, `Bằng chứng` and the description the AI reads, as placed.
 Exit `0`. The section reads:
 
 ```markdown
 ## Review: đạt
+
+<template line>
 
 Câu hỏi của AI cho người lên đơn (không chặn; trả lời trong file đơn nếu cần):
 
@@ -400,19 +465,23 @@ Câu hỏi của AI cho người lên đơn (không chặn; trả lời trong fi
 Chạy `scrumbot assign <file>` để bot đề xuất PIC. Sửa file đơn sau lần review này thì phải review lại.
 ```
 
-With no question, the first lines are `AI không có câu hỏi.` when the AI answered with none, else `Không có câu hỏi
-của AI (AI tắt hoặc lỗi).` (the AI off, failed, or replied without a readable `questions` list).
+The template line is `Mô tả đủ ý của mẫu <label> (AI chấm).` when the check ran, `AI xếp đơn ngoài 8 loại đơn của
+quy trình (vd app mới, theo SRS riêng): chưa chấm theo mẫu.` for `other`, else `Chưa chấm mô tả theo mẫu loại đơn
+(AI tắt hoặc lỗi).` With no question, the question lines are `AI không có câu hỏi.` when the AI answered with none,
+else `Không có câu hỏi của AI (AI tắt hoặc lỗi).` (the AI off, failed, or replied without a readable `questions`
+list).
 
 **Pre-assigned** (the order has a `Người làm`): no check, no AI call, nothing remembered; exit `0`. The section reads
 ``Đơn đã có người làm trên hệ thống: bot giữ nguyên, không review. Chạy `scrumbot assign <file>` để xem người làm và
 rủi ro.``
 
 **Terminal:** `Ngày chạy: <dd/mm/yyyy> (--today)` when given, `Nguồn: API <host> (dữ liệu mới nhất <…>)`, `Luật TM:
-…`, `Lịch sử: API (<n> đơn gốc)`, `Đơn: <title> (đơn mới|đơn trên hệ thống <id>, STT <n> của <sprint>)`; then, not
-ready: `Review: chưa đạt (<k> mục)` and one line `- <code>: <message>` per check; ready: `Đang hỏi <tool> về mô tả
-đơn…` when the AI is called, `Review: đạt (<q> câu hỏi của AI)` or `Review: đạt (không có câu hỏi của AI: <note>)`
-(`tắt AI`, or why the call failed), `Tiếp theo: scrumbot assign <file>`; pre-assigned: `Review: không cần (đơn đã có
-người làm)`. Last, `Báo cáo: <path>`.
+…`, `Lịch sử: API (<n> đơn gốc)`, `Đơn: <title> (đơn mới|đơn trên hệ thống <id>, STT <n> của <sprint>)`; then
+`Đang hỏi <tool> về mô tả đơn…` when the AI is called; not ready: `Review: chưa đạt (<k> mục)` and one line `- <code>:
+<message>` per check; ready: `Review: đạt (<template>; <questions>)`, where `<template>` is `đủ ý mẫu <label>`,
+`ngoài 8 loại đơn` or `chưa chấm theo mẫu` and `<questions>` is `<q> câu hỏi của AI` or `không có câu hỏi của AI:
+<note>` (`tắt AI`, or why the call failed), then `Tiếp theo: scrumbot assign <file>`; pre-assigned: `Review: không cần
+(đơn đã có người làm)`. Last, `Báo cáo: <path>`.
 
 ### 7.4 `assign`: the passed review, then the report (A85, A101)
 
@@ -514,13 +583,14 @@ outcome = core.assign(placed, reviewed=passed, sizer=None)         # §7.4: prop
 - `place` checks `Inputs` (§8.3), picks the running sprint and places the order. `placed` carries what the terminal
   prints before the AI is called (§7.3): the source and its freshness, the rules in force, the size of the history,
   the placed order.
-- `review` runs the checks of §7.3 and, when they pass, asks `asker` (§8.5) for the questions; a blocked or
-  pre-assigned order never reaches `asker`. A `ready` outcome carries `order.fingerprint`, which the caller keeps.
+- `review` runs the fixed checks of §7.3 and, when they pass, asks `asker` (§8.5) for its template check and its
+  questions, then blocks on the points it names (`REVIEW-TEMPLATE`); an order a fixed check blocks, or a pre-assigned
+  one, never reaches `asker`. A `ready` outcome carries `order.fingerprint`, which the caller keeps.
 - `assign` raises the input error of §7.4 unless the order has a `Người làm` or its fingerprint is in `reviewed`, any
   container of the fingerprints of passed reviews (the CLI gives its memory, §5; a website gives its own store). It
   never runs the checks again: the same fingerprint gives the same review (A101).
-- `asker=None` and `sizer=None` are the AI turned off: no questions, every order `M` with the note `tắt AI (mọi đơn
-  M)`, as `--ai off`.
+- `asker=None` and `sizer=None` are the AI turned off: no template check and no questions, every order `M` with the
+  note `tắt AI (mọi đơn M)`, as `--ai off`.
 - Every error the user can act on is an `InputError` whose message is a Vietnamese text of this spec or of the
   assignment spec. The core returns an outcome or raises; it never prints and never exits.
 
@@ -533,7 +603,7 @@ NFC-normalised when read; unknown keys are ignored.
 
 | Field | Type | Required | Meaning |
 |---|---|---|---|
-| `format` | text | ✓ (JSON) | `scrumbot-input/1`. |
+| `format` | text | ✓ (JSON) | `scrumbot-input/2` (`/1` before D65). |
 | `source` | text | ✓ | Label of the data, printed as `Nguồn: <source>`, e.g. `API devclickup.datlt.site`. |
 | `fetched_at` | time | ✓ | When the data was read. |
 | `sprints` | list of Sprint | ✓ | Every list of board Maintain; §2.3 picks the sprints among them. |
@@ -586,21 +656,23 @@ the rule in messages and reasons; the line in the rules file, or any number uniq
 **Order** (§7.1): `title` (text, ✓), `order_id` (text: the order's id on the system; empty to match by title or file a
 new order, §7.2), `app`, `priority_raw` (text), `due` (date), `description` (text as written; the core removes links
 and names before the AI reads it, §7.2), `origin` (text: where the order came from, e.g. the file path; shown as
-`File đơn` and in the not-ready line of `output.md`).
+`File đơn` and in the not-ready line of `output.md`), `kind` (text: `ads`, `iap`, `tracking`, `feature`, `bugfix`,
+`policy`, `research` or `infra`, the file's `Loại đơn`, §7.1, §7.3; absent when not given), `owner` (text: `Người chịu
+trách nhiệm`), `evidence` (text: `Bằng chứng`).
 
 **Checks.** A JSON form that does not fit is the input error `Dữ liệu đầu vào không đúng dạng: <path>: <problem>.`,
 where `<path>` reads like `devs[2].level` or `lists[<list id>][3].created` and `<problem>` is `thiếu`, `không phải
 <kind>` (`chữ`, `số nguyên`, `số`, `đúng/sai`, `danh sách`, `bảng`, `ngày YYYY-MM-DD`, `thời điểm YYYY-MM-DDTHH:MM:SS`) or
-`'<value>' không hợp lệ` (a level or a rule kind). A top level that is not an object is `Dữ liệu đầu vào không đúng
+`'<value>' không hợp lệ` (a level, a rule kind or an order kind). A top level that is not an object is `Dữ liệu đầu vào không đúng
 dạng: không phải bảng.`; a missing `format` is `Dữ liệu đầu vào không đúng dạng: format: thiếu.`; another one is `Dữ
-liệu đầu vào không đúng dạng: format '<value>', cần scrumbot-input/1.` On every `Inputs`, whatever adapter built it, `place` checks before anything else, in this order:
+liệu đầu vào không đúng dạng: format '<value>', cần scrumbot-input/2.` On every `Inputs`, whatever adapter built it, `place` checks before anything else, in this order:
 no dev (`Dữ liệu đầu vào không có dev nào.`), a dev name or code used twice (`Dữ liệu đầu vào trùng tên dev '<name>'.`,
 `Dữ liệu đầu vào trùng mã dev '<code>'.`, compared like names, A10), then the rules against the devs (assignment spec
 §14.2, `rules_source` standing for the file name). The file adapter keeps its own messages with row numbers
 (assignment spec §4), so these fire only for another adapter; the file adapter also checks the rules against the
 devs before any API call, so that a mistake in the files never waits for the API.
 
-### 8.4 Standard outcome: `Outcome` (A95, A104)
+### 8.4 Standard outcome: `Outcome` (A95, A104, A110)
 
 A frozen dataclass of `scrumbot.core`; `outcome.to_dict()` gives its JSON form, with the value formats of §8.3. Texts
 are the Vietnamese texts of this spec. A code (`REVIEW-…`, a risk code, a finding code) never changes once released,
@@ -608,14 +680,14 @@ so another output may show its own words for a code.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `format` | text | `scrumbot-outcome/2` (JSON only; `/1` before D64). |
+| `format` | text | `scrumbot-outcome/3` (JSON only; `/1` before D64, `/2` before D65). |
 | `status` | text | From `review`: `not_ready` (§7.3 blocks), `ready` (nothing blocks) or `pre_assigned`. From `assign`: `proposed` (the bot proposes a PIC) or `pre_assigned`. `pre_assigned`: the order has a `Người làm` and is kept (D10). |
 | `run_at` | time | The run time; with `--today`, that day at the time of `now`. |
 | `source`, `freshness` | text, time | `Inputs.source`; the newest `updated` read (D49), may be empty. |
 | `sprint` | object | `id`, `name`, `start`, `end`, `previous` (the previous sprint's name, §2.3; `sprint trước` without one). |
-| `order` | object | `title`, `stt`, `id` (empty for a new order), `placement` (`new`, `id` or `title`, §7.2), `origin`, `app`, `priority_raw`, `due`, `description` (as the AI read it, §7.2), `fingerprint` (§7.3, A101: 16 hex digits). |
-| `review` | list of {`code`, `message`} | The blocking items of §7.3; empty unless `not_ready`. |
-| `questions` | object or null | `review` only, null otherwise and for `not_ready` and `pre_assigned`: `items` (at most 2 texts), `answered` (the AI answered, even with no question), `note` (`AI (<tool>)`, `tắt AI`, or why the call failed). |
+| `order` | object | `title`, `stt`, `id` (empty for a new order), `placement` (`new`, `id` or `title`, §7.2), `origin`, `app`, `priority_raw`, `due`, `description` (as the AI read it, §7.2), `kind`, `owner`, `evidence` (the file's `Loại đơn`, `Người chịu trách nhiệm`, `Bằng chứng`, §7.1), `fingerprint` (§7.3, A101, A109: 16 hex digits). |
+| `review` | list of {`code`, `message`} | The blocking items of §7.3, fixed or `REVIEW-TEMPLATE`; empty unless `not_ready`. |
+| `ai` | object or null | `review` only, when the AI was asked or is off: `ready`, or `not_ready` by `REVIEW-TEMPLATE`; null otherwise. `kind` (the type the review used: the file's `Loại đơn`, else the AI's; `other` when none fits; empty when unknown), `checked` (the template check ran), `missing` (the numbers of the points the AI found missing, 1 for the first), `questions` (at most 2 texts), `answered` (the AI answered with a list of questions, even an empty one), `note` (`AI (<tool>)`, `tắt AI`, or why the call failed). |
 | `assignment` | object or null | Null for a `review` outcome. `pic_codes` (`proposed`: the PIC; `pre_assigned`: the pool devs holding it, may be empty), `pic_names`, `reason` (assignment spec §8), `backups` (at most 2 codes; empty for `pre_assigned`), `rule_lines` (the TM rules that shaped the choice), `rules_relaxed` (A31). |
 | `size` | object or null | Null for a `review` outcome. `size` (`S`, `M`, `L`, `XL`), `hours` (4, 16, 32, 64), `is_default` (`M` because the AI was off or failed), `reason`, `kind` and `kind_label` (the AI type and its label, §2.6), `items`, `tech_risks`, `remembered`, `note` (the sizing note of the run, e.g. `AI (agy, 6/6 đơn; 5 từ bộ nhớ)`). |
 | `risks` | list of Risk | The risks of this order, of its PIC and of the sprint (§7.4), in register order: `level` (`high`, `medium`, `low`), `level_text` (`Cao`, `Trung bình`, `Thấp`), `code`, `group` (`Năng lực`, `Phân công`, `Tiến độ`, `Chất lượng`), `where`, `problem`, `impact`, `action`, `if_it_happens` (§7.4), `owner`, `due`, `stt`. Empty for a `review` outcome. |
@@ -631,9 +703,11 @@ shows the same words.
 
 The core sees the AI as two callables, one per step:
 
-- **`asker(row) -> Questions`** for `review` (§7.3): `row` is the filed order as placed, its description already
-  scrubbed (§7.2). `Questions` holds `items` (at most 2), `answered` and `note` (§8.4). An asker never raises for an
-  AI failure: it returns no question, `answered` false and why in the note.
+- **`asker(row, kind) -> AiReview`** for `review` (§7.3): `row` is the filed order as placed, its description
+  already scrubbed (§7.2); `kind` is the file's `Loại đơn`, or `None`. `AiReview` holds `kind`, `checked`, `missing`,
+  `questions`, `answered` and `note` (§8.4). An asker never raises for an AI failure: it returns no check and no
+  question, `answered` false and why in the note. The core turns `missing` into the template's own points (§7.3), so
+  no asker can put its own words into a blocking message.
 - **`sizer(orders, examples, fresh) -> Sizing`** for `assign`: `orders` are the sprint's orders, the filed order's
   description already scrubbed; `examples` are the history orders of the window (assignment spec §5.1); `fresh`
   holds the STTs that must be sized by this call and never remembered (§2.6). `Sizing` holds a `SizeEstimate` per
@@ -650,8 +724,8 @@ The core sees the AI as two callables, one per step:
 - `say` receives `Đang hỏi <tool> về mô tả đơn…` (asker) or `Đang ước lượng độ lớn bằng <tool>… (<n> đơn)` (sizer)
   before the call.
 
-What reaches the AI does not change: titles, App, priority, the history's titles and hours and the scrubbed
-description (A18, A83); never a name, a code or a link.
+What reaches the AI: titles, App, priority, the history's titles and hours, the scrubbed description (A18, A83) and
+the templates of §7.3; never a name, a code or a link, and never `Người chịu trách nhiệm` or `Bằng chứng`.
 
 ### 8.6 What does not change
 
