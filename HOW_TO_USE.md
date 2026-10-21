@@ -1,7 +1,7 @@
 # Hướng dẫn sử dụng scrumbot
 
-scrumbot dành cho **BA/MO khi lên đơn**, hai bước trên cùng một file đơn: bot **review** đơn, rồi với đơn đã review
-đạt thì đề xuất **PIC** (dev chịu trách nhiệm chính) và báo **rủi ro** của đơn và của sprint. Bot **chỉ đọc** hệ thống
+scrumbot dành cho **BA/MO khi lên đơn**, hai bước trên cùng một file đơn: bot **review** đơn theo quy trình Sprint
+Tech, rồi với đơn đã review đạt thì đề xuất **PIC** (dev chịu trách nhiệm chính) và báo **rủi ro** của đơn và của sprint. Bot **chỉ đọc** hệ thống
 nội bộ (server dev); có PIC đề xuất thì người lên đơn nhập PIC vào hệ thống.
 
 ```bash
@@ -59,7 +59,7 @@ Khi token đổi, người giữ tool gửi `.env` mới; bot báo `API từ ch�
 |---|---|
 | `gemini` (mặc định) | Lệnh `gemini` và `GEMINI_API_KEY` trên máy |
 | `agy` | `~/.gemini/bin/agy` (máy của người giữ tool dùng cái này) |
-| `off` | Không cần gì; mọi đơn tính là `M` (16 giờ) và không có câu hỏi của AI |
+| `off` | Không cần gì; mọi đơn tính là `M` (16 giờ), review không chấm mô tả theo mẫu loại đơn và không có câu hỏi của AI |
 
 Máy không có AI mà quên `--ai off` thì bot vẫn chạy: báo `SIZE-AI-FAILED` và tính mọi đơn là `M`.
 
@@ -105,40 +105,52 @@ Chỉ dev có `Nhận việc` = `Y` mới được đề xuất. QA, RnD và TM 
 Đặt trong `input/don/`, một đơn một file `.md`. Mẫu:
 
 ```markdown
-# Game Emulator - Chỉnh sửa và bổ sung luồng auto scan game
+# Game Emulator v1.2.0 - Chỉnh sửa và bổ sung luồng auto scan game
 
 | Trường | Giá trị |
 |---|---|
 | ID | |
 | App | Game Emulator |
-| Ưu tiên | high |
-| Hạn | 16/10/2026 |
+| Ưu tiên | normal |
+| Hạn | 30/10/2026 |
+| Loại đơn | Tính năng |
+| Người chịu trách nhiệm | TaiDT – BA |
+| Bằng chứng | |
 
-Mô tả tự do: các hạng mục cần làm, link SRS, link Figma, link tracking, …
+Mục tiêu: … Hiện trạng: … Mong muốn: … Remote Config: … Ngoài phạm vi: …
+Nghiệm thu khi: (1) … (2) …
+Link SRS, link Figma, link tracking, …
 ```
 
 | Phần | Cách bot đọc |
 |---|---|
-| Tên đơn | Dòng `# ` đầu tiên; không có thì lấy tên file |
+| Tên đơn | Dòng `# ` đầu tiên; không có thì lấy tên file. Viết theo mẫu App + version + việc cần làm |
 | `ID` | ID đơn trên hệ thống (nếu đơn đã có) |
 | `App` | Tên app, viết giống `App Name` trên hệ thống |
-| `Ưu tiên` | `urgent`, `high`, `normal` hoặc `low` |
-| `Hạn` | `YYYY-MM-DD` hoặc `DD/MM/YYYY` |
+| `Ưu tiên` | `urgent`, `high`, `normal` hoặc `low`. `urgent` và `high` là đơn **Khẩn cấp** của quy trình |
+| `Hạn` | Ngày mong muốn xong (Expected due), `YYYY-MM-DD` hoặc `DD/MM/YYYY` |
+| `Loại đơn` | Một trong 8 loại của mục 5.1; ghi tắt được (`Tính năng`, `UI`, `Fix bug`, `crash`, `hạ tầng`). Để trống thì AI tự xếp loại |
+| `Người chịu trách nhiệm` | Người trả lời Dev về đơn |
+| `Bằng chứng` | Ảnh dashboard, email store/đối tác, số liệu KPI; bắt buộc với đơn Khẩn cấp |
+| `Người nghiệm thu`, `Tài liệu còn thiếu` | Ghi được theo quy trình; bot chưa đọc |
 | Phần còn lại | Mô tả, giữ nguyên như viết |
 
 Ô trống thì để trống, nhưng không thêm trường lạ (bot báo lỗi). Bot đọc file này **không dùng AI**. Để đơn **qua
-review** (mục 5.1): có `App`, đơn `urgent`/`high` phải có `Hạn`, mô tả từ 30 ký tự trở lên (không tính link). Sửa file
-sau khi review đạt thì phải review lại trước khi `assign`.
+review** (mục 5.1): tiêu đề có version; có `App`, `Hạn`, `Người chịu trách nhiệm`; đơn `urgent`/`high` có `Bằng chứng`;
+mô tả từ 30 ký tự trở lên (không tính link), có mục `Nghiệm thu khi` và đủ ý của mẫu loại đơn. Sửa file sau khi review
+đạt thì phải review lại trước khi `assign`.
 
 **Bot tìm đơn trong sprint thế nào:**
 
-1. Có `ID`: lấy đơn đó trên hệ thống. Tên, App, ưu tiên, hạn lấy từ hệ thống; file chỉ góp phần mô tả.
+1. Có `ID`: lấy đơn đó trên hệ thống. Tên, App, ưu tiên, hạn lấy từ hệ thống; file góp phần mô tả, `Loại đơn`,
+   `Người chịu trách nhiệm` và `Bằng chứng` (hệ thống chưa có các trường này).
 2. Không có `ID` nhưng tên trùng một đơn trong sprint: nối vào đơn đó.
 3. Không trùng: coi là **đơn mới** chưa lên hệ thống, xếp sau các đơn hiện có.
 
 **Riêng tư:** trước khi gửi mô tả cho AI, bot thay mọi link bằng loại link (`[link Figma]`, `[link Google Docs]`, …)
 và tên người (dev trong `devs.xlsx`, người làm trên hệ thống, mọi chữ có dạng mã người như `LinhNV`) bằng `[người]`.
-AI không mở link. Họ tên đầy đủ của người ngoài team thì bot không nhận ra: đừng ghi vào file đơn.
+AI không mở link. Họ tên đầy đủ của người ngoài team thì bot không nhận ra: đừng ghi vào phần mô tả. `Người chịu
+trách nhiệm` và `Bằng chứng` không bao giờ được gửi cho AI.
 
 ## 4. Custom rule: luật TM
 
@@ -218,10 +230,11 @@ Ghi chú tự do ngoài bảng thì bot bỏ qua.
    ```
    rồi mở `output/output.md` (mục 6):
    - **`Review: chưa đạt`**: sửa từng mục được liệt kê trong file đơn (hoặc trên hệ thống, nếu đơn đã có ở đó), rồi
-     review lại. Lúc này bot chưa gọi AI nên xong ngay.
-   - **`Review: đạt`**: đọc câu hỏi của AI (nếu có). Bổ sung mô tả nếu thấy đúng, nhưng sửa file là phải review lại.
-     Đơn đạt thì AI được gọi một lần cho riêng đơn này (với `agy` khoảng 1–2 phút; terminal in `Đang hỏi <AI> về mô tả
-     đơn…`).
+     review lại. Còn thiếu mục cố định thì bot chưa gọi AI nên xong ngay. Đủ mục cố định thì AI được gọi một lần cho
+     riêng đơn này (với `agy` khoảng 1–2 phút; terminal in `Đang hỏi <AI> về mô tả đơn…`) để chấm mô tả theo mẫu loại
+     đơn: thiếu ý nào là `REVIEW-TEMPLATE`, kèm câu hỏi của AI nếu có.
+   - **`Review: đạt`**: dòng đầu cho biết mô tả đã đủ ý của mẫu nào, hoặc chưa chấm (AI tắt, lỗi, hoặc đơn ngoài 8
+     loại như app mới). Đọc câu hỏi của AI (nếu có); bổ sung mô tả nếu thấy đúng, nhưng sửa file là phải review lại.
 3. **Giao** khi review đạt, với đúng file đó:
    ```bash
    scrumbot assign input/don/req_from_ba_test.md
@@ -237,8 +250,30 @@ Ghi chú tự do ngoài bảng thì bot bỏ qua.
 | Mã review | Bot dừng khi | Cách sửa |
 |---|---|---|
 | `REVIEW-APP` | Đơn không có App | Ghi dòng `App` |
-| `REVIEW-DUE` | Đơn `urgent`/`high` không có Hạn | Ghi dòng `Hạn` |
+| `REVIEW-TITLE` | Tiêu đề không có version (`1.0.3`, `v1.0.3`) | Sửa dòng `#` theo mẫu App + version + việc cần làm |
+| `REVIEW-DUE` | Đơn không có Hạn | Ghi dòng `Hạn` |
+| `REVIEW-OWNER` | Không có dòng Người chịu trách nhiệm | Ghi dòng `Người chịu trách nhiệm` |
+| `REVIEW-EVIDENCE` | Đơn `urgent`/`high` không có Bằng chứng | Ghi dòng `Bằng chứng`, hoặc hạ `Ưu tiên` về `normal` |
 | `REVIEW-DESC` | Mô tả dưới 30 ký tự, không tính link | Ghi rõ các hạng mục cần làm |
+| `REVIEW-ACCEPT` | Mô tả không có cụm `Nghiệm thu khi` | Ghi các điều kiện kiểm tra được, đủ để tester viết test case |
+| `REVIEW-TEMPLATE` | AI thấy mô tả thiếu ý của mẫu loại đơn | Bổ sung đúng các ý được liệt kê |
+
+**8 loại đơn và các ý AI chấm** (quy trình Sprint Tech mục 1.3; ý `Tài liệu: …` của mỗi mẫu không chấm vì tài liệu
+được bổ sung sau). Ý bắt đầu bằng "Sửa thì" hoặc có "(nếu có)" chỉ tính khi áp dụng cho đơn.
+
+| Loại đơn | Mô tả cần có |
+|---|---|
+| Quảng cáo | Sửa thì ghi Hiện trạng và Mong muốn của từng vị trí · Danh sách vị trí quảng cáo: màn hình, thời điểm hiển thị · Mỗi vị trí: định dạng, mạng QC, ad unit ID, config name trên Remote Config, timeout · Luồng hiển thị (link Flow), tần suất, preload · Nghiệm thu khi: từng vị trí hiện đúng định dạng, đúng thời điểm, bật/tắt được bằng config |
+| IAP | Danh sách gói: product ID, loại (subscription / mua một lần), chu kỳ, trial · Paywall: màn nào, điều kiện hiển thị · Remote Config: key, giá trị mặc định · Event tracking IAP cần bắn · Nghiệm thu khi: mua thử sandbox, khôi phục, hủy, hết hạn đều đúng |
+| Tracking | Danh sách event theo từng màn · Mỗi event: tên, parameter/value, thời điểm bắn · Ảnh màn hình đánh dấu vị trí bắn · Nơi nhận: Firebase, AppsFlyer… · Nghiệm thu khi: event hiện đúng tên, đúng param trên DebugView |
+| Tính năng / luồng / UI | Mục tiêu và lý do, kèm số liệu nếu có · Hiện trạng · Mong muốn: luồng từng bước, màn hình, điều kiện · Remote Config bật/tắt: key, giá trị mặc định · Ngoài phạm vi · Nghiệm thu khi: điều kiện kiểm tra được |
+| Fix bug / crash | Tên lỗi, mã lỗi và link lỗi cho từng lỗi · Version app, build; thiết bị, OS nếu biết · Bước tái hiện, kết quả thực tế và mong đợi · Ảnh, video hoặc log (nếu có) |
+| Sửa policy | Lý do bị từ chối, copy nguyên văn, kèm email hoặc ảnh Play Console · Hạn store yêu cầu (nếu có) · Danh sách hành động, mỗi hành động có Hiện trạng và Mong muốn · Nội dung chữ thay đổi ghi nguyên văn · Nghiệm thu khi: build đã sửa đủ mọi hành động, sẵn sàng nộp lại |
+| Nghiên cứu | Câu hỏi cần trả lời và vì sao · Input: dữ liệu, tài liệu, app tham khảo (đính kèm) · Output mong muốn và định dạng · Giới hạn: timebox, những gì không làm · Nghiệm thu khi: điều kiện để coi là xong |
+| Chuyển store / hạ tầng | Hiện trạng: đang dùng tài khoản, project, SDK nào · Đích: chuyển sang đâu, phiên bản nào · Danh sách việc: Remote Config, Firebase, keystore, ad unit, IAP… · Lý do và hạn (ví dụ hạn target API của Google) · Nghiệm thu khi: app chạy trên đích mới, config và dữ liệu đúng |
+
+Mục `Nghiệm thu khi` bắt buộc với mọi loại, kể cả Fix bug / crash. Đơn không thuộc loại nào (ví dụ app mới, đi theo
+SRS riêng) thì AI không chấm mẫu.
 
 Đơn đã có người làm trên hệ thống thì bot không review (`Review: không cần`); `assign` chạy được ngay, chỉ báo ai đang
 giữ và rủi ro. Bot tính trên cả sprint đang chạy, nên tải và rủi ro là của sprint thật cộng thêm đơn này.
@@ -249,7 +284,7 @@ Hai lệnh nhận cùng các tuỳ chọn:
 
 | Tuỳ chọn | Mặc định | Ý nghĩa |
 |---|---|---|
-| `--ai gemini\|agy\|off` | `gemini` | Công cụ AI: đặt câu hỏi (`review`), ước lượng độ lớn (`assign`) |
+| `--ai gemini\|agy\|off` | `gemini` | Công cụ AI: chấm mô tả theo mẫu và đặt câu hỏi (`review`), ước lượng độ lớn (`assign`) |
 | `--ai-timeout GIÂY` | `180` | Số giây chờ AI; với `agy` nên để `400` |
 | `--ai-model TÊN` | | Model truyền thẳng cho công cụ AI |
 | `--sprint-id ID` | sprint đang chạy | Đặt đơn vào một sprint khác |
@@ -265,9 +300,10 @@ Xem đủ: `scrumbot review --help`.
 
 ## 6. Output: `output/output.md`
 
-**Sau `review`** (`# Review đơn: …`): mục `Review: chưa đạt` liệt kê mã và cách sửa từng mục, hoặc `Review: đạt` với
-câu hỏi của AI cho người lên đơn (tối đa 2, chỉ để nhắc) và lời nhắc chạy `assign`; cuối là bảng thông tin đơn (đơn mới
-hay đã có trên hệ thống, App, ưu tiên, hạn, mô tả đúng như AI đã đọc). Không có PIC, không có rủi ro.
+**Sau `review`** (`# Review đơn: …`): mục `Review: chưa đạt` liệt kê mã và cách sửa từng mục (cả các ý AI thấy thiếu
+theo mẫu), hoặc `Review: đạt` với kết quả chấm mẫu, câu hỏi của AI cho người lên đơn (tối đa 2, chỉ để nhắc) và lời nhắc
+chạy `assign`; cuối là bảng thông tin đơn (đơn mới hay đã có trên hệ thống, App, ưu tiên, hạn, loại đơn, người chịu
+trách nhiệm, bằng chứng, mô tả đúng như AI đã đọc). Không có PIC, không có rủi ro.
 
 **Sau `assign`** (`# Giao đơn: …`, đọc từ trên xuống):
 
@@ -318,7 +354,8 @@ Terminal in tóm tắt: nguồn dữ liệu, file luật, lịch sử, đơn; r�
 | `API vẫn giới hạn tải (429)` hoặc lỗi server (5xx) | Chạy lại sau ít phút |
 | `Có nhiều … Chỉ định một file bằng --rules` | Chỉ để một file luật `.md` trong `input/`, hoặc dùng `--rules` |
 | `File '…' không có bảng luật …` | Một file `.md` không phải luật (thường là file đơn) nằm thẳng trong `input/`: chuyển nó vào `input/don/` |
-| `File đơn … trường '…' không hợp lệ` | Bảng trong file đơn chỉ dùng `ID`, `App`, `Ưu tiên`, `Hạn` |
+| `File đơn … trường '…' không hợp lệ` | Bảng trong file đơn chỉ dùng các trường của mục 3.2 |
+| `File đơn …: Loại đơn '…' không hợp lệ` | Ghi một trong 8 loại của mục 5.1 (hoặc một phần tên, như `Fix bug`), hoặc để trống cho AI xếp loại |
 | `Có <k> đơn tên '…' trong …` | Nhiều đơn trùng tên: ghi `ID` của đơn vào file đơn |
 | `Không có đơn gốc ID '…' trong …` | ID sai, hoặc đơn không thuộc sprint đang chạy: sửa ID, để trống ID, hoặc dùng `--sprint-id` |
 | `Đơn chưa qua review, hoặc đã đổi sau lần review đạt gần nhất …` | Chạy `scrumbot review` với đúng file đó (cùng `--state`) cho tới khi đạt, rồi mới `assign`. Sửa file đơn, hoặc App/Hạn trên hệ thống đổi, thì phải review lại |

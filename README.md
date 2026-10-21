@@ -3,8 +3,10 @@
 Bot scrum master cho team Android. **BA/MO chạy bot khi lên đơn** (D61): bot đọc đơn trong file `.md`, đọc sprint đang
 chạy của board Maintain từ API chỉ-đọc của hệ thống nội bộ (server **dev**), rồi làm **ba việc**:
 
-1. **Review đơn** (`scrumbot review <file đơn>`): thiếu App, đơn gấp chưa có hạn hoặc mô tả quá ngắn thì bot dừng,
-   chỉ ghi những gì cần bổ sung; đơn đạt thì AI hỏi tối đa 2 câu về chỗ mô tả còn thiếu.
+1. **Review đơn** (`scrumbot review <file đơn>`) theo quy trình Sprint Tech (D65): thiếu trường bắt buộc (App,
+   version trong tiêu đề, Hạn, người chịu trách nhiệm, bằng chứng của đơn khẩn cấp, mục "Nghiệm thu khi") hoặc mô tả
+   quá ngắn thì bot dừng, chỉ ghi những gì cần bổ sung; đủ thì AI chấm mô tả theo mẫu của loại đơn (thiếu ý cũng dừng)
+   và hỏi tối đa 2 câu.
 2. **Đề xuất PIC** (`scrumbot assign <file đơn>`, chỉ cho đơn đã review đạt và chưa sửa sau đó) kèm lý do và 2 người
    dự phòng.
 3. **Báo rủi ro** (cũng trong `assign`) của đơn, của PIC và của cả sprint: quá tải, trễ hạn, kẹt trạng thái, QA trả
@@ -20,7 +22,7 @@ theo lịch. Đơn có PIC đề xuất thì **người lên đơn** nhập PIC 
 
 | | Nội dung |
 |---|---|
-| **Làm** | Review một đơn BA/MO viết trong file `.md` (`review`) · đề xuất PIC và sổ rủi ro 9 mã (`assign`) · `output/output.md` (D60, D62, D64) |
+| **Làm** | Review một đơn BA/MO viết trong file `.md` theo quy trình Sprint Tech (`review`) · đề xuất PIC và sổ rủi ro 9 mã (`assign`) · `output/output.md` (D60, D62, D64, D65) |
 | **Không làm** | Ghi vào hệ thống · giao bug hoặc subtask · đổi đơn đã có người làm · báo gì về người ngoài pool · đọc server production |
 | **Đã bỏ** | 13/10/2026 (D59): chạy theo lịch 30 phút, báo cáo cuối sprint, clone + replay sprint cũ, chạy bằng file export Excel, bộ đánh giá `eval/` (git `7b2fa0d`). 14/10/2026 (D62): lệnh `run`, báo cáo Excel 6 sheet, bộ nhớ đề xuất giữa các lần chạy, rủi ro `ORDER-CHANGED` (git `754b165`). |
 
@@ -31,6 +33,7 @@ theo lịch. Đơn có PIC đề xuất thì **người lên đơn** nhập PIC 
 | GĐ 1 | **Xong** (14/10/2026) | Đọc API dev, review đơn, giao PIC, sổ rủi ro 9 mã. Đo lần cuối (replay 29 sprint, 13/10): khớp TM 64% số đơn; sổ rủi ro báo trước 82% đơn có kết cục xấu. |
 | Bàn giao core | **Xong** (14/10/2026, 0.3.0) | Tách bot thành Input → Process → Output, cộng module AI, nối bằng 2 định dạng chuẩn (`scrumbot-input/1`, `scrumbot-outcome/1`) để TM tích hợp core vào website (D63, mục 4 và 6 dưới đây). Lệnh `assign` không đổi: `output.md` giống từng byte. |
 | Tách review | **Xong** (21/10/2026, 0.4.0) | Review là lệnh và module riêng (`core.review`), `assign` chỉ chạy cho đơn đã review đạt; câu hỏi của AI chuyển sang review; định dạng `scrumbot-outcome/2` (D64). |
+| Review theo quy trình | **Xong** (21/10/2026, 0.5.0) | Review theo quy trình Sprint Tech (`rule.html`, 19/10/2026): thêm 4 mục chặn cố định, AI chấm mô tả theo 8 mẫu loại đơn và chặn khi thiếu ý; file đơn có thêm `Loại đơn`, `Người chịu trách nhiệm`, `Bằng chứng`; định dạng `scrumbot-input/2`, `scrumbot-outcome/3` (D65). Phần còn lại của quy trình (buffer 5%, đơn khẩn cấp ≤ 8 giờ, ai phân công) chưa đưa vào `assign` (O16). |
 | GĐ 2 | Chờ hệ thống | Ghi PIC vào hệ thống khi có API ghi (O8). Rủi ro 1 và 12 cho cả sprint khi API trả mô tả đơn (D53). Đơn RnD mặc định về DuyLT khi hệ thống có tag loại đơn (D58). |
 
 ## 2. Cách bot làm việc
@@ -40,27 +43,35 @@ INPUT                               XỬ LÝ                                    
 file đơn .md của BA/MO       ─┐     Cả hai lệnh: đặt đơn vào sprint đang chạy
 API dev /api/doc/ (chỉ GET)  ─┤     scrumbot review                      ──►   output/output.md
   sprints · don · lich-su     │       1. Check cố định: thiếu gì thì dừng      (review, hoặc PIC và rủi ro)
-input/devs.xlsx              ─┼──►    2. Đạt: AI hỏi tối đa 2 câu; ghi nhớ ──►  Tóm tắt trên terminal
+input/devs.xlsx              ─┼──►    2. AI chấm mẫu loại đơn, hỏi 2 câu   ──►  Tóm tắt trên terminal
+                              │          (thiếu ý thì dừng); đạt thì ghi nhớ
 input/<luật TM>.md (tuỳ ý)   ─┘     scrumbot assign (đơn đã review đạt)
                                       3. AI ước lượng độ lớn S/M/L/XL
                                       4. Giao PIC theo luật cố định
                                       5. Sổ rủi ro (9 mã)
 ```
 
-**AI chỉ ước lượng độ lớn đơn và đặt câu hỏi cho người lên đơn.** Review, ai làm đơn nào và rủi ro mức nào đều do
-luật cố định quyết định, nên lần nào chạy cũng ra cùng kết quả và giải thích được bằng một câu. AI lỗi hoặc tắt thì
-mọi đơn tính là `M` (16 giờ) và lần chạy vẫn tiếp tục.
+**AI chấm mô tả theo mẫu loại đơn, đặt câu hỏi cho người lên đơn và ước lượng độ lớn đơn.** Các mục chặn cố định của
+review, ai làm đơn nào và rủi ro mức nào đều do luật cố định quyết định, nên lần nào chạy cũng ra cùng kết quả và giải
+thích được bằng một câu. Riêng phần chấm mẫu là AI quyết (D65), nên cùng một file có thể lúc đạt lúc không. AI lỗi
+hoặc tắt thì review không chấm mẫu, mọi đơn tính là `M` (16 giờ) và lần chạy vẫn tiếp tục.
 
 ### 2.1 Review đơn
 
 | Mã | Bot dừng khi |
 |---|---|
 | `REVIEW-APP` | Đơn không có App |
-| `REVIEW-DUE` | Đơn urgent/high không có Hạn |
+| `REVIEW-TITLE` | Tiêu đề không có version (`1.0.3`, `v1.0.3`) |
+| `REVIEW-DUE` | Đơn không có Hạn |
+| `REVIEW-OWNER` | File đơn không có dòng Người chịu trách nhiệm |
+| `REVIEW-EVIDENCE` | Đơn urgent/high (Khẩn cấp) không có Bằng chứng |
 | `REVIEW-DESC` | Mô tả dưới 30 ký tự (không tính link) |
+| `REVIEW-ACCEPT` | Mô tả không có mục "Nghiệm thu khi" |
+| `REVIEW-TEMPLATE` | AI thấy mô tả thiếu ý của mẫu loại đơn (8 loại của quy trình, trừ ý "Tài liệu") |
 
-`scrumbot review` chạy các check trên. Đơn chưa đạt thì `output.md` chỉ ghi những gì cần sửa; sửa file đơn rồi review
-lại. Đơn đạt thì AI có thể hỏi tối đa 2 câu về chỗ mô tả còn thiếu (chỉ để nhắc, không chặn) và bot ghi nhớ đơn đã đạt.
+`scrumbot review` chạy 7 check cố định trước. Còn thiếu thì `output.md` chỉ ghi những gì cần sửa, bot không gọi AI;
+sửa file đơn rồi review lại. Đủ thì AI xếp loại đơn (hoặc lấy dòng `Loại đơn` của file), chấm mô tả theo mẫu của loại
+đó và hỏi tối đa 2 câu (câu hỏi chỉ để nhắc). Thiếu ý của mẫu là chưa đạt; đạt thì bot ghi nhớ đơn đã đạt.
 `scrumbot assign` chỉ chạy khi đơn, đúng như lúc đó, đã review đạt: sửa file đơn (hoặc App, Hạn trên hệ thống đổi) thì
 phải review lại. Đơn đã có người làm trên hệ thống thì không review, `assign` vẫn báo người làm và rủi ro.
 Chi tiết: [`docs/bot-spec.md`](docs/bot-spec.md) §7.3, §7.4.
@@ -102,9 +113,9 @@ Ngưỡng và mức: [`docs/bot-spec.md`](docs/bot-spec.md) §4.
 Cách cài cho BA/MO (file `.whl`, thư mục làm việc, token, AI): [`HOW_TO_USE.md`](HOW_TO_USE.md) mục 1.
 
 ```bash
-scrumbot review input/don/<file đơn>.md                  # bước 1, dùng gemini (mặc định) để đặt câu hỏi
+scrumbot review input/don/<file đơn>.md                  # bước 1, dùng gemini (mặc định) để chấm mẫu và hỏi
 scrumbot assign input/don/<file đơn>.md                  # bước 2, sau khi review đạt
-scrumbot review input/don/<file đơn>.md --ai off         # không gọi AI: không có câu hỏi
+scrumbot review input/don/<file đơn>.md --ai off         # không gọi AI: không chấm mẫu, không có câu hỏi
 scrumbot assign input/don/<file đơn>.md --ai off         # không gọi AI: mọi đơn tính là M
 scrumbot assign input/don/<file đơn>.md --ai agy --ai-timeout 400
 scrumbot assign --help                                   # mọi tuỳ chọn (giống nhau cho hai lệnh)
@@ -125,35 +136,35 @@ không đụng tới luật.
 ```
 INPUT   scrumbot.input   file đơn .md · devs.xlsx · luật TM .md · API dev
   │
-  ▼ core.Inputs (JSON scrumbot-input/1)
+  ▼ core.Inputs (JSON scrumbot-input/2)
 CORE    scrumbot.core    place:  chọn sprint, đặt đơn (cả hai bước dùng chung)
-  │                      review: check cố định (chưa đạt: dừng, không gọi AI) ─► câu hỏi của AI
+  │                      review: check cố định (chưa đạt: dừng, không gọi AI) ─► AI chấm mẫu, hỏi
   │                      assign: chỉ đơn đã review đạt ─► độ lớn ─► giao PIC ─► sổ rủi ro
   │                                  │  ▲
-  │    đơn + lịch sử, không tên/link ▼  │ câu hỏi (asker); S/M/L/XL, loại đơn, hạng mục, rủi ro kỹ thuật (sizer)
-  │                      AI  scrumbot.ai: gemini · agy · AI khác · tắt = không câu hỏi, mọi đơn M
-  ▼ core.Outcome (JSON scrumbot-outcome/2)
+  │    đơn + lịch sử, không tên/link ▼  │ loại đơn, ý thiếu, câu hỏi (asker); S/M/L/XL, hạng mục, rủi ro kỹ thuật (sizer)
+  │                      AI  scrumbot.ai: gemini · agy · AI khác · tắt = không chấm mẫu, không câu hỏi, mọi đơn M
+  ▼ core.Outcome (JSON scrumbot-outcome/3)
 OUTPUT  scrumbot.output  output/output.md · terminal · JSON, trang web, … (adapter tự viết)
 ```
 
 | Module | Nhận | Trả | Thay được bằng |
 |---|---|---|---|
 | **Input** (`scrumbot.input`) | File đơn, `devs.xlsx`, luật TM, API dev | `core.Inputs` | API production, JSON, database, form trên website, … |
-| **AI** (`scrumbot.ai`) | Đơn đã che tên và link, đơn lịch sử làm ví dụ | Câu hỏi cho đơn của file (`core.Questions`), độ lớn từng đơn (`core.Sizing`) | AI CLI khác, API của nhà cung cấp khác, hoặc tắt (không câu hỏi, mọi đơn `M`) |
+| **AI** (`scrumbot.ai`) | Đơn đã che tên và link, các mẫu loại đơn, đơn lịch sử làm ví dụ | Kết quả chấm mẫu và câu hỏi cho đơn của file (`core.AiReview`), độ lớn từng đơn (`core.Sizing`) | AI CLI khác, API của nhà cung cấp khác, hoặc tắt (không chấm mẫu, không câu hỏi, mọi đơn `M`) |
 | **Output** (`scrumbot.output`) | `core.Outcome` | `output/output.md`, các dòng terminal | JSON, trang web, tin nhắn, … |
 | Core (`scrumbot.core`) | `Inputs` và AI | `Outcome` | Không thay: review, PIC và rủi ro đều nằm ở đây |
 
 Ba module chỉ import `scrumbot.core`, không import lẫn nhau; core chỉ dùng thư viện chuẩn Python, và hai module con
 `core.review`, `core.assign` không import nhau ([`tests/test_boundaries.py`](tests/test_boundaries.py) kiểm tra). Đơn
-chưa đạt review thì core không gọi AI; `core.assign` từ chối đơn chưa review đạt.
+chưa đạt check cố định thì core không gọi AI; `core.assign` từ chối đơn chưa review đạt.
 
 ### 4.1 Input
 
-**Là gì.** Mọi thứ core cần, gói trong một object `core.Inputs` (dạng JSON `scrumbot-input/1`):
+**Là gì.** Mọi thứ core cần, gói trong một object `core.Inputs` (dạng JSON `scrumbot-input/2`):
 
 | Phần | Nội dung | Bắt buộc | `scrumbot assign` lấy từ |
 |---|---|---|---|
-| `order` | Đơn đang lên: tên, ID, App, ưu tiên, hạn, mô tả | ✓ | File đơn `.md` |
+| `order` | Đơn đang lên: tên, ID, App, ưu tiên, hạn, mô tả, loại đơn, người chịu trách nhiệm, bằng chứng | ✓ | File đơn `.md` |
 | `devs` | Tên, mã, level, nhận việc, ngày nghỉ của từng dev | ✓ | `input/devs.xlsx` |
 | `rules`, `rules_source` | Luật TM và nơi lấy luật | | File luật `.md` trong `input/` |
 | `sprints` | Các list của board Maintain: tên, ngày đầu, ngày cuối, đã lưu trữ chưa | ✓ | API dev `sprints` |
@@ -164,19 +175,21 @@ chưa đạt review thì core không gọi AI; `core.assign` từ chối đơn c
 **File đơn** (đặt trong `input/don/`, đọc **không dùng AI**):
 
 ```markdown
-# Game Emulator - Chỉnh sửa và bổ sung luồng auto scan game
+# Game Emulator v1.2.0 - Chỉnh sửa và bổ sung luồng auto scan game
 
 | Trường | Giá trị |
 |---|---|
 | ID | |
 | App | Game Emulator |
-| Ưu tiên | high |
-| Hạn | 16/10/2026 |
+| Ưu tiên | normal |
+| Hạn | 30/10/2026 |
+| Loại đơn | Tính năng |
+| Người chịu trách nhiệm | TaiDT – BA |
 
-Mô tả tự do: nội dung đơn, các hạng mục cần làm, link SRS, link Figma, …
+Mô tả theo mẫu của loại đơn: mục tiêu, hiện trạng, mong muốn, …, Nghiệm thu khi: …, link SRS, link Figma, …
 ```
 
-Có `ID` thì bot lấy đơn đó trên hệ thống và chỉ thêm mô tả; không có `ID` mà tên trùng một đơn trong sprint thì nối
+Có `ID` thì bot lấy đơn đó trên hệ thống và chỉ thêm mô tả, loại đơn, người chịu trách nhiệm và bằng chứng; không có `ID` mà tên trùng một đơn trong sprint thì nối
 vào đơn đó; không trùng thì coi là **đơn mới** chưa lên hệ thống.
 
 **`input/devs.xlsx`** (sửa tay khi có người vào/ra team hoặc nghỉ phép):
@@ -213,7 +226,7 @@ Mỗi luật có thể kèm `Từ ngày` / `Đến ngày`. Cú pháp đầy đ�
 [`docs/assignment-spec.md`](docs/assignment-spec.md) §14.
 
 **Đổi sang nguồn khác.** API production, file JSON, database, form trên website hay file Excel đều được: viết một
-adapter dựng ra `Inputs`, bằng Python hoặc bằng JSON `scrumbot-input/1` rồi `core.Inputs.from_dict(data)`. Core
+adapter dựng ra `Inputs`, bằng Python hoặc bằng JSON `scrumbot-input/2` rồi `core.Inputs.from_dict(data)`. Core
 không đổi. Adapter phải giữ:
 
 - Đủ trường bắt buộc; ngày viết `YYYY-MM-DD`, thời điểm `YYYY-MM-DDTHH:MM:SS` (giờ hệ thống, không múi giờ). Sai dạng
@@ -231,13 +244,15 @@ Python, không HTTP, không file: [`tests/test_engine.py`](tests/test_engine.py)
 
 ### 4.2 AI
 
-**Làm gì.** Hai lần gọi, mỗi bước một lần. `review` (đơn đã qua check cố định) đưa cho AI riêng đơn của file; AI trả
-tối đa 2 câu hỏi cho người lên đơn. `assign` đưa cho AI các đơn của sprint và các đơn lịch sử (kèm số giờ thực tế để AI
+**Làm gì.** Hai lần gọi, mỗi bước một lần. `review` (đơn đã qua check cố định) đưa cho AI riêng đơn của file cùng các
+mẫu loại đơn; AI trả loại đơn, số thứ tự các ý của mẫu mà mô tả còn thiếu, và tối đa 2 câu hỏi cho người lên đơn. `assign` đưa cho AI các đơn của sprint và các đơn lịch sử (kèm số giờ thực tế để AI
 so); với mỗi đơn AI trả độ lớn `S` (4h), `M` (16h), `L` (32h) hoặc `XL` (64h) kèm lý do, loại đơn, tối đa 5 hạng mục
-và tối đa 2 rủi ro kỹ thuật. AI **không** quyết định review đạt hay không, không chọn PIC, không chấm mức rủi ro. AI không nhận
+và tối đa 2 rủi ro kỹ thuật. Ở `review`, ý thiếu theo mẫu làm review chưa đạt (D65); ngoài phần đó AI **không**
+quyết định review đạt hay không, không chọn PIC, không chấm mức rủi ro. AI không nhận
 tên người, mã dev hay link: tên thành `[người]`, link thành `[link Figma]`, `[link Google Docs]`, …; AI chạy chỉ đọc
 trong một thư mục tạm rỗng. AI lỗi, hết giờ hoặc trả sai thì đơn đó tính là `M` (cảnh báo `SIZE-AI-FAILED` hoặc
-`SIZE-AI-INVALID`) và lần chạy vẫn xong; ở `review` thì không có câu hỏi và review vẫn đạt.
+`SIZE-AI-INVALID`) và lần chạy vẫn xong; ở `review` thì không chấm mẫu, không có câu hỏi, và review vẫn đạt nếu các
+check cố định đạt.
 
 **Cấu hình (không sửa code):**
 
@@ -249,15 +264,17 @@ trong một thư mục tạm rỗng. AI lỗi, hết giờ hoặc trả sai thì
 | Xem prompt và câu trả lời của AI | `-v` |
 | Bắt AI ước lượng lại mọi đơn | Xoá `state/scrumbot.sqlite`: bot nhớ câu trả lời theo ID + tên đơn |
 
-**Custom prompt.** Chưa có file cấu hình prompt: prompt nằm trong code, biến `_PROMPT` (độ lớn) và `_QUESTION_PROMPT`
-(câu hỏi) ở [`src/scrumbot/ai/prompt.py`](src/scrumbot/ai/prompt.py). Prompt là một phần của spec
-([`docs/assignment-spec.md`](docs/assignment-spec.md) §6.4, [`docs/bot-spec.md`](docs/bot-spec.md) §2.6): sửa spec
+**Custom prompt.** Chưa có file cấu hình prompt: prompt nằm trong code, biến `_PROMPT` (độ lớn) và `_REVIEW_PROMPT`
+(review: chấm mẫu và câu hỏi) ở [`src/scrumbot/ai/prompt.py`](src/scrumbot/ai/prompt.py); các mẫu loại đơn ở
+[`src/scrumbot/core/review/templates.py`](src/scrumbot/core/review/templates.py). Prompt là một phần của spec
+([`docs/assignment-spec.md`](docs/assignment-spec.md) §6.4, [`docs/bot-spec.md`](docs/bot-spec.md) §2.6, §7.3): sửa spec
 trước rồi mới sửa code, và giữ:
 
 - **Dạng trả lời**: độ lớn là một mảng JSON, mỗi đơn một phần tử `{"stt", "size", "reason", "type", "items",
-  "tech_risks"}`, đọc bằng `parse_reply`; câu hỏi là một object `{"questions": [...]}`, đọc bằng `parse_questions`.
+  "tech_risks"}`, đọc bằng `parse_reply`; review là một object `{"type", "missing", "questions"}`, đọc bằng
+  `parse_review`.
   Thêm hoặc đổi khoá thì sửa cả hàm đọc trong cùng file.
-- **Không đưa tên người, mã dev hay link vào prompt.** `build_prompt` và `build_question_prompt` đã lo việc này.
+- **Không đưa tên người, mã dev hay link vào prompt.** `build_prompt` và `build_review_prompt` đã lo việc này.
 - **Giới hạn độ dài**: prompt tối đa 30.000 ký tự (mô tả bị cắt dần 600 → 200 → 0 ký tự), tối đa 30 đơn lịch sử làm
   ví dụ, ưu tiên đơn cùng app.
 - Sửa xong thì xoá `state/scrumbot.sqlite` (câu trả lời cũ được nhớ theo đơn, không theo prompt) và chạy thử với AI
@@ -291,7 +308,9 @@ sizer = AiSizer(ask, tool="ten-ai", now=now, memory=None)  # memory=None: không
 outcome = core.assign(core.place(inputs, now=now), reviewed={review.order.fingerprint}, sizer=sizer)
 ```
 
-Mức 3: `asker(row)` trả `core.Questions` (tối đa 2 câu, AI có trả lời không, một dòng ghi chú); không raise khi AI lỗi.
+Mức 3: `asker(row, kind)` trả `core.AiReview` (loại đơn, có chấm mẫu không, số thứ tự các ý thiếu, tối đa 2 câu hỏi, AI
+có trả lời không, một dòng ghi chú); `kind` là `Loại đơn` của file hoặc `None`. Không raise khi AI lỗi. Core tự đổi số
+thứ tự thành chữ của mẫu, nên asker không đưa được chữ của mình vào câu chặn.
 `sizer(orders, examples, fresh)` trả `core.Sizing` (một `SizeEstimate` cho mỗi STT, các cảnh báo, một dòng
 ghi chú). Không raise khi AI lỗi: tính `M` và ghi lý do vào ghi chú. Đơn bị bỏ sót thì core tự tính `M`. STT trong
 `fresh` (đơn của file đơn) phải được ước lượng ngay, không lấy từ bộ nhớ.
@@ -301,26 +320,26 @@ chạy. Chi tiết: [`docs/bot-spec.md`](docs/bot-spec.md) §8.5.
 
 ### 4.3 Output
 
-**Là gì.** Core trả một object `core.Outcome` (dạng JSON `scrumbot-outcome/2`, lấy bằng `outcome.to_dict()`). Mọi
+**Là gì.** Core trả một object `core.Outcome` (dạng JSON `scrumbot-outcome/3`, lấy bằng `outcome.to_dict()`). Mọi
 output đều dựng từ `Outcome`, nên cùng nội dung và cùng câu chữ. `status` là một trong các kết cục:
 
 | `status` | Bước | Khi | Có gì |
 |---|---|---|---|
-| `not_ready` | `review` | Check cố định chưa đạt | Sprint, đơn, danh sách mục cần sửa |
-| `ready` | `review` | Đạt | Sprint, đơn (kèm `fingerprint` để `assign` nhận ra), câu hỏi của AI |
+| `not_ready` | `review` | Check cố định chưa đạt, hoặc AI thấy thiếu ý của mẫu | Sprint, đơn, danh sách mục cần sửa (và kết quả của AI khi AI đã chấm) |
+| `ready` | `review` | Đạt | Sprint, đơn (kèm `fingerprint` để `assign` nhận ra), kết quả chấm mẫu và câu hỏi của AI |
 | `pre_assigned` | `review` | Đơn đã có người làm | Sprint, đơn; không review |
 | `proposed` | `assign` | Đơn chưa có người làm | Đủ mọi phần bên dưới, PIC là đề xuất của bot |
 | `pre_assigned` | `assign` | Đơn đã có người làm trên hệ thống | Như `proposed`, nhưng giữ nguyên người làm, không có dự phòng |
 
 Kết quả của `review` không có `assignment`, `size`, rủi ro, bảng dev hay cảnh báo; kết quả của `assign` không có
-`questions`.
+`ai`.
 
 | Phần | Nội dung |
 |---|---|
 | `run_at`, `source`, `freshness`, `sprint` | Lúc chạy, nguồn, dữ liệu mới nhất lúc nào, sprint đang chạy và sprint trước |
-| `order` | Đơn như bot hiểu: STT, ID, nối theo ID / theo tên / đơn mới, App, ưu tiên, hạn, mô tả AI đã đọc, `fingerprint` |
+| `order` | Đơn như bot hiểu: STT, ID, nối theo ID / theo tên / đơn mới, App, ưu tiên, hạn, mô tả AI đã đọc, loại đơn, người chịu trách nhiệm, bằng chứng, `fingerprint` |
 | `review` | Từng mục cần sửa: mã `REVIEW-…` và câu tiếng Việt |
-| `questions` | Câu hỏi của AI cho người lên đơn, AI có trả lời không, ghi chú |
+| `ai` | Loại đơn review đã dùng, có chấm mẫu không, số thứ tự các ý thiếu, câu hỏi của AI cho người lên đơn, AI có trả lời không, ghi chú |
 | `assignment` | PIC, lý do một câu, 2 người dự phòng, các dòng luật TM đã áp dụng |
 | `size` | Độ lớn, số giờ, có phải mặc định không, lý do, loại đơn, hạng mục, rủi ro kỹ thuật |
 | `risks`, `sprint_risks` | Rủi ro của đơn, PIC và sprint: mức, mã, vấn đề, ảnh hưởng, phòng ngừa, nếu xảy ra, ai xử lý, hạn xử lý; số rủi ro theo mức của cả sổ |
@@ -375,20 +394,20 @@ do website tự chọn theo mục 4.
 from datetime import datetime
 from scrumbot import core
 
-inputs = core.Inputs.from_dict(data)      # data: JSON theo scrumbot-input/1 (mục 4.1)
+inputs = core.Inputs.from_dict(data)      # data: JSON theo scrumbot-input/2 (mục 4.1)
 
-# Bước 1, khi người lên đơn bấm "Review": asker là AI theo mục 4.2; None = không có câu hỏi
+# Bước 1, khi người lên đơn bấm "Review": asker là AI theo mục 4.2; None = không chấm mẫu, không có câu hỏi
 outcome = core.review(core.place(inputs, now=datetime.now()), asker=None)
 if outcome.status is core.Status.READY:
     luu_review_dat(outcome.order.fingerprint)  # website tự lưu, vd trong database
 
 # Bước 2, khi bấm "Giao": reviewed là mọi fingerprint đã lưu; sizer None = mọi đơn M
 outcome = core.assign(core.place(inputs, now=datetime.now()), reviewed=cac_review_dat(), sizer=None)
-result = outcome.to_dict()                # JSON theo scrumbot-outcome/2 (mục 4.3)
+result = outcome.to_dict()                # JSON theo scrumbot-outcome/3 (mục 4.3)
 ```
 
-- `core.assign` ném `core.InputError` khi đơn chưa review đạt, hoặc đã đổi (tiêu đề, ID, App, ưu tiên, Hạn, mô tả)
-  sau lần review đạt. `reviewed` là bất kỳ thứ gì hỗ trợ `in` (set, hoặc object tự viết đọc database).
+- `core.assign` ném `core.InputError` khi đơn chưa review đạt, hoặc đã đổi (tiêu đề, ID, App, ưu tiên, Hạn, mô tả,
+  loại đơn, người chịu trách nhiệm, bằng chứng) sau lần review đạt. `reviewed` là bất kỳ thứ gì hỗ trợ `in` (set, hoặc object tự viết đọc database).
 - `core.place(...)` là một bước riêng để in trạng thái trước khi chờ AI, như terminal
   ([`docs/bot-spec.md`](docs/bot-spec.md) §8.2).
 - Adapter mẫu: `scrumbot.input.dev_api` (API dev), `scrumbot.input.files` (`devs.xlsx`, luật TM, file đơn),
