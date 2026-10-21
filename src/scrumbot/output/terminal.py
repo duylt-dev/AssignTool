@@ -6,10 +6,11 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
-from scrumbot.core.model import Placement, Severity
+from scrumbot.core.model import ORDER_KINDS, Placement, Severity
 from scrumbot.core.outcome import Outcome, Status
 from scrumbot.core.place import Placed
-from scrumbot.output.markdown import risk_counts, short_name
+from scrumbot.core.review.templates import OTHER
+from scrumbot.output.markdown import kind_of, risk_counts, short_name
 
 
 def run_day(day: date) -> str:
@@ -36,7 +37,8 @@ def placed_lines(placed: Placed) -> list[str]:
 
 
 def review_lines(outcome: Outcome, report: Path) -> list[str]:
-    """What blocks the order, or how many questions the AI asked; then the path of the report."""
+    """What blocks the order, or the AI's template check and how many questions it asked; then the path of the
+    report."""
     if outcome.status is Status.NOT_READY:
         lines = [
             f"Review: chưa đạt ({len(outcome.review)} mục)",
@@ -45,13 +47,17 @@ def review_lines(outcome: Outcome, report: Path) -> list[str]:
     elif outcome.status is Status.PRE_ASSIGNED:
         lines = ["Review: không cần (đơn đã có người làm)"]
     else:
-        questions = outcome.questions
+        ai, kind = outcome.ai, kind_of(outcome.ai)
+        if ai is not None and ai.checked and kind is not None:
+            template = f"đủ ý mẫu {ORDER_KINDS[kind]}"
+        else:
+            template = "ngoài 8 loại đơn" if ai is not None and ai.kind == OTHER else "chưa chấm theo mẫu"
         asked = (
-            f"{len(questions.items)} câu hỏi của AI"
-            if questions is not None and questions.answered
-            else f"không có câu hỏi của AI: {questions.note if questions is not None else 'tắt AI'}"
+            f"{len(ai.questions)} câu hỏi của AI"
+            if ai is not None and ai.answered
+            else f"không có câu hỏi của AI: {ai.note if ai is not None else 'tắt AI'}"
         )
-        lines = [f"Review: đạt ({asked})", f"Tiếp theo: scrumbot assign {outcome.order.origin}"]
+        lines = [f"Review: đạt ({template}; {asked})", f"Tiếp theo: scrumbot assign {outcome.order.origin}"]
     return [*lines, f"Báo cáo: {report}"]
 
 

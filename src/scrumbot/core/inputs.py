@@ -11,7 +11,7 @@ from typing import cast
 from scrumbot.core.codec import from_plain, invalid, to_plain
 from scrumbot.core.model import Dev, OrderDraft, StatusChange, TeamRule
 
-FORMAT = "scrumbot-input/1"
+FORMAT = "scrumbot-input/2"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

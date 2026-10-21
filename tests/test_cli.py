@@ -18,10 +18,15 @@ from tests.conftest import build_devs
 from tests.http_server import FakeDevServer
 
 DONE = item("old", "1.0.0", people=(LINH,), status="done", hours=12, created=datetime(2026, 9, 23, 9))
-EMPTY = item("new", "1.0.1 - Add ads", status="ready to progress", created=datetime(2026, 10, 7, 9))
+EMPTY = item(
+    "new", "1.0.1 - Add ads", status="ready to progress", due=date(2026, 10, 16), created=datetime(2026, 10, 7, 9)
+)
 RULES = "# Luật\n\n| Loại | Dev | App | Ghi chú |\n|---|---|---|---|\n| Chỉ định | MinhNM | Demo | thử |\n"
 # The file names the empty order of the sprint by its title (bot spec §7.2) and passes the review (§7.3).
-ORDER = "# 1.0.1 - Add ads\n\nThêm quảng cáo xen kẽ ở màn hình chính và màn kết quả.\n"
+ORDER = (
+    "# 1.0.1 - Add ads\n\n| Trường | Giá trị |\n|---|---|\n| Người chịu trách nhiệm | TaiDT – BA |\n\n"
+    "Thêm quảng cáo xen kẽ ở màn hình chính và màn kết quả. Nghiệm thu khi: hiện ở cả hai màn.\n"
+)
 
 
 @pytest.fixture
@@ -78,7 +83,8 @@ def test_an_off_run_writes_output_md_and_prints_the_proposal(
     assert report.startswith("# Giao đơn: 1.0.1 - Add ads\n") and "## Review" not in report
     printed = capsys.readouterr().out
     assert "Ngày chạy: 08/10/2026 (--today)" in printed and "Độ lớn: M (mặc định) · tắt AI (mọi đơn M)" in printed
-    assert "Luật TM: không có" in printed and "Review: đạt (không có câu hỏi của AI: tắt AI)" in printed
+    assert "Luật TM: không có" in printed
+    assert "Review: đạt (chưa chấm theo mẫu; không có câu hỏi của AI: tắt AI)" in printed
     assert f"Tiếp theo: scrumbot assign {tmp_path / 'don' / 'order.md'}" in printed
     assert "PIC đề xuất: LinhNV (dự phòng: MinhNM, AnTD)" in printed
     assert not list((tmp_path / "out").glob("*.tmp"))
@@ -93,7 +99,7 @@ def test_ai_reply_sizes_the_order_without_names_and_with_the_history_hours(
         asking = prompt.startswith("You review")
         calls.append((asking, tool, model, timeout, LINH in prompt, "- Demo · 1.0.0 · 12h" in prompt))
         if asking:
-            return AiReply(tool, '{"questions": ["Quảng cáo loại nào?"]}', None)
+            return AiReply(tool, '{"type": "ads", "missing": [], "questions": ["Quảng cáo loại nào?"]}', None)
         return AiReply(tool, '[{"stt": 1, "size": "L", "reason": "Thêm ads"}]', None)
 
     monkeypatch.setattr(ai_cli, "run_ai", fake)
@@ -104,10 +110,11 @@ def test_ai_reply_sizes_the_order_without_names_and_with_the_history_hours(
     assert _run(source, tmp_path, *flags) == 0
 
     assert calls == [(True, "gemini", "m1", 9, False, False), (False, "gemini", "m1", 9, False, True)]
-    assert "## Review: đạt\n\nCâu hỏi của AI cho người lên đơn" in review and "- Quảng cáo loại nào?" in review
+    assert "## Review: đạt\n\nMô tả đủ ý của mẫu Quảng cáo (AI chấm).\n\nCâu hỏi của AI cho người lên đơn" in review
+    assert "- Quảng cáo loại nào?" in review
     assert "- Độ lớn (AI): L (32h): Thêm ads" in _report(tmp_path)
     printed = capsys.readouterr().out
-    assert "Đang hỏi gemini về mô tả đơn…\nReview: đạt (1 câu hỏi của AI)" in printed
+    assert "Đang hỏi gemini về mô tả đơn…\nReview: đạt (đủ ý mẫu Quảng cáo; 1 câu hỏi của AI)" in printed
     assert "Độ lớn: L · AI (gemini, 1/1 đơn)" in printed
 
 
@@ -117,11 +124,13 @@ def test_ai_failure_falls_back_to_m_and_still_writes_the_report(
     monkeypatch.setattr(ai_cli, "run_ai", lambda tool, prompt, **_: AiReply(tool, None, "mã thoát 41"))
 
     assert _run(source, tmp_path, "--today", "2026-10-08", command="review") == 0
-    assert "Không có câu hỏi của AI (AI tắt hoặc lỗi)." in _report(tmp_path)
+    assert "Chưa chấm mô tả theo mẫu loại đơn (AI tắt hoặc lỗi).\n\nKhông có câu hỏi của AI (AI tắt hoặc lỗi)." in (
+        _report(tmp_path)
+    )
     assert _run(source, tmp_path, "--today", "2026-10-08") == 0
 
     printed = capsys.readouterr().out
-    assert "Review: đạt (không có câu hỏi của AI: mã thoát 41)" in printed
+    assert "Review: đạt (chưa chấm theo mẫu; không có câu hỏi của AI: mã thoát 41)" in printed
     assert "mặc định M (mã thoát 41)" in printed and "WARN SIZE-AI-FAILED" in printed
     assert "- WARN `SIZE-AI-FAILED`" in _report(tmp_path)
 

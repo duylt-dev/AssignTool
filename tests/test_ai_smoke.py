@@ -1,4 +1,4 @@
-"""Real AI calls: the sizes of three made-up orders, the questions of one (LLM.md §8).
+"""Real AI calls: the sizes of three made-up orders, the review of one (LLM.md §8).
 
 Opt-in: ASSIGNTOOL_TEST_AI=gemini (or agy) uv run pytest -m ai."""
 
@@ -8,7 +8,7 @@ import os
 
 import pytest
 
-from scrumbot.ai.prompt import build_prompt, build_question_prompt, parse_questions, parse_reply
+from scrumbot.ai.prompt import build_prompt, build_review_prompt, parse_reply, parse_review
 from scrumbot.ai.tools import run_ai
 from scrumbot.core.model import Order, Priority, SprintRow
 
@@ -39,14 +39,19 @@ def test_real_ai_sizes_every_order() -> None:
     assert not any(estimate.is_default for estimate in sizes.values()), note
 
 
-def test_real_ai_answers_the_question_prompt() -> None:
-    row = SprintRow(
-        1, TITLES[1], "Task", "Demo", (), "", "high", None, None, "Thêm IAP gói tháng và đổi luồng onboarding."
+def test_real_ai_names_the_type_and_the_missing_points_of_an_incomplete_order() -> None:
+    """An IAP order with the package and the acceptance only: no paywall, no Remote Config, no events (D65)."""
+    description = (
+        "Thêm gói monthly_pro: subscription 1 tháng, không trial. "
+        "Nghiệm thu khi: mua sandbox thành công thì mở Premium."
     )
+    row = SprintRow(1, "Demo v2.0.0 - Thêm gói tháng", "Task", "Demo", (), "", "normal", None, None, description)
 
-    reply = run_ai(TOOL, build_question_prompt(row), model=None, timeout=600)
-    questions = parse_questions(reply)
+    reply = run_ai(TOOL, build_review_prompt(row, None), model=None, timeout=600)
+    found = parse_review(reply, None)
 
     assert reply.failure is None, reply.failure
-    assert questions.answered, (questions.note, reply.text)
-    assert len(questions.items) <= 2
+    assert found.answered and found.checked, (found.note, reply.text)
+    assert found.kind == "iap", reply.text
+    assert found.missing, reply.text
+    assert len(found.questions) <= 2

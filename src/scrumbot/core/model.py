@@ -81,6 +81,32 @@ ORDER_TYPES = {
 }
 
 
+class OrderKind(enum.Enum):
+    """The order types of the Sprint Tech process (bot spec §7.3, D65), each with a description template
+    (`core/review/templates.py`). Not the sizing types of `ORDER_TYPES` (§2.6), which `assign` keeps (O16)."""
+
+    ADS = "ads"
+    IAP = "iap"
+    TRACKING = "tracking"
+    FEATURE = "feature"
+    BUGFIX = "bugfix"
+    POLICY = "policy"
+    RESEARCH = "research"
+    INFRA = "infra"
+
+
+ORDER_KINDS = {  # the labels of the process, as `rule.html` writes them (A106)
+    OrderKind.ADS: "Quảng cáo",
+    OrderKind.IAP: "IAP",
+    OrderKind.TRACKING: "Tracking",
+    OrderKind.FEATURE: "Tính năng / luồng / UI",
+    OrderKind.BUGFIX: "Fix bug / crash",
+    OrderKind.POLICY: "Sửa policy",
+    OrderKind.RESEARCH: "Nghiên cứu",
+    OrderKind.INFRA: "Chuyển store / hạ tầng",
+}
+
+
 @dataclass(frozen=True, slots=True)
 class Dev:
     """One dev of the team (assignment spec §4, bot spec §8.3)."""
@@ -156,6 +182,9 @@ class OrderDraft:
     due: date | None = None
     description: str = ""  # as written
     origin: str = ""  # where the order came from, e.g. the order file
+    kind: OrderKind | None = None  # `Loại đơn` (A105); None lets the AI name the type (§7.3)
+    owner: str = ""  # `Người chịu trách nhiệm`; never sent to the AI
+    evidence: str = ""  # `Bằng chứng`, needed by an urgent or high order (A108)
 
 
 @dataclass(frozen=True, slots=True)

@@ -12,7 +12,7 @@ import pytest
 
 from scrumbot.core.errors import InputError
 from scrumbot.core.inputs import FORMAT, Inputs, Task
-from scrumbot.core.model import Dev, Level, OrderDraft, RuleKind, TeamRule
+from scrumbot.core.model import Dev, Level, OrderDraft, OrderKind, RuleKind, TeamRule
 from tests.api_builders import LINH, POOL, api_inputs, history, item, orders, sprint, sprints
 
 S10 = sprint("S10", "Sprint 10 (10/6 - 10/17)", date(2026, 10, 6), date(2026, 10, 17))
@@ -24,7 +24,16 @@ def _inputs() -> Inputs:
         {"S10": orders(item("a", people=(LINH,), due=date(2026, 10, 16), hours=8), item("s", parent="a", bug=True))},
         history(("a", None, "in progress", datetime(2026, 10, 7, 9))),
         devs=(*POOL[:3], Dev("Người Nghỉ", "NghiNN", Level.SENIOR, False, (date(2026, 10, 8),))),
-        order=OrderDraft(title="Demo 1.0.2", app="Demo", priority_raw="high", due=date(2026, 10, 16), origin="web"),
+        order=OrderDraft(
+            title="Demo 1.0.2",
+            app="Demo",
+            priority_raw="high",
+            due=date(2026, 10, 16),
+            origin="web",
+            kind=OrderKind.FEATURE,
+            owner="TaiDT – BA",
+            evidence="Ảnh dashboard",
+        ),
         rules=(TeamRule(kind=RuleKind.PIN, dev="LinhNV", line=3, app="Demo", note="giữ app"),),
     )
 
@@ -50,7 +59,12 @@ def test_the_json_form_round_trips_with_the_format_first_and_texts_as_written() 
         "rules_source",
         "order",
     ]
-    assert plain["format"] == FORMAT == "scrumbot-input/1"
+    assert plain["format"] == FORMAT == "scrumbot-input/2"
+    assert (plain["order"]["kind"], plain["order"]["owner"], plain["order"]["evidence"]) == (
+        "feature",
+        "TaiDT – BA",
+        "Ảnh dashboard",
+    )
     assert plain["fetched_at"] == "2026-10-13T09:00:00"
     assert [dev["level"] for dev in plain["devs"]] == ["middle+", "middle", "junior+", "senior"]
     assert plain["rules"][0]["kind"] == "Chỉ định"
@@ -94,8 +108,8 @@ def _broken(path: str, value: object) -> dict[str, object]:
         ([], "Dữ liệu đầu vào không đúng dạng: không phải bảng."),
         (_broken("format", KeyError), "Dữ liệu đầu vào không đúng dạng: format: thiếu."),
         (
-            _broken("format", "scrumbot-input/2"),
-            "Dữ liệu đầu vào không đúng dạng: format 'scrumbot-input/2', cần scrumbot-input/1.",
+            _broken("format", "scrumbot-input/1"),
+            "Dữ liệu đầu vào không đúng dạng: format 'scrumbot-input/1', cần scrumbot-input/2.",
         ),
         (_broken("devs", KeyError), "Dữ liệu đầu vào không đúng dạng: devs: thiếu."),
         (_broken("devs", {"a": 1}), "Dữ liệu đầu vào không đúng dạng: devs: không phải danh sách."),
@@ -113,6 +127,7 @@ def _broken(path: str, value: object) -> dict[str, object]:
         ),
         (_broken("rules.0.kind", "Cấm"), "Dữ liệu đầu vào không đúng dạng: rules[0].kind: 'Cấm' không hợp lệ."),
         (_broken("order.title", None), "Dữ liệu đầu vào không đúng dạng: order.title: thiếu."),
+        (_broken("order.kind", "rnd"), "Dữ liệu đầu vào không đúng dạng: order.kind: 'rnd' không hợp lệ."),
     ],
 )
 def test_a_json_form_that_does_not_fit_names_the_first_field(data: object, message: str) -> None:

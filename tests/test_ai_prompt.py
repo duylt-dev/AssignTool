@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import date, timedelta
 
 import pytest
@@ -10,13 +11,13 @@ from scrumbot.ai.prompt import (
     QUESTION_DESC_LIMIT,
     AiReply,
     build_prompt,
-    build_question_prompt,
+    build_review_prompt,
     default_sizes,
-    parse_questions,
     parse_reply,
+    parse_review,
 )
-from scrumbot.core.model import HistoryOrder, Order, Priority, Size, SprintRow
-from scrumbot.core.outcome import Questions
+from scrumbot.core.model import ORDER_KINDS, HistoryOrder, Order, OrderKind, Priority, Size, SprintRow
+from scrumbot.core.outcome import AiReview
 
 
 def _order(
@@ -187,46 +188,95 @@ def test_parse_reply_ignores_a_questions_key() -> None:
     assert (findings, sizes[1].size) == ((), Size.S)
 
 
-def test_the_question_prompt_holds_the_filed_order_alone_without_links() -> None:
-    row = SprintRow(
-        3, "1.0.2 - Add IAP", "Task", "Demo", (), "", "high", None, None, "Gói tháng https://x.io/a [người]"
-    )
+REVIEW_REPLY = (
+    'Reply with only a JSON object, no prose and no code fence:\n{"type": "<type>", "missing": [<point number>], '
+    '"questions": ["<question>"]}\n'
+)
 
-    prompt = build_question_prompt(row)
+
+def _filed(description: str = "Gói tháng https://x.io/a [người]") -> SprintRow:
+    return SprintRow(3, "1.0.2 - Add IAP", "Task", "Demo", (), "", "high", None, None, description)
+
+
+def test_the_review_prompt_holds_the_filed_order_alone_and_every_template_without_links() -> None:
+    prompt = build_review_prompt(_filed(), None)
 
     assert prompt.startswith("You review a change order of an Android app team before it is assigned to a developer.\n")
     assert "The order:\n- Demo · high · 1.0.2 - Add IAP\n- Description: Gói tháng [link] [người]\n" in prompt
-    assert prompt.endswith(
-        'Reply with only a JSON object, no prose and no code fence:\n{"questions": ["<question>"]}\n'
+    assert "The team's process has 8 order types; the description of each must cover the points of its template:\n" in (
+        prompt
     )
+    for kind in OrderKind:
+        assert f"\n- {kind.value} ({ORDER_KINDS[kind]}): 1. " in prompt
+    iap = "- iap (IAP): 1. Danh sách gói: product ID, loại (subscription / mua một lần), chu kỳ, trial; 2. Paywall"
+    assert iap in prompt
+    assert 'or "other" when none fits (for example a new app, which follows its own SRS)' in prompt
+    assert "Tài liệu:" not in prompt  # the documents point is not checked (A106)
+    assert prompt.endswith(REVIEW_REPLY)
     assert "https://" not in prompt and "STT" not in prompt
 
 
-def test_the_question_prompt_cuts_the_description_and_names_what_is_missing() -> None:
+def test_the_review_prompt_gives_only_the_template_of_the_file_s_type() -> None:
+    prompt = build_review_prompt(_filed(), OrderKind.BUGFIX)
+
+    assert (
+        "The order's type is bugfix (Fix bug / crash); its description must cover the points of this template:\n"
+        "1. Tên lỗi, mã lỗi và link lỗi cho từng lỗi\n2. Version app, build; thiết bị, OS nếu biết\n"
+        "3. Bước tái hiện, kết quả thực tế và mong đợi\n4. Ảnh, video hoặc log (nếu có)\n"
+        'Give "type": "bugfix". In "missing", list the numbers of the points the description does not cover'
+    ) in prompt
+    assert "8 order types" not in prompt and "Quảng cáo" not in prompt
+    assert prompt.endswith(REVIEW_REPLY)
+
+
+def test_the_review_prompt_cuts_the_description_and_names_what_is_missing() -> None:
     row = SprintRow(3, "Fix", "Task", "", (), "", "", None, None, "x" * (QUESTION_DESC_LIMIT + 50))
 
-    prompt = build_question_prompt(row)
+    prompt = build_review_prompt(row, None)
 
     assert f"- (không có app) · (không có ưu tiên) · Fix\n- Description: {'x' * QUESTION_DESC_LIMIT}\n" in prompt
-    empty = build_question_prompt(SprintRow(3, "Fix", "Task", "Demo", (), "", "low", None, None, ""))
+    empty = build_review_prompt(SprintRow(3, "Fix", "Task", "Demo", (), "", "low", None, None, ""), None)
     assert "- Description: (không có)\n" in empty
 
 
-def test_parse_questions_keeps_at_most_two_and_drops_empty_ones() -> None:
+def test_parse_review_reads_the_type_the_point_numbers_and_at_most_two_questions() -> None:
     long = "Có " + "x" * 300
-    reply = AiReply("agy", '```json\n{"questions": ["Màn nào?", "", "' + long + '", "Thừa?"]}\n```', None)
+    reply = {"type": " Feature ", "missing": [3, "1", 3, True, "a"], "questions": ["Màn nào?", "", long, "?"]}
+    text = json.dumps(reply, ensure_ascii=False)
 
-    assert parse_questions(reply) == Questions(("Màn nào?", long[:200]), True, "AI (agy)")
-    assert parse_questions(AiReply("agy", '{"questions": []}', None)) == Questions((), True, "AI (agy)")
+    found = parse_review(AiReply("agy", f"```json\n{text}\n```", None), None)
+
+    assert found == AiReview("feature", True, (1, 3), ("Màn nào?", long[:200]), True, "AI (agy)")
+
+
+def test_parse_review_checks_against_the_file_s_type_whatever_type_the_ai_names() -> None:
+    found = parse_review(AiReply("agy", '{"type": "other", "missing": [2], "questions": []}', None), OrderKind.ADS)
+
+    assert found == AiReview("other", True, (2,), (), True, "AI (agy)")
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ('{"type": "other", "missing": [], "questions": []}', AiReview("other", False, (), (), True, "AI (agy)")),
+        ('{"type": "game", "missing": [1], "questions": []}', AiReview("", False, (1,), (), True, "AI (agy)")),
+        ('{"type": "ads", "missing": "1", "questions": []}', AiReview("ads", False, (), (), True, "AI (agy)")),
+        (
+            '{"type": "ads", "missing": [], "questions": "Màn nào?"}',
+            AiReview("ads", True, (), (), False, "không đọc được câu hỏi trong trả lời của AI"),
+        ),
+    ],
+)
+def test_parse_review_checks_nothing_without_a_known_type_or_a_list_of_points(text: str, expected: AiReview) -> None:
+    assert parse_review(AiReply("agy", text, None), None) == expected
 
 
 @pytest.mark.parametrize(
     ("reply", "note"),
     [
         (AiReply("agy", None, "agy hết thời gian chờ"), "agy hết thời gian chờ"),
-        (AiReply("agy", "không có JSON", None), "không đọc được câu hỏi trong trả lời của AI"),
-        (AiReply("agy", '{"questions": "Màn nào?"}', None), "không đọc được câu hỏi trong trả lời của AI"),
+        (AiReply("agy", "không có JSON", None), "không đọc được trả lời của AI"),
     ],
 )
-def test_parse_questions_gives_none_on_a_failure_or_another_form(reply: AiReply, note: str) -> None:
-    assert parse_questions(reply) == Questions((), False, note)
+def test_parse_review_gives_nothing_on_a_failure_or_another_form(reply: AiReply, note: str) -> None:
+    assert parse_review(reply, OrderKind.IAP) == AiReview(note=note)

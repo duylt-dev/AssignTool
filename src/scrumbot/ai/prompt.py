@@ -1,6 +1,6 @@
 """The AI exchanges (assignment spec §6.4, bot spec §2.6, §7.3): the sizing prompt of `assign`, its reply read into
-sizes, types, items and technical risks; the question prompt of `review`, its reply read into questions. Pure: the same
-prompts and replies work with any AI."""
+sizes, types, items and technical risks; the review prompt of `review`, its reply read into the order's type, the
+template points its description lacks and questions. Pure: the same prompts and replies work with any AI."""
 
 from __future__ import annotations
 
@@ -9,9 +9,21 @@ import re
 from dataclasses import dataclass
 
 from scrumbot.core.assign.sizing import default_sizes
-from scrumbot.core.model import ORDER_TYPES, Finding, HistoryOrder, Order, Severity, Size, SizeEstimate, SprintRow
+from scrumbot.core.model import (
+    ORDER_KINDS,
+    ORDER_TYPES,
+    Finding,
+    HistoryOrder,
+    Order,
+    OrderKind,
+    Severity,
+    Size,
+    SizeEstimate,
+    SprintRow,
+)
 from scrumbot.core.normalize import app_key, clean
-from scrumbot.core.outcome import Questions
+from scrumbot.core.outcome import AiReview
+from scrumbot.core.review.templates import OTHER, TEMPLATES
 
 PROMPT_BUDGET = 30_000
 DESC_LIMITS = (600, 200, 0)
@@ -61,21 +73,35 @@ Reply with only a JSON array, no prose and no code fence, one element per order:
   \"type\": \"<type>\", \"items\": [\"<item>\"], \"tech_risks\": [\"<risk>\"]}}]
 """
 
-_QUESTION_PROMPT = """You review a change order of an Android app team before it is assigned to a developer.
+_REVIEW_PROMPT = """You review a change order of an Android app team before it is assigned to a developer.
 An order is one release (version) of one app: the developer who takes it does every item in the title and the
 description, then the release goes through QA.
-Judge from the text only. Do not open links, do not use any tool, do not read files.
+Judge from the text only. Do not open links, do not use any tool, do not read files. Links appear as [link …] and
+people as [người].
 
 The order:
 - {app} · {priority} · {title}
 - Description: {description}
 
+{templates}
+A point is covered when the description gives that information, in any words and any order. A point that starts with
+"Sửa thì" or ends with "(nếu có)" counts only when it applies to this order.
+
 Give at most 2 short questions in Vietnamese to the person who filed the order, about what the description leaves
 unclear for doing the work. Give an empty list when nothing is unclear.
 
 Reply with only a JSON object, no prose and no code fence:
-{{\"questions\": [\"<question>\"]}}
+{{\"type\": \"<type>\", \"missing\": [<point number>], \"questions\": [\"<question>\"]}}
 """
+_ALL_TEMPLATES = """The team's process has 8 order types; the description of each must cover the points of its template:
+{templates}
+Pick the one type that fits the order, or "other" when none fits (for example a new app, which follows its own SRS).
+In "missing", list the numbers of the points of that type's template that the description does not cover: an empty
+list when it covers them all, and for "other"."""
+_ONE_TEMPLATE = """The order's type is {kind} ({label}); its description must cover the points of this template:
+{points}
+Give "type": "{kind}". In "missing", list the numbers of the points the description does not cover: an empty list
+when it covers them all."""
 
 
 def build_prompt(orders: tuple[Order, ...], history: tuple[HistoryOrder, ...]) -> str:
@@ -138,24 +164,63 @@ def parse_reply(reply: AiReply, orders: tuple[Order, ...]) -> tuple[dict[int, Si
     return sizes, findings, f"AI ({reply.tool}, {valid}/{len(orders)} đơn)"
 
 
-def build_question_prompt(row: SprintRow) -> str:
-    """The filed order alone, its description already scrubbed of names and links (bot spec §7.2)."""
-    return _QUESTION_PROMPT.format(
+def build_review_prompt(row: SprintRow, kind: OrderKind | None) -> str:
+    """The filed order alone, its description already scrubbed of names and links (bot spec §7.2), with the template
+    of `kind`, or all 8 for the AI to pick the type (§7.3, A107)."""
+    if kind is not None:
+        points = "\n".join(f"{number}. {point}" for number, point in enumerate(TEMPLATES[kind], 1))
+        templates = _ONE_TEMPLATE.format(kind=kind.value, label=ORDER_KINDS[kind], points=points)
+    else:
+        lines = (
+            f"- {each.value} ({ORDER_KINDS[each]}): "
+            + "; ".join(f"{number}. {point}" for number, point in enumerate(points, 1))
+            for each, points in TEMPLATES.items()
+        )
+        templates = _ALL_TEMPLATES.format(templates="\n".join(lines))
+    return _REVIEW_PROMPT.format(
         app=row.app or "(không có app)",
         priority=clean(row.priority_raw) or "(không có ưu tiên)",
         title=row.title,
         description=clean(_URL.sub("[link]", row.description))[:QUESTION_DESC_LIMIT] or "(không có)",
+        templates=templates,
     )
 
 
-def parse_questions(reply: AiReply) -> Questions:
-    """At most 2 questions; a failure or a reply without a `questions` list gives none (A102)."""
+def parse_review(reply: AiReply, kind: OrderKind | None) -> AiReview:
+    """The type (`kind` when the file gives it), the missing point numbers and at most 2 questions (A102, A107). A
+    failure checks nothing; a reply without a `missing` list, or, without `kind`, without a known type, checks
+    nothing; one without a `questions` list asks nothing."""
     if reply.failure:
-        return Questions(note=reply.failure)
+        return AiReview(note=reply.failure)
     found = _json_object(reply.text)
-    if found is None or not isinstance(found.get("questions"), list):
-        return Questions(note="không đọc được câu hỏi trong trả lời của AI")
-    return Questions(_strings(found["questions"], MAX_QUESTIONS, width=200), True, f"AI ({reply.tool})")
+    if found is None:
+        return AiReview(note="không đọc được trả lời của AI")
+    named = _review_type(found.get("type"))
+    missing = _numbers(found.get("missing"))
+    known = kind is not None or named not in ("", OTHER)
+    questions = found.get("questions")
+    answered = isinstance(questions, list)
+    return AiReview(
+        kind=named,
+        checked=known and missing is not None,
+        missing=missing or (),
+        questions=_strings(questions, MAX_QUESTIONS, width=200),
+        answered=answered,
+        note=f"AI ({reply.tool})" if answered else "không đọc được câu hỏi trong trả lời của AI",
+    )
+
+
+def _review_type(value: object) -> str:
+    """One of the 8 types or `other`; anything else gives "" (A107)."""
+    key = clean(value).casefold() if isinstance(value, str) else ""
+    return key if key == OTHER or key in {kind.value for kind in OrderKind} else ""
+
+
+def _numbers(value: object) -> tuple[int, ...] | None:
+    """Point numbers, once each and sorted; None when `value` is not a list."""
+    if not isinstance(value, list):
+        return None
+    return tuple(sorted({number for number in map(_number, value) if number is not None}))
 
 
 def _order_type(value: object) -> str:
@@ -223,9 +288,11 @@ def _json_object(text: str | None) -> dict[str, object] | None:
 
 
 def _stt(item: object) -> int | None:
-    if not isinstance(item, dict):
-        return None
-    value = item.get("stt")
+    return _number(item.get("stt")) if isinstance(item, dict) else None
+
+
+def _number(value: object) -> int | None:
+    """A whole number, or its digits as text; a boolean is not one."""
     if isinstance(value, bool):
         return None
     if isinstance(value, int):

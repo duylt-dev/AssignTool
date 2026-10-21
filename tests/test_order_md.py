@@ -1,4 +1,4 @@
-"""The order file of BA/MO (bot spec §7.1): title, field table, description, input errors."""
+"""The order file of BA/MO (bot spec §7.1, A105): title, field table, description, input errors."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from scrumbot.core.errors import InputError
+from scrumbot.core.model import OrderKind
 from scrumbot.input.files.order_md import read_order
 
 FULL = """# Demo 1.0.2 - Add ads native
@@ -62,6 +63,50 @@ def test_empty_cells_leave_the_fields_empty(tmp_path: Path) -> None:
     assert (draft.order_id, draft.app, draft.due, draft.description) == ("", "Demo", None, "Mô tả")
 
 
+PROCESS = """# Demo v2.3.1 - Fix 2 crash ở màn Shop
+
+| Trường | Giá trị |
+|---|---|
+| Loại đơn | Fix bug |
+| Người chịu trách nhiệm | TaiDT – MO |
+| Bằng chứng | Ảnh dashboard Crashlytics |
+| Người nghiệm thu | Leader MO |
+| Tài liệu còn thiếu | log lỗi (2), bổ sung 25/10 |
+
+Mở Shop khi mất mạng thì crash.
+"""
+
+
+def test_the_fields_of_the_process_are_read_and_the_two_unread_ones_are_dropped(tmp_path: Path) -> None:
+    draft = read_order(_write(tmp_path, PROCESS))
+
+    assert (draft.kind, draft.owner, draft.evidence) == (OrderKind.BUGFIX, "TaiDT – MO", "Ảnh dashboard Crashlytics")
+    assert draft.description == "Mở Shop khi mất mạng thì crash."
+    assert read_order(_write(tmp_path, FULL)).kind is None
+
+
+@pytest.mark.parametrize(
+    ("text", "kind"),
+    [
+        ("Quảng cáo", OrderKind.ADS),
+        ("iap", OrderKind.IAP),
+        ("Tracking", OrderKind.TRACKING),
+        ("tính năng / luồng / ui", OrderKind.FEATURE),
+        ("UI", OrderKind.FEATURE),
+        ("Luồng", OrderKind.FEATURE),
+        ("crash", OrderKind.BUGFIX),
+        ("Sửa policy", OrderKind.POLICY),
+        ("Nghiên cứu.", OrderKind.RESEARCH),
+        ("hạ tầng", OrderKind.INFRA),
+        ("  ", None),
+    ],
+)
+def test_the_type_is_a_label_of_the_process_or_one_part_of_it(tmp_path: Path, text: str, kind: OrderKind) -> None:
+    draft = read_order(_write(tmp_path, f"# T\n\n| Trường | Giá trị |\n|---|---|\n| Loại đơn | {text} |\n"))
+
+    assert draft.kind is kind
+
+
 @pytest.mark.parametrize(
     ("text", "message"),
     [
@@ -72,3 +117,21 @@ def test_empty_cells_leave_the_fields_empty(tmp_path: Path) -> None:
 def test_a_wrong_field_is_an_input_error_naming_it(tmp_path: Path, text: str, message: str) -> None:
     with pytest.raises(InputError, match=message):
         read_order(_write(tmp_path, text))
+
+
+def test_an_unknown_key_or_type_names_every_accepted_one(tmp_path: Path) -> None:
+    key = _write(tmp_path, "| Trường | Giá trị |\n|---|---|\n| PIC | LinhNV |\n", "key.md")
+    kind = _write(tmp_path, "| Trường | Giá trị |\n|---|---|\n| Loại đơn | RnD |\n", "kind.md")
+
+    with pytest.raises(InputError) as caught:
+        read_order(key)
+    assert str(caught.value) == (
+        f"File đơn '{key}' dòng 3: trường 'PIC' không hợp lệ; dùng ID, App, Ưu tiên, Hạn, Loại đơn, Người chịu "
+        "trách nhiệm, Bằng chứng, Người nghiệm thu hoặc Tài liệu còn thiếu."
+    )
+    with pytest.raises(InputError) as caught:
+        read_order(kind)
+    assert str(caught.value) == (
+        f"File đơn '{kind}': Loại đơn 'RnD' không hợp lệ; dùng Quảng cáo, IAP, Tracking, Tính năng / luồng / UI, "
+        "Fix bug / crash, Sửa policy, Nghiên cứu hoặc Chuyển store / hạ tầng."
+    )

@@ -30,9 +30,12 @@ ORDER = """# Demo 1.0.2 - Add IAP
 | App | Demo |
 | Ưu tiên | high |
 | Hạn | 16/10/2026 |
+| Người chịu trách nhiệm | TestBA – BA |
+| Bằng chứng | Ảnh dashboard doanh thu |
 
 Thêm IAP gói tháng, liên hệ BA: TestBA.
 * Link UI [https://www.figma.com/design/abc/Demo](https://www.figma.com/design/abc/Demo)
+Nghiệm thu khi: mua sandbox gói tháng thành công.
 """
 
 
@@ -84,20 +87,27 @@ def test_a_new_order_gets_a_pic_and_the_report_says_why(
     def fake(tool, prompt, *, model, timeout):
         prompts.append(prompt)
         if prompt.startswith("You review"):
-            return AiReply(tool, '{"questions": ["Gói tháng giá bao nhiêu?"]}', None)
+            return AiReply(tool, '{"type": "iap", "missing": [], "questions": ["Gói tháng giá bao nhiêu?"]}', None)
         return AiReply(tool, '[{"stt": 1, "size": "S", "reason": "x"}, {"stt": 2, "size": "L", "reason": "IAP"}]', None)
 
     monkeypatch.setattr(ai_cli, "run_ai", fake)
     order = _order(source)
 
     assert _cli("review", source, tmp_path, order, "--ai", "agy") == 0
-    assert "- Gói tháng giá bao nhiêu?" in _report(tmp_path)
+    review = _report(tmp_path)
+    assert "## Review: đạt\n\nMô tả đủ ý của mẫu IAP (AI chấm).\n\n" in review
+    assert "- Gói tháng giá bao nhiêu?" in review
+    assert (
+        "| Loại đơn | IAP (AI) |\n| Người chịu trách nhiệm | TestBA – BA |\n| Bằng chứng | Ảnh dashboard doanh thu |"
+        in (review)
+    )
+    assert "Review: đạt (đủ ý mẫu IAP; 1 câu hỏi của AI)" in capsys.readouterr().out
     assert _cli("assign", source, tmp_path, order, "--ai", "agy") == 0
 
     asked, sized = prompts
     for prompt in prompts:
-        assert "Thêm IAP gói tháng, liên hệ BA: [người]. * Link UI [link Figma]" in prompt
-        assert all(text not in prompt for text in ("TestBA", "figma.com", LINH, AN, OUTSIDER, "AnTD"))
+        assert "Thêm IAP gói tháng, liên hệ BA: [người]. * Link UI [link Figma] Nghiệm thu khi:" in prompt
+        assert all(text not in prompt for text in ("TestBA", "figma.com", LINH, AN, OUTSIDER, "AnTD", "Ảnh dashboard"))
     assert asked.startswith("You review") and sized.startswith("You estimate")
     report = _report(tmp_path)
     assert report.startswith("# Giao đơn: Demo 1.0.2 - Add IAP\n")
@@ -196,15 +206,22 @@ def test_an_order_that_is_not_ready_gets_only_what_to_fix_and_cannot_be_assigned
         "## Review: chưa đạt\n\n"
         f"Sửa các mục dưới đây rồi chạy lại `scrumbot review {order}`:\n\n"
         "- `REVIEW-APP`: Thiếu App: ghi tên app vào dòng App của file đơn.\n"
-        "- `REVIEW-DUE`: Đơn urgent chưa có Hạn: ghi dòng Hạn của file đơn (YYYY-MM-DD hoặc DD/MM/YYYY).\n"
+        "- `REVIEW-DUE`: Đơn chưa có Hạn: ghi dòng Hạn của file đơn (YYYY-MM-DD hoặc DD/MM/YYYY).\n"
+        "- `REVIEW-OWNER`: Thiếu người chịu trách nhiệm: ghi dòng Người chịu trách nhiệm của file đơn (người trả lời "
+        "Dev về đơn).\n"
+        "- `REVIEW-EVIDENCE`: Đơn urgent là đơn Khẩn cấp nhưng chưa có Bằng chứng: ghi dòng Bằng chứng của file đơn "
+        "(ảnh dashboard, email store/đối tác, số liệu KPI), hoặc hạ Ưu tiên về normal.\n"
         "- `REVIEW-DESC`: Mô tả quá ngắn (8 ký tự, cần từ 30, không tính link): ghi rõ các hạng mục cần làm.\n"
+        '- `REVIEW-ACCEPT`: Mô tả chưa có mục "Nghiệm thu khi": ghi các điều kiện kiểm tra được, đủ để tester viết '
+        "test case.\n"
         "\n## Thông tin đơn\n\n| Trường | Giá trị |\n|---|---|\n"
         "| Đơn | Đơn mới, chưa có trên hệ thống (tính là STT 2 của Sprint 2) |\n"
-        f"| File đơn | {order} |\n| App | trống |\n| Ưu tiên | urgent |\n| Hạn | trống |\n| Mô tả AI đọc | Sửa lỗi. |\n"
+        f"| File đơn | {order} |\n| App | trống |\n| Ưu tiên | urgent |\n| Hạn | trống |\n| Loại đơn | trống |\n"
+        "| Người chịu trách nhiệm | trống |\n| Bằng chứng | trống |\n| Mô tả AI đọc | Sửa lỗi. |\n"
     )
     assert "Kết luận" not in report and "Rủi ro" not in report
     printed = capsys.readouterr().out
-    assert "Đơn: Demo 1.0.3 - Fix (đơn mới, STT 2 của Sprint 2)\nReview: chưa đạt (3 mục)\n- REVIEW-APP: " in printed
+    assert "Đơn: Demo 1.0.3 - Fix (đơn mới, STT 2 của Sprint 2)\nReview: chưa đạt (6 mục)\n- REVIEW-APP: " in printed
     assert f"Báo cáo: {tmp_path / 'out' / 'output.md'}" in printed
     assert not (tmp_path / "state" / "scrumbot.sqlite").exists()
 
@@ -220,28 +237,84 @@ def test_a_ready_order_is_reviewed_once_the_file_is_fixed_then_assigned(
     server: FakeDevServer, source: Path, tmp_path: Path, capsys
 ) -> None:
     order = source / "don.md"
-    order.write_text("# Demo 1.0.3 - Fix\n\n| Trường | Giá trị |\n|---|---|\n| App | Demo |\n\nSửa lỗi.\n")
+    fields = "| App | Demo |\n| Hạn | 16/10/2026 |\n| Người chịu trách nhiệm | TaiDT – BA |\n"
+    order.write_text(f"# Demo 1.0.3 - Fix\n\n| Trường | Giá trị |\n|---|---|\n{fields}\nSửa lỗi.\n")
     assert _cli("review", source, tmp_path, order, "--ai", "off") == 0
     assert "- `REVIEW-DESC`: Mô tả quá ngắn (8 ký tự" in _report(tmp_path)
 
-    order.write_text(order.read_text(encoding="utf-8") + "Sửa crash khi mở màn hình cài đặt trên Android 15.\n")
+    order.write_text(order.read_text(encoding="utf-8") + "Sửa crash khi mở màn cài đặt. Nghiệm thu khi: không crash.\n")
     assert _cli("review", source, tmp_path, order, "--ai", "off") == 0
 
     review = _report(tmp_path)
     assert (
-        "## Review: đạt\n\nKhông có câu hỏi của AI (AI tắt hoặc lỗi).\n\n"
+        "## Review: đạt\n\nChưa chấm mô tả theo mẫu loại đơn (AI tắt hoặc lỗi).\n\n"
+        "Không có câu hỏi của AI (AI tắt hoặc lỗi).\n\n"
         f"Chạy `scrumbot assign {order}` để bot đề xuất PIC. Sửa file đơn sau lần review này thì phải review lại.\n\n"
         "## Thông tin đơn\n"
     ) in review
-    assert "| Mô tả AI đọc | Sửa lỗi. Sửa crash khi mở màn hình cài đặt trên Android 15. |" in review
-    assert f"Review: đạt (không có câu hỏi của AI: tắt AI)\nTiếp theo: scrumbot assign {order}\n" in (
-        capsys.readouterr().out
+    assert "| Mô tả AI đọc | Sửa lỗi. Sửa crash khi mở màn cài đặt. Nghiệm thu khi: không crash. |" in review
+    assert (
+        f"Review: đạt (chưa chấm theo mẫu; không có câu hỏi của AI: tắt AI)\nTiếp theo: scrumbot assign {order}\n"
+        in (capsys.readouterr().out)
     )
 
     assert _cli("assign", source, tmp_path, order, "--ai", "off") == 0
 
     report = _report(tmp_path)
     assert "- **PIC đề xuất: LinhNV**" in report and "Sổ rủi ro cả sprint: " in report
+
+
+def test_the_ai_s_template_check_blocks_an_order_that_misses_points_of_its_type(
+    server: FakeDevServer, source: Path, tmp_path: Path, monkeypatch, capsys
+) -> None:
+    """D65: the AI names the missing points of the file's type; the message is the template's, assign is refused."""
+
+    def fake(tool, prompt, *, model, timeout):
+        assert "The order's type is iap (IAP)" in prompt and "8 order types" not in prompt
+        return AiReply(tool, '{"type": "iap", "missing": [3, 2], "questions": ["Paywall ở màn nào?"]}', None)
+
+    monkeypatch.setattr(ai_cli, "run_ai", fake)
+    order = _order(source)
+    order.write_text(
+        order.read_text(encoding="utf-8").replace("| Hạn | 16/10/2026 |", "| Hạn | 16/10/2026 |\n| Loại đơn | IAP |")
+    )
+
+    assert _cli("review", source, tmp_path, order, "--ai", "agy") == 0
+
+    report = _report(tmp_path)
+    assert (
+        "## Review: chưa đạt\n\n"
+        f"Sửa các mục dưới đây rồi chạy lại `scrumbot review {order}`:\n\n"
+        "- `REVIEW-TEMPLATE`: Mô tả chưa đủ ý của mẫu IAP (AI chấm): Paywall: màn nào, điều kiện hiển thị; Remote "
+        "Config: key, giá trị mặc định.\n\n"
+        "Câu hỏi của AI cho người lên đơn (không chặn; trả lời trong file đơn nếu cần):\n\n"
+        "- Paywall ở màn nào?\n\n## Thông tin đơn\n"
+    ) in report
+    assert "| Loại đơn | IAP (file đơn) |" in report
+    assert "Review: chưa đạt (1 mục)\n- REVIEW-TEMPLATE: Mô tả chưa đủ ý của mẫu IAP" in capsys.readouterr().out
+    assert _cli("assign", source, tmp_path, order, "--ai", "agy") == 2
+    assert "Đơn chưa qua review" in capsys.readouterr().err
+
+
+def test_an_order_outside_the_8_types_passes_without_a_template_check(
+    server: FakeDevServer, source: Path, tmp_path: Path, monkeypatch, capsys
+) -> None:
+    monkeypatch.setattr(
+        ai_cli,
+        "run_ai",
+        lambda tool, *_, **__: AiReply(tool, '{"type": "other", "missing": [], "questions": []}', None),
+    )
+    order = _order(source)
+
+    assert _cli("review", source, tmp_path, order, "--ai", "agy") == 0
+
+    report = _report(tmp_path)
+    assert (
+        "## Review: đạt\n\nAI xếp đơn ngoài 8 loại đơn của quy trình (vd app mới, theo SRS riêng): chưa chấm theo "
+        "mẫu.\n\nAI không có câu hỏi.\n\n"
+    ) in report
+    assert "| Loại đơn | ngoài 8 loại (AI) |" in report
+    assert "Review: đạt (ngoài 8 loại đơn; 0 câu hỏi của AI)" in capsys.readouterr().out
 
 
 def test_assign_needs_a_review_of_the_order_as_it_is_now(

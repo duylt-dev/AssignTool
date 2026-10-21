@@ -41,14 +41,16 @@ class Placed:
 
     @property
     def fingerprint(self) -> str:
-        """The order as `review` saw it (A101): title, ID, App, priority, `Hạn` and the description the AI reads."""
-        row = self.order.row
+        """The order as `review` saw it (A101, A109): title, ID, App, priority, `Hạn`, the description the AI reads,
+        and the file's `Loại đơn`, `Người chịu trách nhiệm` and `Bằng chứng`."""
+        row, draft = self.order.row, self.inputs.order
         fields = [row.title, row.id, row.app, row.priority_raw, row.due.isoformat() if row.due else "", row.description]
+        fields += [draft.kind.value if draft.kind else "", draft.owner, draft.evidence]
         return hashlib.sha256(json.dumps(fields, ensure_ascii=False).encode()).hexdigest()[:16]
 
     def outcome(self, status: Status) -> Outcome:
         """The facts every outcome has: the run, the sprint and the order as placed."""
-        sprint, row = self.sprint, self.order.row
+        sprint, row, draft = self.sprint, self.order.row, self.inputs.order
         return Outcome(
             status=status,
             run_at=self.run_at,
@@ -60,11 +62,14 @@ class Placed:
                 row.stt,
                 row.id,
                 self.order.how,
-                self.inputs.order.origin,
+                draft.origin,
                 row.app,
                 row.priority_raw,
                 row.due,
                 row.description,
+                draft.kind,
+                draft.owner,
+                draft.evidence,
                 self.fingerprint,
             ),
         )

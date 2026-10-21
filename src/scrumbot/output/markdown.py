@@ -8,13 +8,15 @@ import re
 from datetime import date
 from pathlib import Path
 
-from scrumbot.core.model import ORDER_TYPES, Placement, Severity
+from scrumbot.core.model import ORDER_KINDS, ORDER_TYPES, OrderKind, Placement, Severity
 from scrumbot.core.model_risk import IF_IT_HAPPENS, LEVEL_TEXT, RiskLevel
 from scrumbot.core.normalize import LEVEL_NAMES
-from scrumbot.core.outcome import Outcome, Status
+from scrumbot.core.outcome import AiReview, Outcome, Status
+from scrumbot.core.review.templates import OTHER
 
 FILE = "output.md"
 RISK_HEADERS = ("Mức", "Mã", "Vấn đề", "Ảnh hưởng", "Phòng ngừa", "Nếu xảy ra", "Ai xử lý", "Hạn xử lý")
+QUESTIONS = "Câu hỏi của AI cho người lên đơn (không chặn; trả lời trong file đơn nếu cần):"
 _DATES = re.compile(r"\s*\(.*$")
 
 
@@ -45,9 +47,17 @@ def risk_counts(levels: list[RiskLevel]) -> str:
     return f"{high} cao · {medium} trung bình · {low} thấp"
 
 
+def kind_of(ai: AiReview | None) -> OrderKind | None:
+    """The type the review used (the file's or the AI's), when it is one of the 8 of the process."""
+    try:
+        return OrderKind(ai.kind) if ai is not None else None
+    except ValueError:
+        return None
+
+
 def _review(outcome: Outcome) -> list[str]:
-    """What blocks the order, or the AI's questions, then the order as placed (bot spec §7.3)."""
-    order = outcome.order
+    """What blocks the order, or the AI's template check and questions, then the order as placed (bot spec §7.3)."""
+    order, ai = outcome.order, outcome.ai
     lines = _top(outcome, "Review đơn")
     if outcome.status is Status.NOT_READY:
         lines += [
@@ -57,6 +67,8 @@ def _review(outcome: Outcome) -> list[str]:
             "",
             *(f"- `{item.code}`: {item.message}" for item in outcome.review),
         ]
+        if ai is not None and ai.questions:
+            lines += ["", QUESTIONS, "", *(f"- {question}" for question in ai.questions)]
     elif outcome.status is Status.PRE_ASSIGNED:
         lines += [
             "## Review: không cần",
@@ -65,12 +77,10 @@ def _review(outcome: Outcome) -> list[str]:
             f"Chạy `scrumbot assign {order.origin}` để xem người làm và rủi ro.",
         ]
     else:
-        questions = outcome.questions
-        lines += ["## Review: đạt", ""]
-        if questions is not None and questions.items:
-            lines += ["Câu hỏi của AI cho người lên đơn (không chặn; trả lời trong file đơn nếu cần):", ""]
-            lines += [f"- {question}" for question in questions.items]
-        elif questions is not None and questions.answered:
+        lines += ["## Review: đạt", "", _template_line(ai), ""]
+        if ai is not None and ai.questions:
+            lines += [QUESTIONS, "", *(f"- {question}" for question in ai.questions)]
+        elif ai is not None and ai.answered:
             lines.append("AI không có câu hỏi.")
         else:
             lines.append("Không có câu hỏi của AI (AI tắt hoặc lỗi).")
@@ -79,8 +89,36 @@ def _review(outcome: Outcome) -> list[str]:
             f"Chạy `scrumbot assign {order.origin}` để bot đề xuất PIC. Sửa file đơn sau lần review này thì phải "
             "review lại.",
         ]
-    lines += ["", *_info(outcome, ())]
+    lines += ["", *_info(outcome, _review_rows(outcome))]
     return lines
+
+
+def _template_line(ai: AiReview | None) -> str:
+    kind = kind_of(ai)
+    if ai is not None and ai.checked and kind is not None:
+        return f"Mô tả đủ ý của mẫu {ORDER_KINDS[kind]} (AI chấm)."
+    if ai is not None and ai.kind == OTHER:
+        return "AI xếp đơn ngoài 8 loại đơn của quy trình (vd app mới, theo SRS riêng): chưa chấm theo mẫu."
+    return "Chưa chấm mô tả theo mẫu loại đơn (AI tắt hoặc lỗi)."
+
+
+def _review_rows(outcome: Outcome) -> tuple[tuple[str, str], ...]:
+    """What the review adds to `Thông tin đơn` (bot spec §7.3); the table of `assign` stays as it was (A110)."""
+    order, ai = outcome.order, outcome.ai
+    kind = kind_of(ai)
+    if order.kind is not None:
+        kind_text = f"{ORDER_KINDS[order.kind]} (file đơn)"
+    elif kind is not None:
+        kind_text = f"{ORDER_KINDS[kind]} (AI)"
+    elif ai is not None and ai.kind == OTHER:
+        kind_text = "ngoài 8 loại (AI)"
+    else:
+        kind_text = "trống"
+    return (
+        ("Loại đơn", kind_text),
+        ("Người chịu trách nhiệm", order.owner or "trống"),
+        ("Bằng chứng", order.evidence or "trống"),
+    )
 
 
 def _report(outcome: Outcome) -> list[str]:
@@ -165,8 +203,9 @@ def _top(outcome: Outcome, heading: str) -> list[str]:
     return [f"# {heading}: {outcome.order.title}", "", " · ".join(facts), ""]
 
 
-def _info(outcome: Outcome, ai: tuple[tuple[str, str], ...]) -> list[str]:
-    """The table `Thông tin đơn`; `assign` adds what the AI said of the order before the description."""
+def _info(outcome: Outcome, extra: tuple[tuple[str, str], ...]) -> list[str]:
+    """The table `Thông tin đơn`; `extra` (what the review read, or what the AI said in `assign`) comes before the
+    description."""
     order = outcome.order
     rows = (
         ("Đơn", _placement(outcome)),
@@ -174,7 +213,7 @@ def _info(outcome: Outcome, ai: tuple[tuple[str, str], ...]) -> list[str]:
         ("App", order.app or "trống"),
         ("Ưu tiên", order.priority_raw or "trống"),
         ("Hạn", _day(order.due) if order.due else "trống"),
-        *ai,
+        *extra,
         ("Mô tả AI đọc", order.description or "không có"),
     )
     return [

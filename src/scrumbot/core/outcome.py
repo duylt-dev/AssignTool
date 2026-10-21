@@ -8,14 +8,14 @@ from dataclasses import dataclass
 from datetime import date, datetime
 
 from scrumbot.core.codec import to_plain
-from scrumbot.core.model import ORDER_TYPES, Assignment, Finding, Level, Placement, SizeEstimate
+from scrumbot.core.model import ORDER_TYPES, Assignment, Finding, Level, OrderKind, Placement, SizeEstimate
 from scrumbot.core.model_risk import IF_IT_HAPPENS, LEVEL_TEXT, Risk
 
-FORMAT = "scrumbot-outcome/2"
+FORMAT = "scrumbot-outcome/3"
 
 
 class Status(enum.Enum):
-    NOT_READY = "not_ready"  # review: a check blocks (bot spec §7.3)
+    NOT_READY = "not_ready"  # review: a fixed check or the AI's template check blocks (bot spec §7.3)
     READY = "ready"  # review: nothing blocks; `assign` may run
     PROPOSED = "proposed"  # assign: the bot proposes a PIC
     PRE_ASSIGNED = "pre_assigned"  # review or assign: the order has a `Người làm` and is kept (D10)
@@ -30,11 +30,15 @@ class ReviewItem:
 
 
 @dataclass(frozen=True, slots=True)
-class Questions:
-    """The AI's questions to the person who filed the order (bot spec §7.3, A102); they never block."""
+class AiReview:
+    """What the AI said of the filed order in `review` (bot spec §7.3, §8.5, A107): its type, the points of the type's
+    template that the description lacks, and its questions to the person who filed it, which never block."""
 
-    items: tuple[str, ...] = ()  # at most 2
-    answered: bool = False  # the AI answered, even with no question
+    kind: str = ""  # an OrderKind value, "other" when no type fits, "" when unknown; the outcome holds the type used
+    checked: bool = False  # the template check ran: a known type and a list of missing points
+    missing: tuple[int, ...] = ()  # numbers of the template's points the description lacks; 1 is the first
+    questions: tuple[str, ...] = ()  # at most 2
+    answered: bool = False  # the AI answered with a list of questions, even an empty one
     note: str = ""  # "AI (agy)", "tắt AI", or why the call failed
 
 
@@ -75,7 +79,10 @@ class OrderRef:
     priority_raw: str
     due: date | None
     description: str  # as the AI read it
-    fingerprint: str  # the order as placed; `assign` needs a passed review of it (bot spec §7.4, A101)
+    kind: OrderKind | None  # `Loại đơn` of the file (§7.1)
+    owner: str  # `Người chịu trách nhiệm` of the file
+    evidence: str  # `Bằng chứng` of the file
+    fingerprint: str  # the order as placed; `assign` needs a passed review of it (bot spec §7.4, A101, A109)
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,7 +101,7 @@ class Outcome:
     sprint: SprintRef
     order: OrderRef
     review: tuple[ReviewItem, ...] = ()  # blocking items; empty unless NOT_READY
-    questions: Questions | None = None  # review only, when READY
+    ai: AiReview | None = None  # review only, when the AI was asked or is off
     assignment: Assignment | None = None  # assign only
     sizing_note: str = ""  # e.g. "AI (agy, 6/6 đơn; 5 từ bộ nhớ)"
     risks: tuple[Risk, ...] = ()  # of this order, of its PIC and of the sprint, in register order
@@ -114,7 +121,7 @@ class Outcome:
             "sprint": to_plain(self.sprint),
             "order": to_plain(self.order),
             "review": to_plain(self.review),
-            "questions": to_plain(self.questions),
+            "ai": to_plain(self.ai),
             "assignment": None if item is None else _assignment(item),
             "size": None if item is None else _size(item.size, self.sizing_note),
             "risks": [_risk(risk) for risk in self.risks],

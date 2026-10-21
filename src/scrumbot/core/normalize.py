@@ -6,7 +6,7 @@ import re
 import unicodedata
 from datetime import date, datetime
 
-from scrumbot.core.model import Level, Priority
+from scrumbot.core.model import ORDER_KINDS, Level, OrderKind, Priority
 
 _SPACES = re.compile(r"\s+")
 _ISO = re.compile(r"^(\d{4})-(\d{2})-(\d{2})(?:[ T].*)?$")
@@ -49,6 +49,15 @@ def app_key(value: object) -> str:
 def header_key(value: object) -> str:
     """Key for header cells: clean(), trailing "." removed, casefold (assignment spec §4)."""
     return clean(value).rstrip(".").strip().casefold()
+
+
+_ORDER_KINDS = {header_key(part): kind for kind, label in ORDER_KINDS.items() for part in (label, *label.split("/"))}
+
+
+def parse_order_kind(value: object) -> OrderKind | None:
+    """`Loại đơn` (A105): a label of the process, or one part of it between "/" (`Tính năng`, `UI`, `crash`),
+    compared like header cells; anything else returns None."""
+    return _ORDER_KINDS.get(header_key(value))
 
 
 def parse_priority(value: object) -> Priority | None:

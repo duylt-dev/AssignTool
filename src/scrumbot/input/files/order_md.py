@@ -8,7 +8,7 @@ from pathlib import Path
 
 from scrumbot.core.errors import InputError
 from scrumbot.core.model import OrderDraft
-from scrumbot.core.normalize import clean, header_key, parse_date
+from scrumbot.core.normalize import clean, header_key, parse_date, parse_order_kind
 
 _TITLE = re.compile(r"^#\s+(.+?)\s*#*\s*$")
 _DELIMITER = re.compile(r"^:?-+:?$")
@@ -19,7 +19,17 @@ _FIELDS = {
     "app name": "app",
     "ưu tiên": "priority",
     "hạn": "due",
+    "loại đơn": "kind",
+    "người chịu trách nhiệm": "owner",
+    "bằng chứng": "evidence",
+    "người nghiệm thu": "",  # fields of the process no rule reads yet: accepted, not kept (A105)
+    "tài liệu còn thiếu": "",
 }
+_KEYS = "ID, App, Ưu tiên, Hạn, Loại đơn, Người chịu trách nhiệm, Bằng chứng, Người nghiệm thu hoặc Tài liệu còn thiếu"
+_KINDS = (
+    "Quảng cáo, IAP, Tracking, Tính năng / luồng / UI, Fix bug / crash, Sửa policy, Nghiên cứu hoặc Chuyển store / "
+    "hạ tầng"
+)
 _TABLE_HEAD = "trường"
 
 
@@ -52,6 +62,10 @@ def read_order(path: Path) -> OrderDraft:
         raise InputError(
             f"File đơn '{path}': Hạn '{due_text}' không đọc được; dùng YYYY-MM-DD hoặc DD/MM/YYYY."
         ) from None
+    kind_text = fields.get("kind", "")
+    kind = parse_order_kind(kind_text)
+    if kind_text and kind is None:
+        raise InputError(f"File đơn '{path}': Loại đơn '{kind_text}' không hợp lệ; dùng {_KINDS}.")
     return OrderDraft(
         title=title or clean(path.stem),
         order_id=fields.get("id", ""),
@@ -60,6 +74,9 @@ def read_order(path: Path) -> OrderDraft:
         due=due,
         description="\n".join(rest).strip(),
         origin=str(path),
+        kind=kind,
+        owner=fields.get("owner", ""),
+        evidence=fields.get("evidence", ""),
     )
 
 
@@ -87,10 +104,8 @@ def _read_fields(path: Path, lines: list[str], index: int, fields: dict[str, str
         key, value = header_key(cells[0]), cells[1]
         if key or value:
             if key not in _FIELDS:
-                raise InputError(
-                    f"File đơn '{path}' dòng {index + 1}: trường '{cells[0]}' không hợp lệ; "
-                    "dùng ID, App, Ưu tiên hoặc Hạn."
-                )
-            fields[_FIELDS[key]] = value
+                raise InputError(f"File đơn '{path}' dòng {index + 1}: trường '{cells[0]}' không hợp lệ; dùng {_KEYS}.")
+            if _FIELDS[key]:
+                fields[_FIELDS[key]] = value
         index += 1
     return index
