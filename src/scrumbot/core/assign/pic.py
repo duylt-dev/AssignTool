@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from scrumbot.core.assign.familiarity import FamiliarityIndex
+from scrumbot.core.assign.reasons import PREASSIGNED_REASON, blocked_text, proposed_reason, rule_lead
 from scrumbot.core.model import Assignment, Dev, Level, Order, Priority, SizeEstimate, Source, TeamRule
 from scrumbot.core.normalize import text_key
-from scrumbot.core.rules.familiarity import FamiliarityIndex
-from scrumbot.core.rules.reasons import PREASSIGNED_REASON, blocked_text, proposed_reason, rule_lead
-from scrumbot.core.rules.team_rules import blocking_rule, names, pin_rule, prefer_rule
+from scrumbot.core.sprint.team_rules import blocking_rule, names, pin_rule, prefer_rule
 
 GAP_ORDERS = 1  # D26: a dev may hold at most one order more than the least-loaded dev
 

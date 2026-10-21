@@ -28,7 +28,7 @@ _MESSAGE = re.compile(r'message(?:\\*")?\s*:\s*(?:\\*")+([^"\\{}]{3,})')
 
 
 def cli_ask(tool: str, *, model: str | None, timeout: int) -> Ask:
-    """`ask` for `AiSizer` that runs `gemini` or `agy`."""
+    """`ask` for `AiSizer` and `AiAsker` that runs `gemini` or `agy`."""
     return partial(run_ai, tool, model=model, timeout=timeout)
 
 

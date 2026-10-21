@@ -3,6 +3,7 @@ from datetime import date
 
 import pytest
 
+from scrumbot.core.assign.pipeline import build_result
 from scrumbot.core.errors import InputError
 from scrumbot.core.model import (
     Dev,
@@ -17,7 +18,6 @@ from scrumbot.core.model import (
     SprintView,
     TeamRule,
 )
-from scrumbot.core.rules.pipeline import build_result
 
 LINH = Dev("Ngọc Văn Linh", "LinhNV", Level.MIDDLE_PLUS, True, ())
 MINH = Dev("Nguyễn Nhật Minh", "MinhNM", Level.MIDDLE, True, ())

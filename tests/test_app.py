@@ -1,5 +1,6 @@
-"""`scrumbot assign <file>` end to end against a real local HTTP server (bot spec §7): the order file in the sprint,
-the review, the AI prompt, the Markdown report, the memory. Nothing reaches the dev server."""
+"""`scrumbot review <file>` then `scrumbot assign <file>` end to end against a real local HTTP server (bot spec §7): the
+order file in the sprint, the review, the passed review that assign needs, the AI prompts, the Markdown reports, the
+memory. Nothing reaches the dev server; the run day is pinned (LLM.md §8)."""
 
 from __future__ import annotations
 
@@ -66,9 +67,13 @@ def _order(source: Path, order_id: str = "") -> Path:
     return path
 
 
-def _assign(source: Path, tmp_path: Path, order: Path, *flags: str) -> int:
+def _cli(command: str, source: Path, tmp_path: Path, order: Path, *flags: str) -> int:
     paths = ["--input", str(source), "--state", str(tmp_path / "state"), "--out", str(tmp_path / "out")]
-    return main(["assign", str(order), *paths, *flags])
+    return main([command, str(order), *paths, "--today", "2026-10-08", *flags])
+
+
+def _report(tmp_path: Path) -> str:
+    return (tmp_path / "out" / "output.md").read_text(encoding="utf-8")
 
 
 def test_a_new_order_gets_a_pic_and_the_report_says_why(
@@ -78,30 +83,39 @@ def test_a_new_order_gets_a_pic_and_the_report_says_why(
 
     def fake(tool, prompt, *, model, timeout):
         prompts.append(prompt)
+        if prompt.startswith("You review"):
+            return AiReply(tool, '{"questions": ["Gói tháng giá bao nhiêu?"]}', None)
         return AiReply(tool, '[{"stt": 1, "size": "S", "reason": "x"}, {"stt": 2, "size": "L", "reason": "IAP"}]', None)
 
     monkeypatch.setattr(ai_cli, "run_ai", fake)
+    order = _order(source)
 
-    assert _assign(source, tmp_path, _order(source), "--ai", "agy") == 0
+    assert _cli("review", source, tmp_path, order, "--ai", "agy") == 0
+    assert "- Gói tháng giá bao nhiêu?" in _report(tmp_path)
+    assert _cli("assign", source, tmp_path, order, "--ai", "agy") == 0
 
-    (prompt,) = prompts
-    assert "Thêm IAP gói tháng, liên hệ BA: [người]. * Link UI [link Figma]" in prompt
-    assert all(text not in prompt for text in ("TestBA", "figma.com", LINH, AN, OUTSIDER, "AnTD"))
-    report = (tmp_path / "out" / "output.md").read_text(encoding="utf-8")
+    asked, sized = prompts
+    for prompt in prompts:
+        assert "Thêm IAP gói tháng, liên hệ BA: [người]. * Link UI [link Figma]" in prompt
+        assert all(text not in prompt for text in ("TestBA", "figma.com", LINH, AN, OUTSIDER, "AnTD"))
+    assert asked.startswith("You review") and sized.startswith("You estimate")
+    report = _report(tmp_path)
     assert report.startswith("# Giao đơn: Demo 1.0.2 - Add IAP\n")
     assert "- **PIC đề xuất: LinhNV**" in report
     assert "- Độ lớn (AI): L (32h): IAP" in report
     assert "| Đơn | Đơn mới, chưa có trên hệ thống (tính là STT 2 của Sprint 2) |" in report
     assert "| LinhNV | middle+ | Làm version gần nhất | 1 | 32h / " in report and "| **PIC** |" in report
     assert "## Rủi ro và phương án dự phòng" in report and "## Cảnh báo dữ liệu" in report
-    assert OUTSIDER not in report
+    assert OUTSIDER not in report and "## Review" not in report and "Gói tháng giá" not in report
     printed = capsys.readouterr().out
     assert "Đơn: Demo 1.0.2 - Add IAP (đơn mới, STT 2 của Sprint 2)" in printed
     assert "PIC đề xuất: LinhNV (dự phòng: " in printed
     assert not list((tmp_path / "out").glob("*.xlsx")) and not list((tmp_path / "out").glob("*.tmp"))
     with closing(sqlite3.connect(tmp_path / "state" / "scrumbot.sqlite")) as db:  # only the other orders' answers
-        assert db.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall() == [("ai_answers",)]
+        tables = db.execute("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").fetchall()
+        assert tables == [("ai_answers",), ("reviews",)]
         assert db.execute("SELECT order_id FROM ai_answers").fetchall() == [("t",)]
+        assert db.execute("SELECT origin FROM reviews").fetchall() == [(str(order),)]
 
 
 def test_the_order_of_the_file_is_sized_again_on_every_run(
@@ -114,23 +128,38 @@ def test_the_order_of_the_file_is_sized_again_on_every_run(
         return AiReply(tool, '[{"stt": 1, "size": "S", "reason": "x"}, {"stt": 2, "size": "M", "reason": "y"}]', None)
 
     monkeypatch.setattr(ai_cli, "run_ai", fake)
-    order = _order(source, "t")
+    order = _order(source, "t")  # held on the system: no review needed (A87)
 
-    assert _assign(source, tmp_path, order, "--ai", "agy") == 0
-    assert _assign(source, tmp_path, order, "--ai", "agy") == 0
+    assert _cli("assign", source, tmp_path, order, "--ai", "agy") == 0
+    assert _cli("assign", source, tmp_path, order, "--ai", "agy") == 0
 
     assert sized == [1, 1]  # the only order is the file's, never taken from the memory
 
 
-def test_an_order_already_taken_on_the_system_is_kept(server: FakeDevServer, source: Path, tmp_path: Path) -> None:
-    assert _assign(source, tmp_path, _order(source, "t"), "--ai", "off") == 0
+def test_an_order_already_taken_on_the_system_is_not_reviewed_and_is_kept(
+    server: FakeDevServer, source: Path, tmp_path: Path, monkeypatch, capsys
+) -> None:
+    def no_ai(*_, **__):
+        raise AssertionError("an order with a Người làm is not reviewed (A87)")
 
-    report = (tmp_path / "out" / "output.md").read_text(encoding="utf-8")
+    monkeypatch.setattr(ai_cli, "run_ai", no_ai)
+    order = _order(source, "t")
+
+    assert _cli("review", source, tmp_path, order, "--ai", "agy") == 0
+    assert (
+        "## Review: không cần\n\nĐơn đã có người làm trên hệ thống: bot giữ nguyên, không review. "
+        f"Chạy `scrumbot assign {order}` để xem người làm và rủi ro.\n\n## Thông tin đơn\n"
+    ) in _report(tmp_path)
+    assert "Review: không cần (đơn đã có người làm)" in capsys.readouterr().out
+    assert _cli("assign", source, tmp_path, order, "--ai", "off") == 0
+
+    report = _report(tmp_path)
     assert "- **Đã có người làm trên hệ thống: AnTD.** Bot giữ nguyên, không đề xuất PIC khác." in report
     assert "| Đơn | Đơn trên hệ thống, ID t, STT 1 (nối theo ID) |" in report
     assert "| AnTD | junior+ | Chưa làm | 1 | 16h / " in report and "| **Người làm** |" in report
 
 
+@pytest.mark.parametrize("command", ["review", "assign"])
 @pytest.mark.parametrize(
     ("order_id", "missing", "message"),
     [
@@ -139,17 +168,17 @@ def test_an_order_already_taken_on_the_system_is_kept(server: FakeDevServer, sou
     ],
 )
 def test_input_errors_exit_2_without_a_report(
-    server: FakeDevServer, source: Path, tmp_path: Path, capsys, order_id, missing, message
+    server: FakeDevServer, source: Path, tmp_path: Path, capsys, order_id, missing, message, command
 ) -> None:
     order = source / "nope.md" if missing else _order(source, order_id)
 
-    assert _assign(source, tmp_path, order, "--ai", "off") == 2
+    assert _cli(command, source, tmp_path, order, "--ai", "off") == 2
 
     assert message in capsys.readouterr().err
     assert not (tmp_path / "out").exists()
 
 
-def test_an_order_that_is_not_ready_gets_only_what_to_fix_and_no_ai_call(
+def test_an_order_that_is_not_ready_gets_only_what_to_fix_and_cannot_be_assigned(
     server: FakeDevServer, source: Path, tmp_path: Path, monkeypatch, capsys
 ) -> None:
     def no_ai(*_, **__):
@@ -159,35 +188,72 @@ def test_an_order_that_is_not_ready_gets_only_what_to_fix_and_no_ai_call(
     order = source / "don.md"
     order.write_text("# Demo 1.0.3 - Fix\n\n| Trường | Giá trị |\n|---|---|\n| Ưu tiên | urgent |\n\nSửa lỗi.\n")
 
-    assert _assign(source, tmp_path, order, "--ai", "agy") == 0
+    assert _cli("review", source, tmp_path, order, "--ai", "agy") == 0
 
-    report = (tmp_path / "out" / "output.md").read_text(encoding="utf-8")
-    assert report.startswith("# Giao đơn: Demo 1.0.3 - Fix\n\nSprint 2 (06/10/2026 – 17/10/2026) · chạy ")
+    report = _report(tmp_path)
+    assert report.startswith("# Review đơn: Demo 1.0.3 - Fix\n\nSprint 2 (06/10/2026 – 17/10/2026) · chạy 08/10/2026 ")
     assert report.endswith(
         "## Review: chưa đạt\n\n"
-        f"Bot chưa đề xuất PIC. Sửa các mục dưới đây rồi chạy lại `scrumbot assign {order}`:\n\n"
+        f"Sửa các mục dưới đây rồi chạy lại `scrumbot review {order}`:\n\n"
         "- `REVIEW-APP`: Thiếu App: ghi tên app vào dòng App của file đơn.\n"
         "- `REVIEW-DUE`: Đơn urgent chưa có Hạn: ghi dòng Hạn của file đơn (YYYY-MM-DD hoặc DD/MM/YYYY).\n"
         "- `REVIEW-DESC`: Mô tả quá ngắn (8 ký tự, cần từ 30, không tính link): ghi rõ các hạng mục cần làm.\n"
+        "\n## Thông tin đơn\n\n| Trường | Giá trị |\n|---|---|\n"
+        "| Đơn | Đơn mới, chưa có trên hệ thống (tính là STT 2 của Sprint 2) |\n"
+        f"| File đơn | {order} |\n| App | trống |\n| Ưu tiên | urgent |\n| Hạn | trống |\n| Mô tả AI đọc | Sửa lỗi. |\n"
     )
     assert "Kết luận" not in report and "Rủi ro" not in report
     printed = capsys.readouterr().out
     assert "Đơn: Demo 1.0.3 - Fix (đơn mới, STT 2 của Sprint 2)\nReview: chưa đạt (3 mục)\n- REVIEW-APP: " in printed
-    assert "PIC đề xuất" not in printed and f"Báo cáo: {tmp_path / 'out' / 'output.md'}" in printed
+    assert f"Báo cáo: {tmp_path / 'out' / 'output.md'}" in printed
     assert not (tmp_path / "state" / "scrumbot.sqlite").exists()
 
+    assert _cli("assign", source, tmp_path, order, "--ai", "agy") == 2
 
-def test_a_ready_order_is_reviewed_once_the_file_is_fixed(
+    assert f"Lỗi: Đơn chưa qua review, hoặc đã đổi sau lần review đạt gần nhất: review lại '{order}'" in (
+        capsys.readouterr().err
+    )
+    assert _report(tmp_path) == report  # nothing written
+
+
+def test_a_ready_order_is_reviewed_once_the_file_is_fixed_then_assigned(
     server: FakeDevServer, source: Path, tmp_path: Path, capsys
 ) -> None:
     order = source / "don.md"
     order.write_text("# Demo 1.0.3 - Fix\n\n| Trường | Giá trị |\n|---|---|\n| App | Demo |\n\nSửa lỗi.\n")
-    assert _assign(source, tmp_path, order, "--ai", "off") == 0
-    assert "- `REVIEW-DESC`: Mô tả quá ngắn (8 ký tự" in (tmp_path / "out" / "output.md").read_text(encoding="utf-8")
+    assert _cli("review", source, tmp_path, order, "--ai", "off") == 0
+    assert "- `REVIEW-DESC`: Mô tả quá ngắn (8 ký tự" in _report(tmp_path)
 
     order.write_text(order.read_text(encoding="utf-8") + "Sửa crash khi mở màn hình cài đặt trên Android 15.\n")
-    assert _assign(source, tmp_path, order, "--ai", "off") == 0
+    assert _cli("review", source, tmp_path, order, "--ai", "off") == 0
 
-    report = (tmp_path / "out" / "output.md").read_text(encoding="utf-8")
-    assert "## Review: đạt\n\nKhông có câu hỏi của AI (AI tắt hoặc lỗi).\n\n## Kết luận" in report
+    review = _report(tmp_path)
+    assert (
+        "## Review: đạt\n\nKhông có câu hỏi của AI (AI tắt hoặc lỗi).\n\n"
+        f"Chạy `scrumbot assign {order}` để bot đề xuất PIC. Sửa file đơn sau lần review này thì phải review lại.\n\n"
+        "## Thông tin đơn\n"
+    ) in review
+    assert "| Mô tả AI đọc | Sửa lỗi. Sửa crash khi mở màn hình cài đặt trên Android 15. |" in review
+    assert f"Review: đạt (không có câu hỏi của AI: tắt AI)\nTiếp theo: scrumbot assign {order}\n" in (
+        capsys.readouterr().out
+    )
+
+    assert _cli("assign", source, tmp_path, order, "--ai", "off") == 0
+
+    report = _report(tmp_path)
     assert "- **PIC đề xuất: LinhNV**" in report and "Sổ rủi ro cả sprint: " in report
+
+
+def test_assign_needs_a_review_of_the_order_as_it_is_now(
+    server: FakeDevServer, source: Path, tmp_path: Path, capsys
+) -> None:
+    order = _order(source)
+    assert _cli("assign", source, tmp_path, order, "--ai", "off") == 2  # never reviewed
+    assert "Đơn chưa qua review" in capsys.readouterr().err and not (tmp_path / "out").exists()
+
+    assert _cli("review", source, tmp_path, order, "--ai", "off") == 0
+    order.write_text(order.read_text(encoding="utf-8").replace("| Hạn | 16/10/2026 |", "| Hạn | 17/10/2026 |"))
+
+    assert _cli("assign", source, tmp_path, order, "--ai", "off") == 2  # changed since the review
+    assert "Đơn chưa qua review" in capsys.readouterr().err
+    assert _report(tmp_path).startswith("# Review đơn: ")

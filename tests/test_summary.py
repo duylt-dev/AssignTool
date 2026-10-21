@@ -1,7 +1,7 @@
 from datetime import date
 
+from scrumbot.core.assign.summary import summarize
 from scrumbot.core.model import Assignment, Dev, Level, Order, Priority, Size, SizeEstimate, Source, SprintRow
-from scrumbot.core.rules.summary import summarize
 
 
 def test_summary_keeps_the_dev_list_order_skips_inactive_devs_and_counts_held_orders() -> None:

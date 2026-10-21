@@ -6,13 +6,13 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
 
+from scrumbot.core.assign.carry_over import BUSY_STATUSES
+from scrumbot.core.assign.familiarity import FamiliarityIndex
+from scrumbot.core.assign.leave import add_working_days
 from scrumbot.core.model import Assignment, Dev, Order, Priority, Source, SprintRow, SprintView
 from scrumbot.core.model_risk import Risk, RiskLevel
 from scrumbot.core.normalize import text_key
-from scrumbot.core.rules.board import is_done_kind
-from scrumbot.core.rules.carry_over import BUSY_STATUSES
-from scrumbot.core.rules.familiarity import FamiliarityIndex
-from scrumbot.core.rules.leave import add_working_days
+from scrumbot.core.sprint.board import is_done_kind
 
 NOT_STARTED = frozenset({text_key("ready to progress"), text_key("pending"), text_key("all issue"), ""})
 DONE_NAMES = frozenset({text_key(name) for name in ("done", "ready to release", "close", "complete", "đã ro")})
@@ -41,9 +41,9 @@ class RiskContext:
 
 def register(context: RiskContext) -> tuple[Risk, ...]:
     """Every risk of bot spec §4.2, in the register's order."""
-    from scrumbot.core.rules.capacity import capacity_risks, carry_risks
-    from scrumbot.core.rules.pic_risks import absent_risks, unfamiliar_risks
-    from scrumbot.core.rules.progress import due_risks, qa_risks, stuck_risks
+    from scrumbot.core.assign.capacity import capacity_risks, carry_risks
+    from scrumbot.core.assign.pic_risks import absent_risks, unfamiliar_risks
+    from scrumbot.core.assign.progress import due_risks, qa_risks, stuck_risks
 
     risks = [
         *capacity_risks(context),

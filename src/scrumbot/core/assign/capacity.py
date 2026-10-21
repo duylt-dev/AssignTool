@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from scrumbot.core.model import Assignment
-from scrumbot.core.model_risk import Risk, RiskGroup, RiskLevel
-from scrumbot.core.rules.risk_register import (
+from scrumbot.core.assign.risk_register import (
     RiskContext,
     defer_list,
     is_open,
@@ -14,6 +12,8 @@ from scrumbot.core.rules.risk_register import (
     reverse_key,
     stt_list,
 )
+from scrumbot.core.model import Assignment
+from scrumbot.core.model_risk import Risk, RiskGroup, RiskLevel
 
 HOURS_PER_DAY = 6  # R6 (D48)
 HIGH_FACTOR = 1.5  # R6: Cao above 1.5 × capacity

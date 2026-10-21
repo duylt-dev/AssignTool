@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-from scrumbot.core.model import Assignment, Source, SprintRow, StatusChange
-from scrumbot.core.model_risk import Risk, RiskGroup, RiskLevel
-from scrumbot.core.normalize import text_key
-from scrumbot.core.rules.leave import days_left, working_time
-from scrumbot.core.rules.risk_register import (
+from scrumbot.core.assign.leave import days_left, working_time
+from scrumbot.core.assign.risk_register import (
     RiskContext,
     deadline,
     deadline_text,
@@ -18,6 +15,9 @@ from scrumbot.core.rules.risk_register import (
     order_where,
     pic_codes,
 )
+from scrumbot.core.model import Assignment, Source, SprintRow, StatusChange
+from scrumbot.core.model_risk import Risk, RiskGroup, RiskLevel
+from scrumbot.core.normalize import text_key
 
 DUE_SOON_DAYS = 3  # T3
 QA_RETURNS = 2  # O12

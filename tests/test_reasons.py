@@ -1,8 +1,8 @@
 from datetime import date
 
+from scrumbot.core.assign.familiarity import AppFamiliarity
+from scrumbot.core.assign.reasons import PREASSIGNED_REASON, proposed_reason
 from scrumbot.core.model import HistoryOrder, Level, Priority
-from scrumbot.core.rules.familiarity import AppFamiliarity
-from scrumbot.core.rules.reasons import PREASSIGNED_REASON, proposed_reason
 
 
 def test_proposed_reason_joins_all_applicable_parts_in_spec_order() -> None:

@@ -1,5 +1,6 @@
 """The import rules of bot spec §8.1 and LLM.md §2, read from the source: the core imports only the standard library;
-`input`, `ai` and `output` import only the core and themselves; each kind of I/O has one owner module."""
+its `review` and `assign` never import each other; `input`, `ai` and `output` import only the core and themselves;
+each kind of I/O has one owner module."""
 
 from __future__ import annotations
 
@@ -40,6 +41,18 @@ def test_the_core_imports_only_the_standard_library_and_itself() -> None:
                 assert name.startswith("scrumbot.core"), f"{path.relative_to(PACKAGE)}: {name}"
             else:
                 assert top in sys.stdlib_module_names or top == "__future__", f"{path.relative_to(PACKAGE)}: {name}"
+
+
+def test_review_and_assign_never_import_each_other_and_the_rest_of_the_core_imports_neither() -> None:
+    """D64, A99: the two steps share `core.place`, `core.sprint` and the formats; `core/__init__` re-exports them."""
+    steps = {"core/review/": "scrumbot.core.review", "core/assign/": "scrumbot.core.assign"}
+    for path in _modules("core"):
+        where = path.relative_to(PACKAGE).as_posix()
+        own = next((step for folder, step in steps.items() if where.startswith(folder)), None)
+        for name in _imports(path):
+            other = next((step for step in steps.values() if name == step or name.startswith(f"{step}.")), None)
+            if other is not None and where != "core/__init__.py":
+                assert other == own, f"{where}: {name}"
 
 
 @pytest.mark.parametrize("package", ["input", "ai", "output"])

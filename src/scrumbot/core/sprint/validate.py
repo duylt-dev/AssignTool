@@ -7,7 +7,7 @@ from scrumbot.core.errors import InputError
 from scrumbot.core.inputs import Inputs
 from scrumbot.core.model import Finding, Order, Priority, Severity, SprintView
 from scrumbot.core.normalize import app_key, parse_priority, text_key
-from scrumbot.core.rules.team_rules import check_rules
+from scrumbot.core.sprint.team_rules import check_rules
 
 
 def check_inputs(inputs: Inputs) -> None:

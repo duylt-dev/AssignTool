@@ -1,7 +1,7 @@
 from datetime import date
 
+from scrumbot.core.assign.leave import leave_count, on_leave_all_sprint, working_days
 from scrumbot.core.model import Dev, Level
-from scrumbot.core.rules.leave import leave_count, on_leave_all_sprint, working_days
 
 
 def test_working_days_and_leave_helpers() -> None:

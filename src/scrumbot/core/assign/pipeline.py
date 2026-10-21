@@ -5,6 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, time
 
+from scrumbot.core.assign.capacity import capacities, dev_loads
+from scrumbot.core.assign.carry_over import carry_over
+from scrumbot.core.assign.familiarity import FamiliarityIndex
+from scrumbot.core.assign.leave import leave_count, on_leave_all_sprint, pre_assigned_on_leave, working_days
+from scrumbot.core.assign.pic import assign
+from scrumbot.core.assign.pic_risks import suggester
+from scrumbot.core.assign.risk_register import RiskContext, register
+from scrumbot.core.assign.summary import summarize
 from scrumbot.core.errors import InputError
 from scrumbot.core.model import (
     Dev,
@@ -17,15 +25,7 @@ from scrumbot.core.model import (
     SprintView,
     TeamRule,
 )
-from scrumbot.core.rules.assign import assign
-from scrumbot.core.rules.capacity import capacities, dev_loads
-from scrumbot.core.rules.carry_over import carry_over
-from scrumbot.core.rules.familiarity import FamiliarityIndex
-from scrumbot.core.rules.leave import leave_count, on_leave_all_sprint, pre_assigned_on_leave, working_days
-from scrumbot.core.rules.pic_risks import suggester
-from scrumbot.core.rules.risk_register import RiskContext, register
-from scrumbot.core.rules.summary import summarize
-from scrumbot.core.rules.team_rules import relaxed_findings, rules_day, unavailable_findings
+from scrumbot.core.sprint.team_rules import relaxed_findings, rules_day, unavailable_findings
 
 MORNING = time(8, 30)  # a run day with no clock time is read as the start of the working day
 

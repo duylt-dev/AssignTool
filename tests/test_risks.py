@@ -6,6 +6,8 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import date, datetime
 
+from scrumbot.core.assign.pipeline import build_result
+from scrumbot.core.assign.risk_register import defer_list, due_for, escalate, ordered
 from scrumbot.core.model import (
     Assignment,
     Dev,
@@ -19,9 +21,7 @@ from scrumbot.core.model import (
     StatusChange,
 )
 from scrumbot.core.model_risk import Risk, RiskLevel
-from scrumbot.core.rules.pipeline import build_result
-from scrumbot.core.rules.risk_register import defer_list, due_for, escalate, ordered
-from scrumbot.core.rules.validate import orders_and_findings
+from scrumbot.core.sprint.validate import orders_and_findings
 from tests.api_builders import AN, LINH, MINH, POOL, TIEN
 
 START, END = date(2026, 10, 6), date(2026, 10, 17)  # Tue 06/10 – Sat 17/10, as Sprint 10

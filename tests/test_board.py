@@ -8,7 +8,7 @@ import pytest
 
 from scrumbot.core.errors import InputError, NoRunningSprint
 from scrumbot.core.inputs import Inputs
-from scrumbot.core.rules.board import (
+from scrumbot.core.sprint.board import (
     history_orders,
     maintain_sprints,
     newest_update,

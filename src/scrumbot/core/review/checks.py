@@ -1,4 +1,4 @@
-"""The review of the filed order before the PIC (bot spec §7.3, D62, A86–A89): what blocks it. Pure."""
+"""The checks of the review (bot spec §7.3, D62, A86–A89): what blocks the filed order. Pure."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ MIN_DESCRIPTION = 30  # characters without links (A88, T1 of A45)
 _LINK = re.compile(r"\[link[^\]]*\]")
 
 
-def review(row: SprintRow, how: Placement) -> tuple[ReviewItem, ...]:
+def blocking(row: SprintRow, how: Placement) -> tuple[ReviewItem, ...]:
     """What the person who filed the order must fix first; empty when the order is ready, or when it already has a
     `Người làm` (A87). `row` is the order as placed: App, priority and `Hạn` from the API for an order on the system,
     the description as the AI reads it (§7.2)."""

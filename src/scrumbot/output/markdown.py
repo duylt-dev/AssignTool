@@ -1,5 +1,5 @@
-"""`output.md` of `scrumbot assign`, built from the standard outcome alone: the review when the order is not ready
-(bot spec §7.3), else the full report (§7.4). Written to `.tmp` and renamed."""
+"""`output.md` of `scrumbot review` (bot spec §7.3) and of `scrumbot assign` (§7.4), built from the standard outcome
+alone; the later run replaces it (D64). Written to `.tmp` and renamed."""
 
 from __future__ import annotations
 
@@ -29,7 +29,8 @@ def write(outcome: Outcome, out_dir: Path) -> Path:
 
 
 def render(outcome: Outcome) -> str:
-    lines = _review(outcome) if outcome.status is Status.NOT_READY else _report(outcome)
+    """A `review` outcome carries no assignment."""
+    lines = _review(outcome) if outcome.assignment is None else _report(outcome)
     return "\n".join(lines) + "\n"
 
 
@@ -45,33 +46,49 @@ def risk_counts(levels: list[RiskLevel]) -> str:
 
 
 def _review(outcome: Outcome) -> list[str]:
-    """The order is not ready (bot spec §7.3): only what to fix, no PIC."""
-    return [
-        *_top(outcome),
-        "## Review: chưa đạt",
-        "",
-        f"Bot chưa đề xuất PIC. Sửa các mục dưới đây rồi chạy lại `scrumbot assign {outcome.order.origin}`:",
-        "",
-        *(f"- `{item.code}`: {item.message}" for item in outcome.review),
-    ]
+    """What blocks the order, or the AI's questions, then the order as placed (bot spec §7.3)."""
+    order = outcome.order
+    lines = _top(outcome, "Review đơn")
+    if outcome.status is Status.NOT_READY:
+        lines += [
+            "## Review: chưa đạt",
+            "",
+            f"Sửa các mục dưới đây rồi chạy lại `scrumbot review {order.origin}`:",
+            "",
+            *(f"- `{item.code}`: {item.message}" for item in outcome.review),
+        ]
+    elif outcome.status is Status.PRE_ASSIGNED:
+        lines += [
+            "## Review: không cần",
+            "",
+            "Đơn đã có người làm trên hệ thống: bot giữ nguyên, không review. "
+            f"Chạy `scrumbot assign {order.origin}` để xem người làm và rủi ro.",
+        ]
+    else:
+        questions = outcome.questions
+        lines += ["## Review: đạt", ""]
+        if questions is not None and questions.items:
+            lines += ["Câu hỏi của AI cho người lên đơn (không chặn; trả lời trong file đơn nếu cần):", ""]
+            lines += [f"- {question}" for question in questions.items]
+        elif questions is not None and questions.answered:
+            lines.append("AI không có câu hỏi.")
+        else:
+            lines.append("Không có câu hỏi của AI (AI tắt hoặc lỗi).")
+        lines += [
+            "",
+            f"Chạy `scrumbot assign {order.origin}` để bot đề xuất PIC. Sửa file đơn sau lần review này thì phải "
+            "review lại.",
+        ]
+    lines += ["", *_info(outcome, ())]
+    return lines
 
 
 def _report(outcome: Outcome) -> list[str]:
     item, order = outcome.assignment, outcome.order
-    assert item is not None  # a ready outcome always carries its assignment
+    assert item is not None  # an `assign` outcome always carries its assignment
     size = item.size
     proposed = outcome.status is Status.PROPOSED
-    lines = _top(outcome)
-    if proposed:  # a pre-assigned order is not reviewed (A87)
-        lines += ["## Review: đạt", ""]
-        if size.is_default:
-            lines.append("Không có câu hỏi của AI (AI tắt hoặc lỗi).")
-        elif size.questions:
-            lines += ["Câu hỏi của AI cho người lên đơn (không chặn; trả lời trong file đơn nếu cần):", ""]
-            lines += [f"- {question}" for question in size.questions]
-        else:
-            lines.append("AI không có câu hỏi.")
-        lines.append("")
+    lines = _top(outcome, "Giao đơn")
     lines += ["## Kết luận", ""]
     if proposed:
         lines += [
@@ -88,18 +105,8 @@ def _report(outcome: Outcome) -> list[str]:
     if proposed:
         lines += ["", "Bot chưa ghi được vào hệ thống: người lên đơn nhập PIC vào hệ thống."]
 
-    lines += ["", "## Thông tin đơn", "", "| Trường | Giá trị |", "|---|---|"]
-    info = [
-        ("Đơn", _placement(outcome)),
-        ("File đơn", order.origin),
-        ("App", order.app or "trống"),
-        ("Ưu tiên", order.priority_raw or "trống"),
-        ("Hạn", _day(order.due) if order.due else "trống"),
-        ("Loại đơn (AI)", ORDER_TYPES.get(size.kind, "") or "—"),
-        ("Hạng mục (AI)", "; ".join(size.items) or "—"),
-        ("Mô tả AI đọc", order.description or "không có"),
-    ]
-    lines += [f"| {name} | {_cell(value)} |" for name, value in info]
+    ai = (("Loại đơn (AI)", ORDER_TYPES.get(size.kind, "") or "—"), ("Hạng mục (AI)", "; ".join(size.items) or "—"))
+    lines += ["", *_info(outcome, ai)]
 
     app = order.app or "app"
     lines += [
@@ -148,14 +155,35 @@ def _report(outcome: Outcome) -> list[str]:
     return lines
 
 
-def _top(outcome: Outcome) -> list[str]:
+def _top(outcome: Outcome, heading: str) -> list[str]:
     """The title and the facts of the run (bot spec §7.3, §7.4)."""
     sprint = outcome.sprint
     dates = f" ({_day(sprint.start)} – {_day(sprint.end)})" if sprint.start and sprint.end else ""
     facts = [f"{short_name(sprint.name)}{dates}", f"chạy {outcome.run_at:%d/%m/%Y %H:%M}"]
     if outcome.freshness is not None:
         facts.append(f"dữ liệu API mới nhất {outcome.freshness:%d/%m/%Y %H:%M}")
-    return [f"# Giao đơn: {outcome.order.title}", "", " · ".join(facts), ""]
+    return [f"# {heading}: {outcome.order.title}", "", " · ".join(facts), ""]
+
+
+def _info(outcome: Outcome, ai: tuple[tuple[str, str], ...]) -> list[str]:
+    """The table `Thông tin đơn`; `assign` adds what the AI said of the order before the description."""
+    order = outcome.order
+    rows = (
+        ("Đơn", _placement(outcome)),
+        ("File đơn", order.origin),
+        ("App", order.app or "trống"),
+        ("Ưu tiên", order.priority_raw or "trống"),
+        ("Hạn", _day(order.due) if order.due else "trống"),
+        *ai,
+        ("Mô tả AI đọc", order.description or "không có"),
+    )
+    return [
+        "## Thông tin đơn",
+        "",
+        "| Trường | Giá trị |",
+        "|---|---|",
+        *(f"| {name} | {_cell(value)} |" for name, value in rows),
+    ]
 
 
 def _placement(outcome: Outcome) -> str:

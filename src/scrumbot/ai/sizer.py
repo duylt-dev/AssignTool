@@ -9,8 +9,8 @@ from datetime import datetime
 from scrumbot.ai.memory import AnswerMemory
 from scrumbot.ai.prompt import build_prompt, parse_reply
 from scrumbot.ai.tools import Ask
+from scrumbot.core.assign.sizing import Sizing
 from scrumbot.core.model import HistoryOrder, Order
-from scrumbot.core.sizing import Sizing
 
 Say = Callable[[str], None]
 

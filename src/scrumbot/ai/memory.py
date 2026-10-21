@@ -1,5 +1,6 @@
-"""The AI answers between runs (bot spec §5, A51, A67): one SQLite file in `state/`. The only module that imports
-sqlite3. A file written by an older version may hold more tables; they are left alone."""
+"""What is remembered between runs (bot spec §5): the AI answers (A51, A67) and the passed reviews (A101), in one
+SQLite file in `state/`. The only module that imports sqlite3. A file written by an older version may hold more
+tables; they are left alone."""
 
 from __future__ import annotations
 
@@ -20,11 +21,12 @@ CREATE TABLE IF NOT EXISTS ai_answers (
     order_id TEXT NOT NULL, title_key TEXT NOT NULL, size TEXT NOT NULL, reason TEXT NOT NULL, kind TEXT NOT NULL,
     items TEXT NOT NULL, tech_risks TEXT NOT NULL, tool TEXT NOT NULL, at TEXT NOT NULL,
     PRIMARY KEY (order_id, title_key));
+CREATE TABLE IF NOT EXISTS reviews (fingerprint TEXT PRIMARY KEY, origin TEXT NOT NULL, at TEXT NOT NULL);
 """
 
 
-class AnswerMemory:
-    """Open with `AnswerMemory(folder)`; every method commits its own change, so a crash loses at most one step."""
+class _Store:
+    """The SQLite file of `folder`; every method commits its own change, so a crash loses at most one step."""
 
     def __init__(self, folder: Path) -> None:
         folder.mkdir(parents=True, exist_ok=True)
@@ -34,6 +36,23 @@ class AnswerMemory:
                 connection.executescript(_SCHEMA)
         except sqlite3.DatabaseError as error:
             raise InputError(f"Không mở được bộ nhớ '{self.path}': {error}") from error
+
+    def _connect(self) -> sqlite3.Connection:
+        return sqlite3.connect(self.path, timeout=30)
+
+    def _one(self, query: str, params: tuple[object, ...]) -> tuple[object, ...] | None:
+        with closing(self._connect()) as connection:
+            return connection.execute(query, params).fetchone()
+
+    def _many(self, query: str, rows: list[tuple[object, ...]]) -> None:
+        if not rows:
+            return
+        with closing(self._connect()) as connection, connection:
+            connection.executemany(query, rows)
+
+
+class AnswerMemory(_Store):
+    """The AI answers of `assign`, by order id and title (bot spec §2.6)."""
 
     def ai_answers(self, keys: list[tuple[str, str]]) -> dict[tuple[str, str], SizeEstimate]:
         """Remembered answers for (order id, title); the estimate is marked `remembered`."""
@@ -69,18 +88,18 @@ class AnswerMemory:
             ],
         )
 
-    def _connect(self) -> sqlite3.Connection:
-        return sqlite3.connect(self.path, timeout=30)
 
-    def _one(self, query: str, params: tuple[object, ...]) -> tuple[object, ...] | None:
-        with closing(self._connect()) as connection:
-            return connection.execute(query, params).fetchone()
+class ReviewMemory(_Store):
+    """The fingerprints of the orders that passed `review` (A101): the `reviewed` of `core.assign`. Never expire."""
 
-    def _many(self, query: str, rows: list[tuple[object, ...]]) -> None:
-        if not rows:
-            return
-        with closing(self._connect()) as connection, connection:
-            connection.executemany(query, rows)
+    def __contains__(self, fingerprint: object) -> bool:
+        return (
+            isinstance(fingerprint, str)
+            and self._one("SELECT 1 FROM reviews WHERE fingerprint = ?", (fingerprint,)) is not None
+        )
+
+    def save(self, fingerprint: str, origin: str, now: datetime) -> None:
+        self._many("INSERT OR REPLACE INTO reviews VALUES (?, ?, ?)", [(fingerprint, origin, now.strftime(_TIME))])
 
 
 def _title_key(title: str) -> str:

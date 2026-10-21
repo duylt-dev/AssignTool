@@ -1,5 +1,5 @@
-"""Command line (bot spec §1, §7, assignment spec §2, §11): parse, run `assign`, print, exit codes. The only module that
-prints; `app.py` hands its lines to `say`."""
+"""Command line (bot spec §1, §7, assignment spec §2, §11): parse, run `review` or `assign`, print, exit codes. The only
+module that prints; `app.py` hands its lines to `say`."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import traceback
 from datetime import date, datetime
 from pathlib import Path
 
-from scrumbot.app import Options, run_assign
+from scrumbot.app import Options, run_assign, run_review
 from scrumbot.core.errors import AssignError, InputError
 from scrumbot.core.normalize import parse_date
 
@@ -37,7 +37,8 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _dispatch(args: argparse.Namespace) -> int:
-    run_assign(_options(args), Path(args.file), _say, datetime.now())
+    run = run_review if args.command == "review" else run_assign
+    run(_options(args), Path(args.file), _say, datetime.now())
     return 0
 
 
@@ -61,9 +62,13 @@ def _parser() -> argparse.ArgumentParser:
         prog="scrumbot", description="Bot scrum master: review đơn của BA/MO, đề xuất PIC và rủi ro."
     )
     commands = parser.add_subparsers(dest="command", required=True)
-    assign = commands.add_parser("assign", help="review và giao một đơn từ file .md của BA/MO, ghi output/output.md")
-    assign.add_argument("file", help="file đơn .md (mẫu: README mục 4)")
-    _options_of(assign)
+    review = commands.add_parser("review", help="review một đơn từ file .md của BA/MO, ghi output/output.md")
+    assign = commands.add_parser(
+        "assign", help="đề xuất PIC cho đơn đã review đạt (bước sau review), ghi output/output.md"
+    )
+    for command in (review, assign):
+        command.add_argument("file", help="file đơn .md (mẫu: README mục 4)")
+        _options_of(command)
     return parser
 
 

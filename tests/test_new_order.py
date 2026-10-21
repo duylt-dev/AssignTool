@@ -7,6 +7,9 @@ from datetime import date, datetime
 
 import pytest
 
+from scrumbot.core.assign.pipeline import team_for
+from scrumbot.core.assign.report import order_report
+from scrumbot.core.assign.summary import summarize
 from scrumbot.core.errors import InputError
 from scrumbot.core.model import (
     Assignment,
@@ -26,9 +29,7 @@ from scrumbot.core.model import (
     SprintView,
 )
 from scrumbot.core.model_risk import IF_IT_HAPPENS, Risk, RiskGroup, RiskLevel
-from scrumbot.core.rules.new_order import PERSON, looks_like_code, order_report, place, scrub
-from scrumbot.core.rules.pipeline import team_for
-from scrumbot.core.rules.summary import summarize
+from scrumbot.core.sprint.new_order import PERSON, looks_like_code, place_order, scrub
 
 LINH = Dev("Ngọc Văn Linh", "LinhNV", Level.MIDDLE_PLUS, True, ())
 MINH = Dev("Nguyễn Nhật Minh", "MinhNM", Level.MIDDLE, True, ())
@@ -88,7 +89,7 @@ def test_ordinary_words_are_not_codes(word: str) -> None:
 
 
 def test_a_new_order_comes_after_the_roots_and_moves_subtasks_and_bugs_down() -> None:
-    placed = place(_view(), _draft(description="Thêm IAP, liên hệ TestBA"), frozenset(), date(2026, 10, 13))
+    placed = place_order(_view(), _draft(description="Thêm IAP, liên hệ TestBA"), frozenset(), date(2026, 10, 13))
 
     assert (placed.stt, placed.how) == (3, Placement.NEW)
     new = placed.view.rows[2]
@@ -111,8 +112,8 @@ def test_a_new_order_comes_after_the_roots_and_moves_subtasks_and_bugs_down() ->
 
 
 def test_an_id_or_the_same_title_finds_the_order_and_gives_it_the_description() -> None:
-    by_id = place(_view(), _draft(order_id="b", description="Sửa UI"), frozenset(), date(2026, 10, 13))
-    by_title = place(_view(), _draft(title="1.0.1 - ADD ads", description="x"), frozenset(), date(2026, 10, 13))
+    by_id = place_order(_view(), _draft(order_id="b", description="Sửa UI"), frozenset(), date(2026, 10, 13))
+    by_title = place_order(_view(), _draft(title="1.0.1 - ADD ads", description="x"), frozenset(), date(2026, 10, 13))
 
     assert (by_id.stt, by_id.how, by_id.view.rows[1].description, len(by_id.view.rows)) == (
         2,
@@ -127,14 +128,14 @@ def test_an_unknown_id_or_a_title_found_twice_is_an_input_error() -> None:
     twice = SprintView("Sprint 10", 10, None, None, (_row(1, "Same", order_id="a"), _row(2, "same", order_id="b")))
 
     with pytest.raises(InputError, match="Không có đơn gốc ID 'zz' trong Sprint 10"):
-        place(_view(), _draft(order_id="zz"), frozenset(), date(2026, 10, 13))
+        place_order(_view(), _draft(order_id="zz"), frozenset(), date(2026, 10, 13))
     with pytest.raises(InputError, match="Có 2 đơn tên 'Same' trong Sprint 10; ghi ID của đơn vào file đơn."):
-        place(twice, _draft(title="Same"), frozenset(), date(2026, 10, 13))
+        place_order(twice, _draft(title="Same"), frozenset(), date(2026, 10, 13))
 
 
 def test_the_report_keeps_the_risks_of_the_order_its_pic_and_the_sprint_only() -> None:
     view = _view()
-    placed = place(view, _draft(), frozenset(), date(2026, 10, 13))
+    placed = place_order(view, _draft(), frozenset(), date(2026, 10, 13))
     size = SizeEstimate(Size.M, "", False)
     rows = [row for row in placed.view.rows if row.kind == "Task"]
     items = (

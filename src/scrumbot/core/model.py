@@ -218,7 +218,6 @@ class SizeEstimate:
     items: tuple[str, ...] = ()  # AI work items
     tech_risks: tuple[str, ...] = ()  # AI technical risks; shown, never scored (A79)
     remembered: bool = False  # taken from the memory of A67 instead of this run's AI call
-    questions: tuple[str, ...] = ()  # AI questions to the person who filed the order (A90); never remembered
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,5 +1,5 @@
-"""`scrumbot assign <file>` (bot spec §7, §8): the input adapter, the core, the AI and the output adapters, wired. It
-prints nothing itself: it hands lines to `say`, which `cli.py` binds to print."""
+"""`scrumbot review <file>` and `scrumbot assign <file>` (bot spec §7, §8): the input adapter, the core, the AI and
+the output adapters, wired. It prints nothing itself: it hands lines to `say`, which `cli.py` binds to print."""
 
 from __future__ import annotations
 
@@ -10,7 +10,8 @@ from datetime import date, datetime
 from pathlib import Path
 
 from scrumbot import core
-from scrumbot.ai.memory import AnswerMemory
+from scrumbot.ai.asker import AiAsker
+from scrumbot.ai.memory import AnswerMemory, ReviewMemory
 from scrumbot.ai.sizer import AiSizer
 from scrumbot.ai.tools import cli_ask
 from scrumbot.input.local import load_inputs
@@ -36,8 +37,31 @@ class Options:
     env_file: Path = Path(".env")
 
 
+def run_review(options: Options, order_file: Path, say: Say, now: datetime) -> Path:
+    """Read, place, review, write `output.md`, remember a passed review (A101); return the path of the report."""
+    placed = _place(options, order_file, say, now)
+    outcome = core.review(placed, _asker(options, say))
+    path = markdown.write(outcome, options.out_dir)
+    if outcome.status is core.Status.READY:
+        ReviewMemory(options.state_dir).save(outcome.order.fingerprint, outcome.order.origin, placed.run_at)
+    for line in terminal.review_lines(outcome, path):
+        say(line)
+    return path
+
+
 def run_assign(options: Options, order_file: Path, say: Say, now: datetime) -> Path:
-    """Read, prepare, decide, write `output.md`; return its path."""
+    """Read, place, assign an order that passed `review`, write `output.md`; return its path."""
+    placed = _place(options, order_file, say, now)
+    reviewed = ReviewMemory(options.state_dir)
+    outcome = core.assign(placed, reviewed=reviewed, sizer=_sizer(options, placed.run_at, say))
+    path = markdown.write(outcome, options.out_dir)
+    for line in terminal.assign_lines(outcome, path):
+        say(line)
+    return path
+
+
+def _place(options: Options, order_file: Path, say: Say, now: datetime) -> core.Placed:
+    """Read every input, place the order and print what was read, before any AI call."""
     if options.today is not None:
         say(terminal.run_day(options.today))
     inputs = load_inputs(
@@ -52,15 +76,17 @@ def run_assign(options: Options, order_file: Path, say: Say, now: datetime) -> P
         sprint_id=options.sprint_id,
         now=now,
     )
-    prepared = core.prepare(inputs, now=now, today=options.today, sprint_id=options.sprint_id)
-    for line in terminal.prepared_lines(prepared):
+    placed = core.place(inputs, now=now, today=options.today, sprint_id=options.sprint_id)
+    for line in terminal.placed_lines(placed):
         say(line)
-    sizer = None if prepared.review else _sizer(options, prepared.run_at, say)
-    outcome = core.decide(prepared, sizer)
-    path = markdown.write(outcome, options.out_dir)
-    for line in terminal.outcome_lines(outcome, path):
-        say(line)
-    return path
+    return placed
+
+
+def _asker(options: Options, say: Say) -> core.Asker | None:
+    """The AI of `--ai` for the questions of `review` (bot spec §7.3); `off` asks nothing."""
+    if options.ai == "off":
+        return None
+    return AiAsker(cli_ask(options.ai, model=options.ai_model, timeout=options.ai_timeout), tool=options.ai, say=say)
 
 
 def _sizer(options: Options, run_at: datetime, say: Say) -> core.Sizer | None:

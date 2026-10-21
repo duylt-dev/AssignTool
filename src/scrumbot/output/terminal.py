@@ -1,14 +1,14 @@
-"""The lines `scrumbot assign` prints (bot spec §7.4): what the run read, before the AI is called, then what it
-decided. `cli.py` prints them."""
+"""The lines `scrumbot review` and `scrumbot assign` print (bot spec §7.3, §7.4): what the run read, before the AI is
+called, then what it decided. `cli.py` prints them."""
 
 from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
 
-from scrumbot.core.engine import Prepared
 from scrumbot.core.model import Placement, Severity
 from scrumbot.core.outcome import Outcome, Status
+from scrumbot.core.place import Placed
 from scrumbot.output.markdown import risk_counts, short_name
 
 
@@ -16,39 +16,51 @@ def run_day(day: date) -> str:
     return f"Ngày chạy: {day:%d/%m/%Y} (--today)"
 
 
-def prepared_lines(prepared: Prepared) -> list[str]:
+def placed_lines(placed: Placed) -> list[str]:
     """The source, the TM rules, the history and the placed order."""
-    inputs, row = prepared.inputs, prepared.placed.row
-    fresh = f" (dữ liệu mới nhất {prepared.freshness:%d/%m/%Y %H:%M})" if prepared.freshness else ""
+    inputs, row = placed.inputs, placed.order.row
+    fresh = f" (dữ liệu mới nhất {placed.freshness:%d/%m/%Y %H:%M})" if placed.freshness else ""
     rules = (
         f"Luật TM: file {Path(inputs.rules_source).name} ({len(inputs.rules)} luật, "
-        f"{len(prepared.rules)} có hiệu lực ngày {prepared.rules_day:%d/%m/%Y})"
+        f"{len(placed.rules)} có hiệu lực ngày {placed.rules_day:%d/%m/%Y})"
         if inputs.rules_source
         else "Luật TM: không có"
     )
-    where = "đơn mới" if prepared.placed.how is Placement.NEW else f"đơn trên hệ thống {row.id}"
+    where = "đơn mới" if placed.order.how is Placement.NEW else f"đơn trên hệ thống {row.id}"
     return [
         f"Nguồn: {inputs.source}{fresh}",
         rules,
-        f"Lịch sử: API ({len(prepared.history)} đơn gốc)",
-        f"Đơn: {row.title} ({where}, STT {row.stt} của {short_name(prepared.sprint.name)})",
+        f"Lịch sử: API ({len(placed.history)} đơn gốc)",
+        f"Đơn: {row.title} ({where}, STT {row.stt} của {short_name(placed.sprint.name)})",
     ]
 
 
-def outcome_lines(outcome: Outcome, report: Path) -> list[str]:
-    """The review, or the size, the PIC and the risks; then the path of the report."""
-    item = outcome.assignment
-    if outcome.status is Status.NOT_READY or item is None:
-        return [
+def review_lines(outcome: Outcome, report: Path) -> list[str]:
+    """What blocks the order, or how many questions the AI asked; then the path of the report."""
+    if outcome.status is Status.NOT_READY:
+        lines = [
             f"Review: chưa đạt ({len(outcome.review)} mục)",
             *(f"- {review.code}: {review.message}" for review in outcome.review),
-            f"Báo cáo: {report}",
         ]
+    elif outcome.status is Status.PRE_ASSIGNED:
+        lines = ["Review: không cần (đơn đã có người làm)"]
+    else:
+        questions = outcome.questions
+        asked = (
+            f"{len(questions.items)} câu hỏi của AI"
+            if questions is not None and questions.answered
+            else f"không có câu hỏi của AI: {questions.note if questions is not None else 'tắt AI'}"
+        )
+        lines = [f"Review: đạt ({asked})", f"Tiếp theo: scrumbot assign {outcome.order.origin}"]
+    return [*lines, f"Báo cáo: {report}"]
+
+
+def assign_lines(outcome: Outcome, report: Path) -> list[str]:
+    """The size, the PIC and the risks; then the path of the report."""
+    item = outcome.assignment
+    assert item is not None  # an `assign` outcome always carries its assignment
     size = item.size
-    lines = []
-    if outcome.status is Status.PROPOSED:
-        lines.append(f"Review: đạt ({len(size.questions)} câu hỏi của AI)")
-    lines.append(f"Độ lớn: {size.size.name}" + (" (mặc định)" if size.is_default else "") + f" · {outcome.sizing_note}")
+    lines = [f"Độ lớn: {size.size.name}" + (" (mặc định)" if size.is_default else "") + f" · {outcome.sizing_note}"]
     if outcome.status is Status.PROPOSED:
         lines.append(f"PIC đề xuất: {item.pic_codes[0]} (dự phòng: {', '.join(item.backups) or 'không có'})")
     else:

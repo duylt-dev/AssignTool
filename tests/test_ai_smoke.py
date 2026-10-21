@@ -1,4 +1,4 @@
-"""One real AI call on three made-up orders (LLM.md §8).
+"""Real AI calls: the sizes of three made-up orders, the questions of one (LLM.md §8).
 
 Opt-in: ASSIGNTOOL_TEST_AI=gemini (or agy) uv run pytest -m ai."""
 
@@ -8,7 +8,7 @@ import os
 
 import pytest
 
-from scrumbot.ai.prompt import build_prompt, parse_reply
+from scrumbot.ai.prompt import build_prompt, build_question_prompt, parse_questions, parse_reply
 from scrumbot.ai.tools import run_ai
 from scrumbot.core.model import Order, Priority, SprintRow
 
@@ -37,3 +37,16 @@ def test_real_ai_sizes_every_order() -> None:
     assert findings == (), findings
     assert sorted(sizes) == [1, 2, 3]
     assert not any(estimate.is_default for estimate in sizes.values()), note
+
+
+def test_real_ai_answers_the_question_prompt() -> None:
+    row = SprintRow(
+        1, TITLES[1], "Task", "Demo", (), "", "high", None, None, "Thêm IAP gói tháng và đổi luồng onboarding."
+    )
+
+    reply = run_ai(TOOL, build_question_prompt(row), model=None, timeout=600)
+    questions = parse_questions(reply)
+
+    assert reply.failure is None, reply.failure
+    assert questions.answered, (questions.note, reply.text)
+    assert len(questions.items) <= 2

@@ -1,5 +1,6 @@
 """The core API (bot spec §8.2, §8.4, §8.5) with an input built in Python, as an integrating website would: no HTTP, no
-file. Prepare and decide, the outcome and its JSON form, the sizer, and the checks of every input."""
+file. Place, review and assign, the passed review that assign needs, the outcome and its JSON form, the asker and the
+sizer, and the checks of every input."""
 
 from __future__ import annotations
 
@@ -10,10 +11,10 @@ from datetime import date, datetime
 import pytest
 
 from scrumbot import core
-from scrumbot.core import Dev, Inputs, Level, OrderDraft, RuleKind, SprintInfo, Status, Task, TeamRule
+from scrumbot.core import Dev, Inputs, Level, OrderDraft, Questions, RuleKind, SprintInfo, Status, Task, TeamRule
+from scrumbot.core.assign.sizing import Sizing, size_orders
 from scrumbot.core.errors import InputError
-from scrumbot.core.model import HistoryOrder, Order, Placement, Priority, Size, SizeEstimate
-from scrumbot.core.sizing import Sizing, size_orders
+from scrumbot.core.model import HistoryOrder, Order, Placement, Priority, Size, SizeEstimate, SprintRow
 from tests.api_builders import LINH, MINH, POOL
 
 NOW = datetime(2026, 10, 14, 10, 30)
@@ -57,13 +58,20 @@ def _inputs(order: OrderDraft = FILED, **changes: object) -> Inputs:
 
 
 def _no_ai(*_: object) -> Sizing:
-    raise AssertionError("the sizer must not be called")
+    raise AssertionError("the AI must not be called")
+
+
+def _assigned(inputs: Inputs | None = None, sizer: core.Sizer | None = None) -> core.Outcome:
+    """Review, then assign with the fingerprint of that review, as the CLI does across its two runs."""
+    reviewed = core.review(core.place(inputs or _inputs(), now=NOW))
+    passed = {reviewed.order.fingerprint} if reviewed.status is Status.READY else set()
+    return core.assign(core.place(inputs or _inputs(), now=NOW), reviewed=passed, sizer=sizer)
 
 
 def test_without_ai_the_new_order_gets_a_pic_and_every_order_is_m() -> None:
-    outcome = core.evaluate(_inputs(), now=NOW)
+    outcome = _assigned()
 
-    assert outcome.status is Status.PROPOSED
+    assert outcome.status is Status.PROPOSED and outcome.questions is None
     assert (outcome.order.title, outcome.order.stt, outcome.order.placement) == ("Demo 1.0.2", 3, Placement.NEW)
     assert outcome.assignment is not None and outcome.assignment.pic_codes == ("LinhNV",)
     assert outcome.assignment.size == SizeEstimate(Size.M, "", True)
@@ -73,7 +81,7 @@ def test_without_ai_the_new_order_gets_a_pic_and_every_order_is_m() -> None:
 
 
 def test_the_outcome_as_json_follows_bot_spec_8_4() -> None:
-    plain = json.loads(json.dumps(core.evaluate(_inputs(), now=NOW).to_dict(), ensure_ascii=False))
+    plain = json.loads(json.dumps(_assigned().to_dict(), ensure_ascii=False))
 
     assert list(plain) == [
         "format",
@@ -84,6 +92,7 @@ def test_the_outcome_as_json_follows_bot_spec_8_4() -> None:
         "sprint",
         "order",
         "review",
+        "questions",
         "assignment",
         "size",
         "risks",
@@ -91,12 +100,14 @@ def test_the_outcome_as_json_follows_bot_spec_8_4() -> None:
         "devs",
         "findings",
     ]
-    assert (plain["format"], plain["status"], plain["run_at"]) == (
-        "scrumbot-outcome/1",
+    assert (plain["format"], plain["status"], plain["run_at"], plain["questions"]) == (
+        "scrumbot-outcome/2",
         "proposed",
         "2026-10-14T10:30:00",
+        None,
     )
     assert plain["order"]["placement"] == "new" and plain["order"]["due"] == "2026-10-16"
+    assert len(plain["order"]["fingerprint"]) == 16 and int(plain["order"]["fingerprint"], 16) >= 0
     assert plain["assignment"]["pic_codes"] == ["LinhNV"] and len(plain["assignment"]["backups"]) == 2
     assert plain["size"] == {
         "size": "M",
@@ -107,7 +118,6 @@ def test_the_outcome_as_json_follows_bot_spec_8_4() -> None:
         "kind_label": "",
         "items": [],
         "tech_risks": [],
-        "questions": [],
         "remembered": False,
         "note": "tắt AI (mọi đơn M)",
     }
@@ -117,14 +127,19 @@ def test_the_outcome_as_json_follows_bot_spec_8_4() -> None:
     assert set(plain["sprint_risks"]) == {"high", "medium", "low"}
 
 
-def test_a_blocked_order_is_never_sized_and_has_no_pic_nor_register() -> None:
-    blocked = OrderDraft(title="Demo 1.0.2", priority_raw="urgent", description="ngắn")
+def test_a_ready_order_gets_the_questions_of_the_asker_and_nothing_of_assign() -> None:
+    seen: list[SprintRow] = []
 
-    outcome = core.evaluate(_inputs(blocked), now=NOW, sizer=_no_ai)
+    def asker(row: SprintRow) -> Questions:
+        seen.append(row)
+        return Questions(("Màn kết quả là màn nào?",), True, "AI (thử)")
+
+    outcome = core.review(core.place(_inputs(), now=NOW), asker)
     plain = outcome.to_dict()
 
-    assert outcome.status is Status.NOT_READY
-    assert [item.code for item in outcome.review] == ["REVIEW-APP", "REVIEW-DUE", "REVIEW-DESC"]
+    assert outcome.status is Status.READY and outcome.review == ()
+    assert [(row.stt, row.title, row.description) for row in seen] == [(3, "Demo 1.0.2", DESCRIPTION)]
+    assert plain["questions"] == {"items": ["Màn kết quả là màn nào?"], "answered": True, "note": "AI (thử)"}
     assert (plain["assignment"], plain["size"], plain["risks"], plain["devs"], plain["findings"]) == (
         None,
         None,
@@ -132,16 +147,88 @@ def test_a_blocked_order_is_never_sized_and_has_no_pic_nor_register() -> None:
         [],
         [],
     )
+
+
+def test_a_review_without_ai_is_ready_with_no_question() -> None:
+    outcome = core.review(core.place(_inputs(), now=NOW))
+
+    assert (outcome.status, outcome.questions) == (Status.READY, Questions((), False, "tắt AI"))
+
+
+def test_a_blocked_order_never_reaches_the_ai_and_has_no_pic_nor_register() -> None:
+    blocked = OrderDraft(title="Demo 1.0.2", priority_raw="urgent", description="ngắn")
+
+    outcome = core.review(core.place(_inputs(blocked), now=NOW), _no_ai)
+    plain = outcome.to_dict()
+
+    assert outcome.status is Status.NOT_READY
+    assert [item.code for item in outcome.review] == ["REVIEW-APP", "REVIEW-DUE", "REVIEW-DESC"]
+    assert (plain["questions"], plain["assignment"], plain["size"], plain["risks"], plain["devs"]) == (
+        None,
+        None,
+        None,
+        [],
+        [],
+    )
     assert plain["sprint_risks"] == {"high": 0, "medium": 0, "low": 0}
 
 
-def test_an_order_already_held_is_kept_and_not_reviewed() -> None:
-    outcome = core.evaluate(_inputs(OrderDraft(title="x", order_id="held")), now=NOW)
+def test_an_order_already_held_is_not_reviewed_and_is_kept_without_a_passed_review() -> None:
+    held = _inputs(OrderDraft(title="x", order_id="held"))
 
+    reviewed = core.review(core.place(held, now=NOW), _no_ai)
+    outcome = core.assign(core.place(held, now=NOW), reviewed=())
+
+    assert (reviewed.status, reviewed.review, reviewed.questions) == (Status.PRE_ASSIGNED, (), None)
     assert outcome.status is Status.PRE_ASSIGNED and outcome.review == ()
     assert outcome.order.placement is Placement.BY_ID and outcome.order.title == "Other 2.0"
     assert outcome.assignment is not None
     assert (outcome.assignment.pic_codes, outcome.assignment.backups) == (("MinhNM",), ())
+
+
+@pytest.mark.parametrize(
+    "order",
+    [
+        FILED,  # never reviewed
+        OrderDraft(title="Demo 1.0.2", priority_raw="urgent", description="ngắn"),  # reviewed, not ready
+    ],
+)
+def test_assign_refuses_an_order_without_a_passed_review(order: OrderDraft) -> None:
+    placed = core.place(_inputs(replace(order, origin="input/don/a.md")), now=NOW)
+    core.review(placed)
+
+    with pytest.raises(InputError) as caught:
+        core.assign(placed, reviewed=set(), sizer=_no_ai)
+
+    assert str(caught.value) == (
+        "Đơn chưa qua review, hoặc đã đổi sau lần review đạt gần nhất: review lại 'input/don/a.md' trước khi giao."
+    )
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"description": DESCRIPTION + " Thêm màn cài đặt."},
+        {"app": "Other"},
+        {"priority_raw": "normal"},
+        {"due": date(2026, 10, 17)},
+        {"title": "Demo 1.0.3"},
+    ],
+)
+def test_an_order_changed_after_its_review_needs_another(change: dict[str, object]) -> None:
+    passed = {core.review(core.place(_inputs(), now=NOW)).order.fingerprint}
+    changed = core.place(_inputs(replace(FILED, **change)), now=NOW)
+
+    with pytest.raises(InputError, match="chưa qua review"):
+        core.assign(changed, reviewed=passed)
+
+
+def test_the_fingerprint_is_the_order_not_the_run() -> None:
+    first = core.place(_inputs(), now=NOW)
+    later = core.place(_inputs(replace(FILED, origin="khác.md")), now=datetime(2026, 10, 15, 8), sprint_id="S10")
+
+    assert first.fingerprint == later.fingerprint
+    assert core.assign(later, reviewed={first.fingerprint}).status is Status.PROPOSED
 
 
 def test_the_sizer_gets_the_orders_the_history_and_the_filed_order_as_fresh() -> None:
@@ -151,7 +238,7 @@ def test_the_sizer_gets_the_orders_the_history_and_the_filed_order_as_fresh() ->
         seen.append((tuple(order.row.stt for order in orders), len(examples), fresh))
         return Sizing({3: SizeEstimate(Size.L, "lớn", False)}, (), "AI (thử, 1/3 đơn)")
 
-    outcome = core.evaluate(_inputs(), now=NOW, sizer=sizer)
+    outcome = _assigned(sizer=sizer)
 
     assert seen == [((1, 2, 3), 1, frozenset({3}))]  # the history window holds the order of Sprint 9
     assert outcome.assignment is not None and outcome.assignment.size == SizeEstimate(Size.L, "lớn", False)
@@ -162,8 +249,8 @@ def test_an_order_the_sizer_leaves_out_is_m() -> None:
     def sizer(orders: tuple[Order, ...], examples: tuple[HistoryOrder, ...], fresh: frozenset[int]) -> Sizing:
         return Sizing({2: SizeEstimate(Size.S, "", False), 99: SizeEstimate(Size.XL, "", False)}, (), "AI")
 
-    prepared = core.prepare(_inputs(), now=NOW)
-    orders = tuple(Order(row, Priority.NORMAL) for row in prepared.placed.view.rows if row.kind == "Task")
+    placed = core.place(_inputs(), now=NOW)
+    orders = tuple(Order(row, Priority.NORMAL) for row in placed.order.view.rows if row.kind == "Task")
 
     sizes = size_orders(orders, (), frozenset(), sizer).sizes
 
@@ -175,17 +262,17 @@ def test_an_order_the_sizer_leaves_out_is_m() -> None:
 
 
 def test_the_run_day_is_the_day_of_now_unless_given_and_keeps_the_time_of_now() -> None:
-    assert (core.prepare(_inputs(), now=NOW).today, core.prepare(_inputs(), now=NOW).run_at) == (NOW.date(), NOW)
-    given = core.prepare(_inputs(), now=NOW, today=date(2026, 10, 8))
+    assert (core.place(_inputs(), now=NOW).today, core.place(_inputs(), now=NOW).run_at) == (NOW.date(), NOW)
+    given = core.place(_inputs(), now=NOW, today=date(2026, 10, 8))
     assert (given.today, given.run_at) == (date(2026, 10, 8), datetime(2026, 10, 8, 10, 30))
 
 
 def test_the_json_input_decides_as_the_python_one() -> None:
     inputs = _inputs()
 
-    from_json = core.evaluate(Inputs.from_dict(json.loads(json.dumps(inputs.to_dict()))), now=NOW)
+    from_json = _assigned(Inputs.from_dict(json.loads(json.dumps(inputs.to_dict()))))
 
-    assert from_json.to_dict() == core.evaluate(inputs, now=NOW).to_dict()
+    assert from_json.to_dict() == _assigned(inputs).to_dict()
 
 
 @pytest.mark.parametrize(
@@ -202,5 +289,5 @@ def test_the_json_input_decides_as_the_python_one() -> None:
 )
 def test_every_input_is_checked_whatever_adapter_built_it(changes: dict[str, object], message: str) -> None:
     with pytest.raises(InputError) as caught:
-        core.prepare(_inputs(**changes), now=NOW)
+        core.place(_inputs(**changes), now=NOW)
     assert str(caught.value) == message

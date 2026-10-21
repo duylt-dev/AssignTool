@@ -10,7 +10,7 @@ from pathlib import Path
 
 from scrumbot.core.inputs import SprintInfo, Task
 from scrumbot.core.model import StatusChange
-from scrumbot.core.rules.board import maintain_sprints, select_current
+from scrumbot.core.sprint.board import maintain_sprints, select_current
 from scrumbot.input.dev_api.cache import LiveSource
 from scrumbot.input.dev_api.client import ApiClient
 from scrumbot.input.dev_api.config import TECH_MANAGER_LIST, ApiConfig

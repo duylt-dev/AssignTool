@@ -2,6 +2,8 @@ from datetime import date
 
 import pytest
 
+from scrumbot.core.assign.familiarity import FamiliarityIndex
+from scrumbot.core.assign.pic import GAP_ORDERS, assign
 from scrumbot.core.model import (
     Dev,
     HistoryOrder,
@@ -14,8 +16,6 @@ from scrumbot.core.model import (
     SprintRow,
     TeamRule,
 )
-from scrumbot.core.rules.assign import GAP_ORDERS, assign
-from scrumbot.core.rules.familiarity import FamiliarityIndex
 
 
 def dev(code: str, level: Level = Level.MIDDLE) -> Dev:

@@ -1,5 +1,6 @@
-"""The AI exchange (assignment spec §6.4, bot spec §2.6): the prompt, and the reply read into sizes, types, items,
-technical risks and questions. Pure: the same prompt and reply work with any AI."""
+"""The AI exchanges (assignment spec §6.4, bot spec §2.6, §7.3): the sizing prompt of `assign`, its reply read into
+sizes, types, items and technical risks; the question prompt of `review`, its reply read into questions. Pure: the same
+prompts and replies work with any AI."""
 
 from __future__ import annotations
 
@@ -7,9 +8,10 @@ import json
 import re
 from dataclasses import dataclass
 
-from scrumbot.core.model import ORDER_TYPES, Finding, HistoryOrder, Order, Severity, Size, SizeEstimate
+from scrumbot.core.assign.sizing import default_sizes
+from scrumbot.core.model import ORDER_TYPES, Finding, HistoryOrder, Order, Severity, Size, SizeEstimate, SprintRow
 from scrumbot.core.normalize import app_key, clean
-from scrumbot.core.sizing import default_sizes
+from scrumbot.core.outcome import Questions
 
 PROMPT_BUDGET = 30_000
 DESC_LIMITS = (600, 200, 0)
@@ -17,6 +19,7 @@ MAX_EXAMPLES = 30
 MAX_ITEMS = 5
 MAX_TECH_RISKS = 2
 MAX_QUESTIONS = 2
+QUESTION_DESC_LIMIT = 2000  # A102
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,13 +54,27 @@ Orders to size:
 
 For every order also give its type (ads, iap, flow_ui, policy, crash, sdk, feature or other), its work items (at most
 5, a few words each, as written in the order) and at most 2 technical risks visible from the text (a new SDK, a store
-or policy deadline, a new app), in Vietnamese; give an empty list when none is visible. For an order with a
-description, also give at most 2 short questions in Vietnamese to the person who filed it, about what the description
-leaves unclear for doing the work; give an empty list when the order has no description or nothing is unclear.
+or policy deadline, a new app), in Vietnamese; give an empty list when none is visible.
 
 Reply with only a JSON array, no prose and no code fence, one element per order:
 [{{\"stt\": <STT number>, \"size\": \"S|M|L|XL\", \"reason\": \"<at most 20 words, in Vietnamese>\",
-  \"type\": \"<type>\", \"items\": [\"<item>\"], \"tech_risks\": [\"<risk>\"], \"questions\": [\"<question>\"]}}]
+  \"type\": \"<type>\", \"items\": [\"<item>\"], \"tech_risks\": [\"<risk>\"]}}]
+"""
+
+_QUESTION_PROMPT = """You review a change order of an Android app team before it is assigned to a developer.
+An order is one release (version) of one app: the developer who takes it does every item in the title and the
+description, then the release goes through QA.
+Judge from the text only. Do not open links, do not use any tool, do not read files.
+
+The order:
+- {app} · {priority} · {title}
+- Description: {description}
+
+Give at most 2 short questions in Vietnamese to the person who filed the order, about what the description leaves
+unclear for doing the work. Give an empty list when nothing is unclear.
+
+Reply with only a JSON object, no prose and no code fence:
+{{\"questions\": [\"<question>\"]}}
 """
 
 
@@ -103,7 +120,6 @@ def parse_reply(reply: AiReply, orders: tuple[Order, ...]) -> tuple[dict[int, Si
             _order_type(item.get("type")),
             _strings(item.get("items"), MAX_ITEMS),
             _strings(item.get("tech_risks"), MAX_TECH_RISKS),
-            questions=_strings(item.get("questions"), MAX_QUESTIONS, width=200),
         )
 
     missing = sorted(stt for stt, estimate in sizes.items() if estimate.is_default)
@@ -120,6 +136,26 @@ def parse_reply(reply: AiReply, orders: tuple[Order, ...]) -> tuple[dict[int, Si
         )
     valid = len(orders) - len(missing)
     return sizes, findings, f"AI ({reply.tool}, {valid}/{len(orders)} đơn)"
+
+
+def build_question_prompt(row: SprintRow) -> str:
+    """The filed order alone, its description already scrubbed of names and links (bot spec §7.2)."""
+    return _QUESTION_PROMPT.format(
+        app=row.app or "(không có app)",
+        priority=clean(row.priority_raw) or "(không có ưu tiên)",
+        title=row.title,
+        description=clean(_URL.sub("[link]", row.description))[:QUESTION_DESC_LIMIT] or "(không có)",
+    )
+
+
+def parse_questions(reply: AiReply) -> Questions:
+    """At most 2 questions; a failure or a reply without a `questions` list gives none (A102)."""
+    if reply.failure:
+        return Questions(note=reply.failure)
+    found = _json_object(reply.text)
+    if found is None or not isinstance(found.get("questions"), list):
+        return Questions(note="không đọc được câu hỏi trong trả lời của AI")
+    return Questions(_strings(found["questions"], MAX_QUESTIONS, width=200), True, f"AI ({reply.tool})")
 
 
 def _order_type(value: object) -> str:
@@ -171,6 +207,19 @@ def _json_array(text: str | None) -> list[object] | None:
     except json.JSONDecodeError:
         return None
     return value if isinstance(value, list) else None
+
+
+def _json_object(text: str | None) -> dict[str, object] | None:
+    if text is None:
+        return None
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end < start:
+        return None
+    try:
+        value = json.loads(text[start : end + 1])
+    except json.JSONDecodeError:
+        return None
+    return value if isinstance(value, dict) else None
 
 
 def _stt(item: object) -> int | None:

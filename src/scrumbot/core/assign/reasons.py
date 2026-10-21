@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from scrumbot.core.assign.familiarity import AppFamiliarity
 from scrumbot.core.model import Level, Priority, RuleKind, TeamRule
 from scrumbot.core.normalize import app_key
-from scrumbot.core.rules.familiarity import AppFamiliarity
 
 PREASSIGNED_REASON = "Đã có người làm trên hệ thống"
 

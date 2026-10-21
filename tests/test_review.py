@@ -8,7 +8,7 @@ from datetime import date
 import pytest
 
 from scrumbot.core.model import Placement, SprintRow
-from scrumbot.core.rules.review import review
+from scrumbot.core.review.checks import blocking
 
 ENOUGH = "Thêm màn cài đặt và sửa luồng mua gói tháng."  # 44 characters
 
@@ -25,11 +25,11 @@ def _row(
 
 
 def _codes(row: SprintRow, how: Placement = Placement.NEW) -> list[str]:
-    return [item.code for item in review(row, how)]
+    return [item.code for item in blocking(row, how)]
 
 
 def test_a_ready_order_has_nothing_to_fix() -> None:
-    assert review(_row(), Placement.NEW) == ()
+    assert blocking(_row(), Placement.NEW) == ()
 
 
 @pytest.mark.parametrize(
@@ -41,7 +41,7 @@ def test_a_ready_order_has_nothing_to_fix() -> None:
     ],
 )
 def test_review_app_fires_without_an_app_and_says_where_to_fill_it(how: Placement, message: str) -> None:
-    (item,) = review(_row(app="  "), how)
+    (item,) = blocking(_row(app="  "), how)
 
     assert (item.code, item.message) == ("REVIEW-APP", message)
 
@@ -54,7 +54,7 @@ def test_review_app_fires_without_an_app_and_says_where_to_fill_it(how: Placemen
     ],
 )
 def test_review_due_fires_for_a_high_order_without_a_due_date(how: Placement, message: str) -> None:
-    (item,) = review(_row(priority="High"), how)
+    (item,) = blocking(_row(priority="High"), how)
 
     assert (item.code, item.message) == ("REVIEW-DUE", message)
 
@@ -70,7 +70,7 @@ def test_review_due_is_silent_with_a_due_date_or_below_high(priority: str, due: 
 def test_review_desc_fires_below_30_characters_without_links() -> None:
     linked = "Xem [link Figma] và [link Google Docs] nhé"  # "Xem và nhé": 10 characters once the links are gone
 
-    (item,) = review(_row(description=linked), Placement.NEW)
+    (item,) = blocking(_row(description=linked), Placement.NEW)
 
     assert (item.code, item.message) == (
         "REVIEW-DESC",
@@ -95,4 +95,4 @@ def test_an_order_that_already_has_a_person_is_not_reviewed() -> None:
     """A87: the order is kept as it is (D10), so nothing blocks it."""
     row = _row(app="", priority="urgent", description="", assignees=("Ngọc Văn Linh",))
 
-    assert review(row, Placement.BY_ID) == ()
+    assert blocking(row, Placement.BY_ID) == ()

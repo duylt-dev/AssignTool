@@ -2,8 +2,21 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from scrumbot.ai.prompt import MAX_EXAMPLES, PROMPT_BUDGET, AiReply, build_prompt, default_sizes, parse_reply
+import pytest
+
+from scrumbot.ai.prompt import (
+    MAX_EXAMPLES,
+    PROMPT_BUDGET,
+    QUESTION_DESC_LIMIT,
+    AiReply,
+    build_prompt,
+    build_question_prompt,
+    default_sizes,
+    parse_questions,
+    parse_reply,
+)
 from scrumbot.core.model import HistoryOrder, Order, Priority, Size, SprintRow
+from scrumbot.core.outcome import Questions
 
 
 def _order(
@@ -36,10 +49,10 @@ def test_build_prompt_has_exact_headers_removes_urls_and_never_includes_people()
     assert "Orders to size:\n- STT 7 · Camera · high · Fix crash · See [link] please" in prompt
     assert prompt.endswith(
         '[{"stt": <STT number>, "size": "S|M|L|XL", "reason": "<at most 20 words, in Vietnamese>",\n'
-        '  "type": "<type>", "items": ["<item>"], "tech_risks": ["<risk>"], "questions": ["<question>"]}]\n'
+        '  "type": "<type>", "items": ["<item>"], "tech_risks": ["<risk>"]}]\n'
     )
     assert "its type (ads, iap, flow_ui, policy, crash, sdk, feature or other)" in prompt
-    assert "also give at most 2 short questions in Vietnamese to the person who filed it" in prompt
+    assert "question" not in prompt  # the questions are the review's own call (A102)
     assert "Nguyen Van A" not in prompt
     assert "Tran Thi B" not in prompt
     assert "https://" not in prompt
@@ -165,19 +178,55 @@ def test_parse_reply_reads_the_understanding_fields_and_never_lets_them_change_t
     assert (sizes[3].size, sizes[3].kind) == (Size.XL, "")
 
 
-def test_parse_reply_keeps_at_most_two_questions_and_a_wrong_key_never_changes_the_size() -> None:
-    """A90: questions to the person who filed the order; bad values are dropped, the size stays."""
-    orders = (_order(1), _order(2))
-    long = "Có " + "x" * 300
-    reply = AiReply(
-        "agy",
-        '[{"stt": 1, "size": "M", "reason": "r", "questions": ["Màn nào?", "", "' + long + '", "Thừa?"]},'
-        ' {"stt": 2, "size": "S", "questions": "not a list"}]',
-        None,
+def test_parse_reply_ignores_a_questions_key() -> None:
+    """D64: the sizing reply has no questions; an extra key never changes the size."""
+    reply = AiReply("agy", '[{"stt": 1, "size": "S", "reason": "r", "questions": ["Màn nào?"]}]', None)
+
+    sizes, findings, _ = parse_reply(reply, (_order(1),))
+
+    assert (findings, sizes[1].size) == ((), Size.S)
+
+
+def test_the_question_prompt_holds_the_filed_order_alone_without_links() -> None:
+    row = SprintRow(
+        3, "1.0.2 - Add IAP", "Task", "Demo", (), "", "high", None, None, "Gói tháng https://x.io/a [người]"
     )
 
-    sizes, findings, _ = parse_reply(reply, orders)
+    prompt = build_question_prompt(row)
 
-    assert findings == ()
-    assert sizes[1].questions == ("Màn nào?", long[:200])
-    assert (sizes[2].size, sizes[2].questions) == (Size.S, ())
+    assert prompt.startswith("You review a change order of an Android app team before it is assigned to a developer.\n")
+    assert "The order:\n- Demo · high · 1.0.2 - Add IAP\n- Description: Gói tháng [link] [người]\n" in prompt
+    assert prompt.endswith(
+        'Reply with only a JSON object, no prose and no code fence:\n{"questions": ["<question>"]}\n'
+    )
+    assert "https://" not in prompt and "STT" not in prompt
+
+
+def test_the_question_prompt_cuts_the_description_and_names_what_is_missing() -> None:
+    row = SprintRow(3, "Fix", "Task", "", (), "", "", None, None, "x" * (QUESTION_DESC_LIMIT + 50))
+
+    prompt = build_question_prompt(row)
+
+    assert f"- (không có app) · (không có ưu tiên) · Fix\n- Description: {'x' * QUESTION_DESC_LIMIT}\n" in prompt
+    empty = build_question_prompt(SprintRow(3, "Fix", "Task", "Demo", (), "", "low", None, None, ""))
+    assert "- Description: (không có)\n" in empty
+
+
+def test_parse_questions_keeps_at_most_two_and_drops_empty_ones() -> None:
+    long = "Có " + "x" * 300
+    reply = AiReply("agy", '```json\n{"questions": ["Màn nào?", "", "' + long + '", "Thừa?"]}\n```', None)
+
+    assert parse_questions(reply) == Questions(("Màn nào?", long[:200]), True, "AI (agy)")
+    assert parse_questions(AiReply("agy", '{"questions": []}', None)) == Questions((), True, "AI (agy)")
+
+
+@pytest.mark.parametrize(
+    ("reply", "note"),
+    [
+        (AiReply("agy", None, "agy hết thời gian chờ"), "agy hết thời gian chờ"),
+        (AiReply("agy", "không có JSON", None), "không đọc được câu hỏi trong trả lời của AI"),
+        (AiReply("agy", '{"questions": "Màn nào?"}', None), "không đọc được câu hỏi trong trả lời của AI"),
+    ],
+)
+def test_parse_questions_gives_none_on_a_failure_or_another_form(reply: AiReply, note: str) -> None:
+    assert parse_questions(reply) == Questions((), False, note)

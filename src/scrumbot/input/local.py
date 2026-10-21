@@ -9,7 +9,7 @@ from pathlib import Path
 
 from scrumbot.core.errors import InputError
 from scrumbot.core.inputs import Inputs
-from scrumbot.core.rules.team_rules import check_rules
+from scrumbot.core.sprint.team_rules import check_rules
 from scrumbot.input.dev_api.config import load_config
 from scrumbot.input.dev_api.fetch import read_snapshot
 from scrumbot.input.files.devs_xlsx import read_devs

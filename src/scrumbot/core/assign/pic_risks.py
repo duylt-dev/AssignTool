@@ -5,13 +5,10 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from scrumbot.core.model import Assignment, Dev, Order, SizeEstimate, Source, TeamRule
-from scrumbot.core.model_risk import Risk, RiskGroup, RiskLevel
-from scrumbot.core.normalize import text_key
-from scrumbot.core.rules.assign import assign
-from scrumbot.core.rules.familiarity import FamiliarityIndex
-from scrumbot.core.rules.reasons import familiarity_text
-from scrumbot.core.rules.risk_register import (
+from scrumbot.core.assign.familiarity import FamiliarityIndex
+from scrumbot.core.assign.pic import assign
+from scrumbot.core.assign.reasons import familiarity_text
+from scrumbot.core.assign.risk_register import (
     URGENT,
     RiskContext,
     Suggest,
@@ -21,6 +18,9 @@ from scrumbot.core.rules.risk_register import (
     order_where,
     pic_codes,
 )
+from scrumbot.core.model import Assignment, Dev, Order, SizeEstimate, Source, TeamRule
+from scrumbot.core.model_risk import Risk, RiskGroup, RiskLevel
+from scrumbot.core.normalize import text_key
 
 
 def suggester(

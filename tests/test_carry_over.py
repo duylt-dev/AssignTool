@@ -1,5 +1,5 @@
+from scrumbot.core.assign.carry_over import BUSY_STATUSES, carry_over
 from scrumbot.core.model import Dev, Level, SprintRow, SprintView
-from scrumbot.core.rules.carry_over import BUSY_STATUSES, carry_over
 
 
 def test_carry_over_counts_busy_tasks_and_subtasks_once_per_pool_dev() -> None:

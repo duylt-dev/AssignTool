@@ -1,7 +1,7 @@
 from datetime import date
 
 from scrumbot.core.model import Priority, SprintRow, SprintView
-from scrumbot.core.rules.validate import orders_and_findings
+from scrumbot.core.sprint.validate import orders_and_findings
 
 
 def row(stt: int, **changes: object) -> SprintRow:
